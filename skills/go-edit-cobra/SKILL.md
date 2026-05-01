@@ -1,33 +1,58 @@
 ---
 name: go-edit-cobra
-description: "Use this when editing or adding subcommands to Go CLI. Triggers on: 'edit cmd/', 'add subcommand', 'scaffold cli', 'create go command'."
+description: "Use when authoring or editing a Go CLI built on spf13/cobra. Auto-triggers on any edit/create under ./cmd, plus phrases: 'scaffold cli', 'create go command', 'add subcommand', 'rename subcommand', 'remove subcommand', 'add flag to <cmd>', 'move <cmd> under <cmd>', 'edit cmd/'."
 ---
 
-# Edit cobra
+# Cobra CLI authoring
 
-Generate / Edit a Go CLI project with Cobra subcommands.
+Scaffold a new Cobra CLI, edit an existing one, or apply Cobra-specific design rules. Cobra-only — see "Out of scope" for non-Cobra layouts.
 
-## Interview
+General Go design philosophy lives in `instructions/go/go-general-design.instructions.md`. Go-version idioms live in `instructions/go/go-basics.instructions.md`. This file owns Cobra-specific structure, naming, helpers, and edit mechanics — do not restate the other two.
 
-Before generating files, gather the following from the user. If provided inline (e.g. "scaffold go mytool with serve and migrate"), extract values directly — only ask for missing required fields.
+## When this skill applies
 
-| Parameter         | Required | Default                    | Example                    |
-| ----------------- | -------- | -------------------------- | -------------------------- |
-| Project name      | yes      | -                          | `mytool`                   |
-| Module root       | yes      | -                          | `tools/mytool`             |
-| Go module path    | no       | `github.com/watage/<name>` | `github.com/watage/mytool` |
-| Short description | no       | `<name> CLI tool.`         | `My awesome tool.`         |
-| Subcommands       | no       | _(none)_                   | `serve`, `migrate`         |
+Activates when **either** condition holds:
 
-**Module root** is the directory that will contain `go.mod`. The binary's package always lives at `<module-root>/cmd/<name>/`, never directly at the module root. See "Project layout" below for the exact tree.
+- The user message contains: `scaffold cli`, `create go command`, `add subcommand`, `rename subcommand`, `remove subcommand`, `add flag to <cmd>`, `move <cmd> under <cmd>`, `edit cmd/`.
+- The agent is about to edit or create files under `./cmd/`.
 
-Subcommands can be nested using **dot notation** (`server.start`, `server.stop`) or natural language ("a server group containing start and stop"). When a dotted subcommand is given, the part before the dot becomes a parent group command and the part after becomes a child leaf command.
+After activation, run the pre-flight checks below before any edit.
 
-For each subcommand, ask for a short description if not provided. Default to `<Name> subcommand.`.
+## Pre-flight checks
 
-## Project layout
+1. **Cobra detection.** Look for `github.com/spf13/cobra` in `go.mod` or any import. If absent, do not apply Cobra rules — ask whether to introduce Cobra, otherwise stop.
+2. **Layout classification.** Categorize the project:
+   - **Canonical** — `<root>/cmd/<name>/main.go` + `<root>/cmd/<name>/commands/` + `<root>/cmd/internal/cmdsignals/` exist. → Proceed.
+   - **Close variant** — `cmd/<name>/main.go` + `cmd/<name>/commands/` exist but `cmd/internal/` differs (e.g. helpers under module-root `internal/`, no `cmdsignals` yet). → Proceed; do not force-migrate existing files.
+   - **Non-canonical Cobra** — e.g. `cmd/root.go` at module root, or `cobra-cli` defaults. → **Stop and ask.** Likely mid-migration or accidental drift.
+   - **Non-Cobra** — no Cobra import. → Out of scope; report and stop.
 
-The skill always generates this exact tree. `<module-root>` is the path from the Interview; `<name>` is the project name. Subcommand files in `commands/` depend on what the user requested, but everything else is fixed.
+## Cobra design rules
+
+These rules are Cobra-specific. The "thin run function" rule is a Cobra-mechanics consequence of the broader "no business logic under `./cmd`" rule in `go-general-design.instructions.md` — do not restate that rule here.
+
+- **`RunE` only**, never `Run`. Return errors; do not `os.Exit` from a command body.
+- **Root command**: `SilenceUsage: true`, `SilenceErrors: true`. Delegate to a named `runRoot`.
+- **Default `Args`**: `cobra.NoArgs`. **Change it** when positional arguments fit the command better — e.g. `cobra.ExactArgs(1)`, `cobra.MinimumNArgs(1)`, `cobra.MaximumNArgs(2)`, `cobra.RangeArgs(1, 3)`, `cobra.MatchAll(cobra.ExactArgs(1), customValidator)`. Treat positional args as the natural shape when the command operates on a target (`mytool inspect <path>`, `mytool delete <id>...`); flags are for options on top of that target. The templates set `cobra.NoArgs` as a safe placeholder, not a recommendation.
+- **Command vars**: package-level `var xxxCmd = &cobra.Command{...}`. `init()` calls `<parent>Cmd.AddCommand(xxxCmd)`.
+- **Run functions are named** (`runXxx`), not inline closures.
+- **Run functions are thin wiring**: read flags, read positional args, call a service, return its error.
+- **Group parents**: no `RunE`, no `Args` by default. They MAY own persistent flags / aliases / pre-run hooks when intentional.
+
+### Canonical flag pattern
+
+Package-level `var (...)` block whose values are the pointer returned by `xxxCmd.Flags().<Type>(...)` or `xxxCmd.PersistentFlags().<Type>(...)`. Read via the package-level pointer; do not call `cmd.Flags().Get*` from inside `runXxx`.
+
+```go
+var (
+    flagName = rootCmd.PersistentFlags().String("name", "default", "description of option")
+    flagPort = rootCmd.PersistentFlags().Int("port", 8080, "listen port")
+)
+```
+
+Exception: when a flag must bind into an external configuration struct, use the `var name T` + `init()` `StringVar`-style form. The `*T` form is the default.
+
+## Project layout (canonical)
 
 ```
 <module-root>/
@@ -37,47 +62,42 @@ The skill always generates this exact tree. `<module-root>` is the path from the
     │   ├── main.go
     │   └── commands/
     │       ├── root.go
-    │       ├── <subcmd>.go              # one per flat subcommand
-    │       ├── <parent>.go              # one per parent group (no RunE)
+    │       ├── <subcmd>.go              # one per flat leaf
+    │       ├── <parent>.go              # one per group (no RunE)
     │       └── <parent>_<child>.go      # one per nested leaf
     └── internal/
         ├── cmdsignals/
-        │   └── signals.go         # always generated
-        └── stdiopipe/              # only when a subcommand needs cancellable stdio
-            └── stdiopipe.go
-```
-
-Worked example — `mytool` at `tools/mytool` with subcommands `serve` (long-running, needs cancellable stdout), `db.migrate`, `db.query`:
-
-```
-tools/mytool/
-├── go.mod
-└── cmd/
-    ├── mytool/
-    │   ├── main.go
-    │   └── commands/
-    │       ├── root.go
-    │       ├── serve.go
-    │       ├── db.go              # parent group, no RunE
-    │       ├── db_migrate.go      # leaf, init() wires to dbCmd
-    │       └── db_query.go        # leaf, init() wires to dbCmd
-    └── internal/
-        ├── cmdsignals/
-        │   └── signals.go
-        └── stdiopipe/              # included because `serve` needs it
+        │   └── signals.go               # always present
+        └── stdiopipe/                   # only when a subcommand needs cancellable stdio
             └── stdiopipe.go
 ```
 
 Why this shape:
 
-- Binary entrypoint and its `commands/` package live under `cmd/<name>/` so a future second binary can be added as a sibling `cmd/<other>/` without moving any existing files.
-- Shared helpers (`cmdsignals`, `stdiopipe`) live at `cmd/internal/` — siblings of `cmd/<name>/` — so they are reusable across binaries while still scoped to the `cmd/` tree by Go's `internal/` rules.
-- Never put `commands/` directly at the module root. See "Anti-patterns" at the bottom.
+- `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
+- `cmd/internal/` is a sibling of all binary packages, sharing helpers under Go's `internal/` rule.
+- Never put `commands/` directly at the module root. See "Anti-patterns".
+
+## Naming conventions
+
+### Flat subcommands
+
+- **Var**: `{{camelCase}}Cmd` — e.g. `serve` → `serveCmd`, `dry-run` → `dryRunCmd`.
+- **Run function**: `run{{PascalCase}}` — e.g. `runServe`, `runDryRun`.
+- **File name**: `commands/<subcmd>.go` preserving hyphens — `commands/serve.go`, `commands/dry-run.go`.
+- **Wiring**: `init()` calls `rootCmd.AddCommand(xxxCmd)`.
+
+### Nested subcommands
+
+- **File name**: `commands/{{parent}}_{{child}}.go` — underscore-joined, hyphens preserved per segment. `server start` → `commands/server_start.go`. 3-level: `commands/db_migrate_up.go`.
+- **Var**: concatenate camelCase — `serverStartCmd`, `dbMigrateUpCmd`.
+- **Run function**: concatenate PascalCase — `runServerStart`, `runDbMigrateUp`.
+- **Parent group**: no `RunE`, no `Args` by default.
+- **Wiring**: child `init()` calls `<parentCamel>Cmd.AddCommand(...)`, not `rootCmd`.
 
 ## Templates
 
-This is templates but you **must** **strictly** follow the order of elements.
-DO NOT REORDER THINGS.
+These are templates. **Strictly follow** the order of elements. Do **NOT** reorder.
 
 ### `cmd/{{NAME}}/main.go`
 
@@ -92,11 +112,11 @@ import (
 
 	"github.com/ngicks/go-common/contextkey"
 	"{{MODULE}}/cmd/{{NAME}}/commands"
-    "{{MODULE}}/cmd/internal/cmdsignals"
+	"{{MODULE}}/cmd/internal/cmdsignals"
 )
 
 func main() {
-    logger := slog.New(
+	logger := slog.New(
 		slog.NewJSONHandler(
 			os.Stdout,
 			&slog.HandlerOptions{
@@ -108,15 +128,14 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
-        cmdsignals.ExitSignals[:]...,
+		cmdsignals.ExitSignals[:]...,
 	)
 	defer stop()
 
-
-    ctx = contextkey.WithSlogLogger(ctx, logger)
+	ctx = contextkey.WithSlogLogger(ctx, logger)
 
 	if err := commands.Execute(ctx); err != nil {
-        logger.ErrorContext(ctx, "stopped with an error", slog.Any("err", err))
+		logger.ErrorContext(ctx, "stopped with an error", slog.Any("err", err))
 		os.Exit(1)
 	}
 }
@@ -129,41 +148,64 @@ package commands
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/spf13/cobra"
 )
 
 func Execute(ctx context.Context) error {
-    return rootCmd.ExecuteContext(ctx)
+	return rootCmd.ExecuteContext(ctx)
 }
 
 var rootCmd = &cobra.Command{
-		Use:           "{{NAME}}",
-		Short:         "{{SHORT_DESCRIPTION}}",
-		SilenceUsage:  true,
-		SilenceErrors: true,
-		Args:          cobra.NoArgs,
-		RunE: runRoot,
+	Use:           "{{NAME}}",
+	Short:         "{{SHORT_DESCRIPTION}}",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Args:          cobra.NoArgs,
+	RunE:          runRoot,
 }
 
 var (
-   flagA = rootCmd.PersistentFlags().String("name", "default value", "description of opton")
-   flagB = rootCmd.PersistentFlags().String(...)
+	flagName = rootCmd.PersistentFlags().String("name", "default", "description of option")
 )
 
 func runRoot(cmd *cobra.Command, args []string) error {
-    return cmd.Help()
+	return cmd.Help()
 }
 
 // TODO: you may add initialization logic for root internal service construct here.
 ```
 
-The TODO comment line is marker for implementor: just leave it there.
+The TODO comment is a marker for the implementor — leave it.
 
-### `cmd/{{NAME}}/commands/<parent>.go` (parent group command — no `RunE`)
+### `cmd/{{NAME}}/commands/<subcmd>.go` (flat leaf)
 
-When a subcommand has children (e.g. `server.start`), the parent is a grouping command with no run logic. Cobra shows help by default.
+```go
+package commands
+
+import "github.com/spf13/cobra"
+
+func init() {
+	rootCmd.AddCommand({{subCamel}}Cmd)
+}
+
+var {{subCamel}}Cmd = &cobra.Command{
+	Use:   "{{sub-name}}",
+	Short: "{{Sub short description}}",
+	Args:  cobra.NoArgs,
+	RunE:  run{{SubPascal}},
+}
+
+func run{{SubPascal}}(cmd *cobra.Command, args []string) error {
+	// TODO: implement {{sub-name}}
+	// This function should only wire flags and positional arguments into the
+	// configuration of an internal service, then invoke it.
+	// Do not put business logic here.
+	return nil
+}
+```
+
+### `cmd/{{NAME}}/commands/<parent>.go` (parent group — no `RunE`)
 
 ```go
 package commands
@@ -175,16 +217,14 @@ func init() {
 }
 
 var {{parentCamel}}Cmd = &cobra.Command{
-    Use:   "{{parent-name}}",
-    Short: "{{Parent short description}}",
+	Use:   "{{parent-name}}",
+	Short: "{{Parent short description}}",
 }
 
 // TODO: you may add initialization logic for sub internal service construct here.
 ```
 
-The TODO comment line is marker for an implementor: just leave it there.
-
-### `cmd/{{NAME}}/commands/{{parent}}_{{child}}.go` (child leaf command, wired to parent)
+### `cmd/{{NAME}}/commands/<parent>_<child>.go` (nested leaf)
 
 ```go
 package commands
@@ -196,228 +236,156 @@ func init() {
 }
 
 var {{parentCamel}}{{ChildPascal}}Cmd = &cobra.Command{
-    Use:   "{{child-name}}",
-    Short: "{{Child short description}}",
-    Args:  cobra.NoArgs,
-    RunE:  run{{ParentPascal}}{{ChildPascal}},
+	Use:   "{{child-name}}",
+	Short: "{{Child short description}}",
+	Args:  cobra.NoArgs,
+	RunE:  run{{ParentPascal}}{{ChildPascal}},
 }
 
 func run{{ParentPascal}}{{ChildPascal}}(cmd *cobra.Command, args []string) error {
-    // TODO: implement {{parent-name}} {{child-name}}
-    // This function should only wire flags and positional arguments into the
-    // configuration of an internal service, then invoke it.
-    // Do not put business logic here.
-    return nil
+	// TODO: implement {{parent-name}} {{child-name}}
+	// This function should only wire flags and positional arguments into the
+	// configuration of an internal service, then invoke it.
+	// Do not put business logic here.
+	return nil
 }
 ```
 
-The comment lines are marker for an implementor: just leave it there.
+Differences vs. flat:
 
-Key differences from flat subcommands:
-
-- Parent command has **no `RunE`/`Args`** — it's just a group (shows help by default)
-- Child file name uses **underscore** to join levels: `commands/server_start.go`
-- Child var name concatenates: `serverStartCmd`
-- Child `init()` wires to **parent var**, not `rootCmd`
-- 3rd level follows the same pattern: `commands/server_start_foo.go`, wired to `serverStartCmd`
-
-### Internal helpers
-
-`cmdsignals` is always generated — `main.go` imports it. Import path: `{{MODULE}}/cmd/internal/cmdsignals`.
-
-`stdiopipe` is **only generated on demand** — when a subcommand actually needs cancellable stdio (e.g. a long-running `serve` or a streaming command that must unblock on `ctx.Done()`). Do not generate it speculatively. Import path when used: `{{MODULE}}/cmd/internal/stdiopipe`.
-
-#### `cmd/internal/cmdsignals/signals.go`
-
-```go
-package cmdsignals
-
-import (
-	"os"
-	"syscall"
-)
-
-// ExitSignals are the signals that should cancel top-level CLI execution.
-var ExitSignals = [...]os.Signal{
-	os.Interrupt,
-	syscall.SIGTERM,
-}
-```
-
-#### `cmd/internal/stdiopipe/stdiopipe.go`
-
-```go
-// Package stdiopipe provides a cancellable reader backed by os.Stdin.
-package stdiopipe
-
-import (
-	"context"
-	"io"
-	"os"
-	"sync"
-)
-
-var (
-	onceStdin  sync.Once
-	onceStdout sync.Once
-	onceStderr sync.Once
-)
-
-// Stdin returns an [io.ReadCloser] which is piped to [os.Stdin] through an [io.Pipe].
-//
-// This is necessary because Read calls on [os.Stdin] cannot be unblocked by closing it.
-//
-// Only one invocation is allowed per process; a second call will panic.
-func Stdin(ctx context.Context) io.ReadCloser {
-	var pr *io.PipeReader
-	called := false
-	onceStdin.Do(func() {
-		called = true
-		var pw *io.PipeWriter
-		pr, pw = io.Pipe()
-		go func() {
-			<-ctx.Done()
-			pr.CloseWithError(ctx.Err())
-		}()
-		go func() {
-			_, err := io.Copy(pw, os.Stdin)
-			pw.CloseWithError(err)
-		}()
-	})
-	if !called {
-		panic("stdiopipe: Stdin is called more than once")
-	}
-	return pr
-}
-
-func stdout(ctx context.Context, label string, out *os.File, once *sync.Once) io.WriteCloser {
-	var pw *io.PipeWriter
-	called := false
-	once.Do(func() {
-		called = true
-		var pr *io.PipeReader
-		pr, pw = io.Pipe()
-		go func() {
-			<-ctx.Done()
-			pw.CloseWithError(ctx.Err())
-		}()
-		go func() {
-			_, err := io.Copy(out, pr)
-			pr.CloseWithError(err)
-		}()
-	})
-	if !called {
-		panic("stdiopipe: " + label + " is called more than once")
-	}
-	return pw
-}
-
-// Stdout returns an [io.WriteCloser] which is piped to [os.Stdout] through an [io.Pipe].
-//
-// This is necessary because Write calls on [os.Stdout] cannot be unblocked by closing it.
-//
-// Only one invocation is allowed per process; a second call will panic.
-func Stdout(ctx context.Context) io.WriteCloser {
-	return stdout(ctx, "Stdout", os.Stdout, &onceStdout)
-}
-
-// Stderr returns an [io.WriteCloser] which is piped to [os.Stderr] through an [io.Pipe].
-//
-// This is necessary because Write calls on [os.Stderr] cannot be unblocked by closing it.
-//
-// Only one invocation is allowed per process; a second call will panic.
-func Stderr(ctx context.Context) io.WriteCloser {
-	return stdout(ctx, "Stderr", os.Stderr, &onceStderr)
-}
-```
+- Parent has no `RunE` / `Args`.
+- Child file uses underscore between levels.
+- Child var concatenates: `serverStartCmd`.
+- Child `init()` wires to **parent var**, not `rootCmd`.
+- 3-level follows the same pattern (`server_start_foo.go`, wired to `serverStartCmd`).
 
 ### `go.mod`
 
 ```
 module {{MODULE}}
 
-go 1.26.0 // latest major with .0
+go {{GO_VERSION}} // latest major with .0, e.g. 1.26.0
 
 require (
-    github.com/ngicks/go-common/contextkey v0.2.0
-    github.com/spf13/cobra v1.10.2
+	github.com/ngicks/go-common/contextkey v0.0.0 // resolved by `go get @latest`
+	github.com/spf13/cobra v0.0.0                 // resolved by `go get @latest`
 )
 ```
 
-- Version notation is just for display; use latest possible version.
-- Go version must stay .0 of latest major version.
-  - The user may instruct to use exact versions like "use go1.26.2", in that case set that value.
+Version policy:
 
-## Naming Conventions
+- **Go version**: latest major with `.0` (e.g. `go 1.26.0`). User may override with an explicit version.
+- **Direct dependencies**: latest possible. Workflow: `go get <module>@latest` for each direct dep, then `go mod tidy`. (Plain `tidy` does not bump already-required modules.)
 
-### Flat subcommands
+## Workflows
 
-- **Command vars**: `{{camelCase}}Cmd` — package-level `var` of `*cobra.Command`. Examples:
-  - `serve` -> `serveCmd`
-  - `dry-run` -> `dryRunCmd`
-  - `db-migrate` -> `dbMigrateCmd`
-- **Run functions**: `run{{CamelCase}}` — separate named function, not inline closure. Examples:
-  - `serve` -> `runServe`
-  - `dry-run` -> `runDryRun`
-  - `db-migrate` -> `runDbMigrate`
-- **Wiring**: each subcommand file uses `init()` to call `rootCmd.AddCommand(xxxCmd)`
-- **File names**: `commands/<subcmd>.go` using the exact subcommand name (e.g. `commands/serve.go`, `commands/dry-run.go`)
+### Scaffold a new project
 
-### Nested subcommands
+Interview (extract from user message inline; only ask for missing required fields):
 
-- **File names**: `commands/{{parent}}_{{child}}.go` — underscore-joined, preserving hyphens within each segment. Examples:
-  - `server start` -> `commands/server_start.go`
-  - `db dry-run` -> `commands/db_dry-run.go`
-  - `db migrate up` (3 levels) -> `commands/db_migrate_up.go`
-- **Var names**: concatenate camelCase segments. Examples:
-  - `server` + `start` -> `serverStartCmd`
-  - `db` + `migrate` + `up` -> `dbMigrateUpCmd`
-- **Run functions**: concatenate PascalCase segments. Examples:
-  - `server start` -> `runServerStart`
-  - `db migrate up` -> `runDbMigrateUp`
-- **Parent commands**: no `RunE`, no `Args` — cobra shows help by default
-- **Wiring**: child `init()` calls `{{parentCamel}}Cmd.AddCommand(...)`, not `rootCmd`
+| Parameter         | Required | Default                    | Example                    |
+| ----------------- | -------- | -------------------------- | -------------------------- |
+| Project name      | yes      | -                          | `mytool`                   |
+| Module root       | yes      | -                          | `tools/mytool`             |
+| Go module path    | no       | `github.com/watage/<name>` | `github.com/watage/mytool` |
+| Short description | no       | `<name> CLI tool.`         | `My awesome tool.`         |
+| Subcommands       | no       | _(none)_                   | `serve`, `migrate`         |
 
-### General rules
+Subcommands accept dot notation (`server.start`) or natural language ("a server group containing start and stop"). Dotted = parent group + child leaf.
 
-- **Always use `RunE`**, never `Run` — return errors instead of calling `os.Exit`
-- **Default `Args`**: `cobra.NoArgs` unless the user specifies arguments
-- **Root command**: package-level `var rootCmd`, delegates to `runRoot` which calls `cmd.Help()`
-- **SilenceUsage + SilenceErrors**: always set on root command
-- **Flags**: package-level `var` block using `rootCmd.PersistentFlags()` or `xxxCmd.Flags()` in a separate `init()`
+Generation steps (relative to module root):
 
-## Generation Steps
-
-Refer to "Project layout" for the canonical tree. Every path below is relative to the **module root** (the directory containing `go.mod`).
-
-1. Resolve all parameters (interview or extract from user message).
-2. Write `go.mod` at the module root.
+1. Resolve all parameters.
+2. Write `go.mod` (with placeholder `v0.0.0` lines per the template).
 3. Write `cmd/<name>/main.go`.
-4. Write `cmd/<name>/commands/root.go` with `rootCmd` var and `Execute` function.
-5. Write one `cmd/<name>/commands/<subcmd>.go` per flat subcommand (each with its own `init()` for `rootCmd.AddCommand(...)` wiring).
-6. For nested commands, write the **parent file before child files** (children reference parent vars via `init()`):
-   - Parent: `cmd/<name>/commands/<parent>.go` with no `RunE`/`Args`.
-   - Child: `cmd/<name>/commands/<parent>_<child>.go`, init() calls `<parentCamel>Cmd.AddCommand(...)`.
-7. Write `cmd/internal/cmdsignals/signals.go` (always — `main.go` imports it). Write `cmd/internal/stdiopipe/stdiopipe.go` **only if** a generated subcommand needs cancellable stdio; skip otherwise.
-8. Run `cd <module-root> && go mod tidy` to resolve dependencies.
-9. Report the generated file list to the user.
+4. Write `cmd/<name>/commands/root.go`.
+5. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf.
+6. For nested commands, write the parent **before** child files. Then write children.
+7. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
+8. For each direct dep in `go.mod`: `go get <module>@latest`.
+9. `go mod tidy`.
+10. Run the post-edit validation chain (see below).
+11. Report the generated file list to the user.
 
-Use the **Write** tool for every file — Write creates parent directories as needed, so do not run `mkdir` separately.
+Use **Write** for every file. Write creates parent directories — do not run `mkdir` separately.
 
-## Important
+### Edit an existing project
 
-- Generate files using the **Write** tool — do not use helper scripts
-- Keep generated code minimal — no extra helpers, no unused imports
-- If the user provides flags, add them as a separate `init()` block in the subcommand file (persistent flags on `rootCmd`, local flags on `xxxCmd`)
-- `main.go` always sets up a `slog.Logger` (JSON handler, debug level, with source) and stores it in context via `contextkey.WithSlogLogger`
+Pre-flight checks first (Cobra detection, layout classification). Then pick the operation; each entry below lists what to touch.
+
+#### Subcommand structure
+
+| Operation                           | Files / actions                                                                                                                                                             | Ask the user when                                                                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Add flat subcommand                 | new `commands/<subcmd>.go` (flat-leaf template)                                                                                                                             | —                                                                                                                                     |
+| Add nested subcommand               | new `commands/<parent>_<child>.go`; if parent missing, also write `commands/<parent>.go`                                                                                    | —                                                                                                                                     |
+| Rename subcommand                   | rename file, rename `<old>Cmd` → `<new>Cmd`, rename `run<Old>` → `run<New>`, update `init()` `AddCommand` call. Search for any external reference (tests, docs, completion) | —                                                                                                                                     |
+| Remove leaf                         | delete file                                                                                                                                                                 | —                                                                                                                                     |
+| Remove group                        | delete file + all children                                                                                                                                                  | If children exist (cascade vs refuse)                                                                                                 |
+| Promote leaf → group                | drop `RunE` from leaf var, split logic into a new child file                                                                                                                | Where original `RunE` body, `Args`, `Aliases`, `Example`, `PreRunE`, `PostRunE`, and flags go (parent persistent / new child / split) |
+| Demote group → leaf                 | merge child into parent var, give it a `RunE`                                                                                                                               | If children exist (merge / refuse)                                                                                                    |
+| Move leaf under different parent    | rename file (`<old-parent>_<name>.go` → `<new-parent>_<name>.go`), rename var, rename run func, rewire `init()` to new parent                                               | If new parent missing                                                                                                                 |
+| Move subtree under different parent | rename every descendant file / var / run func; rewire each `init()`                                                                                                         | If new parent missing                                                                                                                 |
+
+#### Flag
+
+| Operation                               | Files / actions                                                                                                                                                                                                                              |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add                                     | extend the package-level `var` block in the target command file; choose persistent (root or group) vs local (leaf)                                                                                                                           |
+| Remove                                  | drop from `var` block; remove every read                                                                                                                                                                                                     |
+| Rename                                  | flag-name string + Go identifier in `var` block; check `Flags().Lookup`, `Flag(name)`, `Flags().Get*`, `LocalFlags()`, `InheritedFlags()`, `BindPFlag`/Viper bindings, env-var names, `RegisterFlagCompletionFunc`, tests, READMEs, examples |
+| Change type                             | update the `var` declaration call (`String` → `Int` etc.) and every read                                                                                                                                                                     |
+| Change default / shorthand / usage text | update the `var` declaration arguments                                                                                                                                                                                                       |
+| Move scope (persistent ↔ local)        | move the `var` declaration to the appropriate command's `Flags()` / `PersistentFlags()`; update reads if scope name changes                                                                                                                  |
+| Mark required / hidden / deprecated     | call `cmd.MarkFlagRequired(name)` / `Flags().MarkHidden(name)` / `Flags().MarkDeprecated(name, "msg")` in `init()`                                                                                                                           |
+
+#### Command metadata
+
+`Use`, `Short`, `Long`, `Example`, `Aliases`, `Annotations`, `SuggestFor`, `Hidden`, `Deprecated` — edit the `cobra.Command` literal in the target file.
+
+`PreRunE`, `PostRunE`, `PersistentPreRunE`, `PersistentPostRunE` — set on the `cobra.Command` literal; assign a named function (`preRunXxx`, `postRunXxx`) defined in the same file.
+
+#### Completion
+
+- **Positional-argument completion**: set `ValidArgs`, `ValidArgsFunction`, or `cobra.FixedCompletions(...)` on the `cobra.Command` literal.
+- **Flag-value completion**: call `cmd.RegisterFlagCompletionFunc(name, fn)` in `init()`.
+
+## Helper catalog
+
+Brief catalog only — full source lives at `${SKILL-DIR}/helpers/cmd/internal/<helper>/`. To emit, copy the file into `<project-root>/cmd/internal/<helper>/...` (paths line up 1:1).
+
+| Helper       | Import path                          | Purpose                                                          | Signature(s)                                                                           | Use when                                                                                                    |
+| ------------ | ------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `cmdsignals` | `{{MODULE}}/cmd/internal/cmdsignals` | exit-signal list for `signal.NotifyContext`                      | `var ExitSignals [...]os.Signal`                                                       | Always when scaffolding (main.go imports it). For existing projects, only when adopting this template.      |
+| `stdiopipe`  | `{{MODULE}}/cmd/internal/stdiopipe`  | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe` | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser` | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics. |
+
+## Post-edit validation
+
+Run after **every** edit and after scaffolding, in this order:
+
+1. `go mod tidy` — only when imports / dependencies changed.
+2. `goimports -w <changed_files>`. If `goimports` is missing, run `go install golang.org/x/tools/cmd/goimports@latest`. If install fails, fall back to `gofmt -w` and surface the install failure to the user.
+3. `go vet ./...` — full module. Cobra `init()` wiring crosses package boundaries, so package-scoped vet is unsafe.
+4. `go test ./...` — full module.
+
+Edits in this skill are best-effort textual changes. The validation chain (vet + test) is the safety net for rename / move operations that touch identifiers across many files.
 
 ## Anti-patterns
 
-Do not generate any of these. They look superficially shorter but break the layout contract.
+Do not generate any of these — they look superficially shorter but break the layout contract.
 
-- **`commands/` at the module root** (i.e. `<module-root>/commands/...` instead of `<module-root>/cmd/<name>/commands/...`). Adding a second binary later forces a rename of every import path. The `cmd/<name>/` wrapper costs nothing today and avoids that churn.
-- **`main.go` at the module root**. Same reason — the entrypoint must live at `cmd/<name>/main.go` so a sibling `cmd/<other>/main.go` can be added without moving anything.
-- **`internal/` at the module root** for the helpers in this skill. They go at `cmd/internal/` so they are scoped to binaries under `cmd/` and shared across them. (A separate module-root `internal/` for non-CLI library code is fine and unrelated.)
-- **Importing `{{MODULE}}/commands`** anywhere. The only correct import for the commands package is `{{MODULE}}/cmd/<name>/commands`. If you find yourself writing the shorter form, the layout is wrong — fix the layout, not the import.
-- **Skipping `cmdsignals`**. It is always generated — `main.go` imports it.
-- **Generating `stdiopipe` speculatively**. Only generate it when a concrete subcommand actually needs cancellable stdio. An unused helper file is dead weight.
+- **`commands/` at the module root** (i.e. `<root>/commands/...` instead of `<root>/cmd/<name>/commands/...`). A second binary forces a rename of every import path.
+- **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
+- **`internal/` at the module root for these helpers.** They go at `cmd/internal/`. (A separate module-root `internal/` for non-CLI library code is fine.)
+- **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
+- **Skipping `cmdsignals`.** Always generated for scaffold; `main.go` imports it.
+- **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
+- **Reading flags via `cmd.Flags().Get*`** when a package-level `*T` pointer exists. Use the pointer.
+- **Putting business logic inside `RunE`.** Business logic lives outside `./cmd` per `go-general-design.instructions.md`.
+
+## Out of scope
+
+- Migrating non-canonical projects to the canonical layout (skill detects + asks; user drives migration).
+- Frameworks other than `spf13/cobra`.
+- `cobra-cli` code generation.
+- AST-based rewriting (`go/ast`, `dst`); plain `Edit` / `Write` only.
