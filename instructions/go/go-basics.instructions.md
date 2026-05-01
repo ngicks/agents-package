@@ -38,8 +38,6 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 - **DON'T** use `ReverseProxy.Director` — use `ReverseProxy.Rewrite` (header-stripping safe).
 - **DO** prefer `HTTP2Config.StrictMaxConcurrentRequests` for connection-pool control.
 
----
-
 #### Go 1.25
 
 ##### Language / Compiler
@@ -70,8 +68,6 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 - **DON'T** call `testing.AllocsPerRun` from a parallel test (now panics).
 - **DON'T** use SHA-1 signatures in TLS 1.2 (RFC 9155).
 - **DON'T** use `go/parser.ParseDir` or `go/ast.FilterPackage`/`PackageExports`/`MergePackageFiles` (deprecated).
-
----
 
 #### Go 1.24
 
@@ -129,8 +125,6 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 - **DO** use `go:wasmexport` for WASM exports.
 - **DON'T** use `math/rand.Seed` (use `math/rand/v2`).
 
----
-
 #### Go 1.23
 
 ##### Language
@@ -181,8 +175,6 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 ##### Other Stdlib Additions
 
 - **DO** use `encoding/binary.Encode/Decode/Append`, `sync.Map.Clear`, `sync/atomic.And/Or`, `unicode/utf16.RuneLen`, `runtime/debug.SetCrashOutput`.
-
----
 
 #### Go 1.22
 
