@@ -3,9 +3,9 @@ name: go-edit-cobra
 description: "Use this when editing or adding subcommands to Go CLI. Triggers on: 'edit cmd/', 'add subcommand', 'scaffold cli', 'create go command'."
 ---
 
-# Scaffold Go Cobra CLI
+# Edit cobra
 
-Generate a Go CLI project with Cobra subcommands.
+Generate / Edit a Go CLI project with Cobra subcommands.
 
 ## Interview
 
