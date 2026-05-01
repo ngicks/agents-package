@@ -3,21 +3,19 @@ description: "Up to date basic Go rules (Go 1.22 - 1.26)"
 applyTo: "**/*.go"
 ---
 
-# Go Version Cheat Sheet (1.22 → 1.26)
+### Go Version Cheat Sheet (1.22 → 1.26)
 
 Apply rules from the highest Go version declared in `go.mod`. Lower versions inherit prior rules unless superseded.
 
----
+#### Go 1.26
 
-## Go 1.26
-
-### Language
+##### Language
 
 - **DO** use `new(<expr>)` to create pointers from expressions (e.g. `new("foo")`, `new(true)`, `new(yearsSince(born))`).
   - **DON'T** define a helper like `func ptr[T any](v T) *T`.
 - **DO** use self-referential generic type constraints when needed: `type Adder[A Adder[A]] interface { Add(A) A }`.
 
-### Crypto / TLS
+##### Crypto / TLS
 
 - **DO** use new `crypto/hpke` (RFC 9180 HPKE).
 - **DO** use `testing/cryptotest.SetGlobalRandom()` for deterministic crypto tests.
@@ -28,7 +26,7 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 - **DON'T** use `big.Int` fields on `crypto/ecdsa.PublicKey` / `PrivateKey` (deprecated).
 - **DO** implement `crypto.MessageSigner` on `Certificate.PrivateKey` for TLS 1.2+.
 
-### Standard Library
+##### Standard Library
 
 - **DO** use `errors.AsType[T]` (generic, allocation-free `errors.As`).
 - **DO** use `bytes.Buffer.Peek()` for non-destructive reads.
@@ -42,9 +40,9 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 
 ---
 
-## Go 1.25
+#### Go 1.25
 
-### Language / Compiler
+##### Language / Compiler
 
 - **DO** check errors **before** using results — the compiler no longer delays nil checks past use sites.
   ```go
@@ -54,7 +52,7 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
   ```
 - **DON'T** dereference results before the error check.
 
-### Standard Library
+##### Standard Library
 
 - **DO** use `testing/synctest` (graduated, no longer experimental).
   ```go
@@ -75,19 +73,19 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 
 ---
 
-## Go 1.24
+#### Go 1.24
 
-### Language
+##### Language
 
 - **DO** use generic type aliases: `type MyAlias[T any] = SomeType[T]` (fully supported).
 
-### Testing
+##### Testing
 
 - **DO** write benchmarks with `for b.Loop() { ... }` instead of `for i := 0; i < b.N; i++`.
 - **DO** use `T.Context()` / `B.Context()` and `T.Chdir()` / `B.Chdir()`.
 - **DO** address `tests` analyzer findings (malformed test/example signatures).
 
-### Crypto
+##### Crypto
 
 - **DO** use stdlib equivalents instead of `golang.org/x/crypto`: `crypto/hkdf`, `crypto/pbkdf2`, `crypto/sha3`, `crypto/mlkem`.
 - **DO** use `crypto/cipher.NewGCMWithRandomNonce()` for auto nonce generation.
@@ -102,40 +100,40 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
 - **DON'T** rely on `crypto/rand.Read` returning errors — it now crashes.
 - **DON'T** use `X25519Kyber768Draft00` (use `X25519MLKEM768`).
 
-### Filesystem
+##### Filesystem
 
 - **DO** use `os.OpenRoot` / `os.Root` for path-traversal-safe FS access.
 
-### Iterators / Hashing / Weak Refs
+##### Iterators / Hashing / Weak Refs
 
 - **DO** use `bytes.Lines/SplitSeq/SplitAfterSeq/FieldsSeq/FieldsFuncSeq` and the same in `strings`.
 - **DO** use iterator methods in `go/types` (e.g. `Methods()`).
 - **DO** use `maphash.Comparable` / `WriteComparable`.
 - You can use `weak` package for weak pointers in caches, if really needed.
 
-### Encoding Interfaces
+##### Encoding Interfaces
 
 - **DO** implement `encoding.TextAppender` / `BinaryAppender` to avoid allocations.
 
-### JSON
+##### JSON
 
 - **DO** prefer the `omitzero` struct tag over `omitempty`: use only `omitzero`.
 
-### Networking
+##### Networking
 
 - **DO** rely on default MPTCP via `ListenConfig` on Linux.
 - **DO** configure HTTP via `Server.Protocols` / `Transport.Protocols`; use `UnencryptedHTTP2` when intentional.
 
-### Misc
+##### Misc
 
 - **DO** use `go:wasmexport` for WASM exports.
 - **DON'T** use `math/rand.Seed` (use `math/rand/v2`).
 
 ---
 
-## Go 1.23
+#### Go 1.23
 
-### Language
+##### Language
 
 - **DO** use range-over-func iterators:
   ```go
@@ -144,56 +142,56 @@ Apply rules from the highest Go version declared in `go.mod`. Lower versions inh
   for range counter { ... }               // func(yield func() bool)
   ```
 
-### Standard Library — New Packages
+##### Standard Library — New Packages
 
 - You can use `unique.Make[T]` for value canonicalization (interning) returning `unique.Handle[T]`.
 - If your library returns sequence of data, **DO** return `iter.Seq[K]` or `iter.Seq2[K, V]` instead of converting internal data structure into `[]T`.
 - **DO** mark host-API structs with `structs.HostLayout`.
 
-### Timer / Ticker (only when `go 1.23+` in go.mod)
+##### Timer / Ticker (only when `go 1.23+` in go.mod)
 
 - **DO** rely on GC of unreferenced timers/tickers — no `Stop()` needed.
 - **DO** use non-blocking `select`/`case` for timer reads.
 - **DON'T** use `len(t.C)` / `cap(t.C)` (now 0).
 - **DON'T** expect stale values to remain after `Reset()` / `Stop()`.
 
-### slices / maps Iterators
+##### slices / maps Iterators
 
 - **DO** use `slices.{All,Values,Backward,Collect,AppendSeq,Sorted,SortedFunc,SortedStableFunc,Chunk,Repeat}`.
 - **DO** use `maps.{All,Keys,Values,Insert,Collect}`.
 
-### net / net/http
+##### net / net/http
 
 - **DO** use `net.TCPConn.SetKeepAliveConfig` and `net.KeepAliveConfig`.
 - **DO** use `Request.CookiesNamed`, `http.ParseCookie`, `http.ParseSetCookie`, `Cookie.Quoted`, `Cookie.Partitioned`.
 - **DO** use `Request.Pattern` to read the matched `ServeMux` pattern.
 - **DON'T** wrap `ResponseWriter` with on-the-fly `Content-Encoding` middleware around `ServeContent`/`ServeFile`/`ServeFileFS` — those now strip such headers on errors. Use `Transfer-Encoding` instead.
 
-### Crypto / TLS
+##### Crypto / TLS
 
 - **DO** populate `tls.Certificate.Leaf` automatically via `X509KeyPair`/`LoadX509KeyPair`.
 - **DO** support ECH via `tls.Config.EncryptedClientHelloConfigList`.
 - **DON'T** verify SHA-1 certificate signatures.
 
-### reflect
+##### reflect
 
 - **DO** use `Type.OverflowComplex/Float/Int/Uint`, `reflect.SliceAt`, `Value.Seq`/`Value.Seq2`, `Type.CanSeq`/`CanSeq2`.
 - **DO** use `Value.Pointer`/`UnsafePointer` on string kinds.
 
-### Other Stdlib Additions
+##### Other Stdlib Additions
 
 - **DO** use `encoding/binary.Encode/Decode/Append`, `sync.Map.Clear`, `sync/atomic.And/Or`, `unicode/utf16.RuneLen`, `runtime/debug.SetCrashOutput`.
 
 ---
 
-## Go 1.22
+#### Go 1.22
 
-### Language
+##### Language
 
 - **DO** rely on per-iteration loop variable scoping — each iteration gets fresh variables. Existing loop-capture bugs are fixed.
 - **DO** use `for i := range 10` for integer ranges.
 
-### Standard Library
+##### Standard Library
 
 - **DO** use `math/rand/v2`. Names: `IntN`, `Int32`, `Int32N`, `Int64`, `Int64N`, `Uint32`, `Uint32N`, `Uint64`, `Uint64N`, `UintN`, generic `N[T]`.
   - **DON'T** use legacy names like `Intn`, `Int31`, `Int63n`.
