@@ -7,29 +7,23 @@ description: "Use when authoring or editing a Go CLI built on spf13/cobra. Auto-
 
 Scaffold a new Cobra CLI, edit an existing one, or apply Cobra-specific design rules. Cobra-only — see "Out of scope" for non-Cobra layouts.
 
-General Go design philosophy lives in `instructions/go/go-general-design.instructions.md`. Go-version idioms live in `instructions/go/go-basics.instructions.md`. This file owns Cobra-specific structure, naming, helpers, and edit mechanics — do not restate the other two.
-
-## When this skill applies
-
-Activates when **either** condition holds:
-
-- The user message contains: `scaffold cli`, `create go command`, `add subcommand`, `rename subcommand`, `remove subcommand`, `add flag to <cmd>`, `move <cmd> under <cmd>`, `edit cmd/`.
-- The agent is about to edit or create files under `./cmd/`.
-
-After activation, run the pre-flight checks below before any edit.
-
 ## Pre-flight checks
 
-1. **Cobra detection.** Look for `github.com/spf13/cobra` in `go.mod` or any import. If absent, do not apply Cobra rules — ask whether to introduce Cobra, otherwise stop.
-2. **Layout classification.** Categorize the project:
+Run before any edit.
+
+1. **Mode detection.** Inspect `<root>/cmd/`.
+   - **Missing or empty** → **Scaffold mode**. Skip the remaining checks; jump to "Scaffold a new project".
+   - **Populated** → **Edit mode**; continue.
+2. **Cobra detection** (edit mode only). Look for `github.com/spf13/cobra` in `go.mod` or any import.
+   - Absent → out of scope; report and stop.
+3. **Layout classification** (edit mode only). Categorize the project:
    - **Canonical** — `<root>/cmd/<name>/main.go` + `<root>/cmd/<name>/commands/` + `<root>/cmd/internal/cmdsignals/` exist. → Proceed.
    - **Close variant** — `cmd/<name>/main.go` + `cmd/<name>/commands/` exist but `cmd/internal/` differs (e.g. helpers under module-root `internal/`, no `cmdsignals` yet). → Proceed; do not force-migrate existing files.
    - **Non-canonical Cobra** — e.g. `cmd/root.go` at module root, or `cobra-cli` defaults. → **Stop and ask.** Likely mid-migration or accidental drift.
-   - **Non-Cobra** — no Cobra import. → Out of scope; report and stop.
 
 ## Cobra design rules
 
-These rules are Cobra-specific. The "thin run function" rule is a Cobra-mechanics consequence of the broader "no business logic under `./cmd`" rule in `go-general-design.instructions.md` — do not restate that rule here.
+These rules are Cobra-specific. The "thin run function" rule is the Cobra-mechanics consequence of the broader "no business logic under `./cmd`" rule.
 
 - **`RunE` only**, never `Run`. Return errors; do not `os.Exit` from a command body.
 - **Root command**: `SilenceUsage: true`, `SilenceErrors: true`. Delegate to a named `runRoot`.
@@ -101,41 +95,30 @@ These are templates. **Strictly follow** the order of elements. Do **NOT** reord
 
 ### `cmd/{{NAME}}/main.go`
 
+`main.go` only handles signal wiring and process exit. The final error is written unconditionally to stderr because logging is opt-in via `--log` / `--log-level`.
+
 ```go
 package main
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 	"os"
 	"os/signal"
 
-	"github.com/ngicks/go-common/contextkey"
 	"{{MODULE}}/cmd/{{NAME}}/commands"
 	"{{MODULE}}/cmd/internal/cmdsignals"
 )
 
 func main() {
-	logger := slog.New(
-		slog.NewJSONHandler(
-			os.Stdout,
-			&slog.HandlerOptions{
-				AddSource: true,
-				Level:     slog.LevelDebug,
-			},
-		),
-	)
-
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		cmdsignals.ExitSignals[:]...,
 	)
 	defer stop()
 
-	ctx = contextkey.WithSlogLogger(ctx, logger)
-
 	if err := commands.Execute(ctx); err != nil {
-		logger.ErrorContext(ctx, "stopped with an error", slog.Any("err", err))
+		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
@@ -143,17 +126,96 @@ func main() {
 
 ### `cmd/{{NAME}}/commands/root.go`
 
+Owns the logger. Logging is **opt-in** via two persistent flags on `rootCmd`:
+
+- `--log[=text|json]` — enables logging; chooses format. Default format when `--log` is given without a value: `json`.
+- `--log-level[=trace|debug|info|warn|error|fatal]` — enables logging; chooses level. Default level when `--log-level` is given without a value: `info`. Levels map to `slog.Level` values: `trace`=-8, `debug`=-4, `info`=0, `warn`=4, `error`=8, `fatal`=12.
+
+The presence of either flag enables logging. When both are absent, the logger is `slog.DiscardHandler`. `PersistentPreRun` builds the logger from the parsed flags, calls `slog.SetDefault`, and wraps `cmd.Context()` with `contextkey.WithSlogLogger`. `PersistentPostRun` re-wraps the context so any post-run code on subcommands also sees the logger.
+
 ```go
 package commands
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"os"
 
+	"github.com/ngicks/go-common/contextkey"
 	"github.com/spf13/cobra"
 )
 
+const (
+	logLevelTrace = slog.Level(-8)
+	logLevelFatal = slog.Level(12)
+)
+
+var (
+	logEnabled bool
+	logFormat  = "json"
+	logLevel   = slog.LevelInfo
+
+	logger = slog.New(slog.DiscardHandler)
+)
+
+func init() {
+	f := rootCmd.PersistentFlags()
+
+	f.Func("log", `enable logging; format "text" or "json" (default "json")`, func(s string) error {
+		logEnabled = true
+		switch s {
+		case "text", "json":
+			logFormat = s
+			return nil
+		}
+		return fmt.Errorf(`--log: must be "text" or "json", got %q`, s)
+	})
+	f.Lookup("log").NoOptDefVal = "json"
+
+	f.Func("log-level", `enable logging; level "trace" | "debug" | "info" | "warn" | "error" | "fatal" (default "info")`, func(s string) error {
+		logEnabled = true
+		switch s {
+		case "trace":
+			logLevel = logLevelTrace
+		case "debug":
+			logLevel = slog.LevelDebug
+		case "info":
+			logLevel = slog.LevelInfo
+		case "warn":
+			logLevel = slog.LevelWarn
+		case "error":
+			logLevel = slog.LevelError
+		case "fatal":
+			logLevel = logLevelFatal
+		default:
+			return fmt.Errorf(`--log-level: must be one of "trace", "debug", "info", "warn", "error", "fatal"; got %q`, s)
+		}
+		return nil
+	})
+	f.Lookup("log-level").NoOptDefVal = "info"
+}
+
 func Execute(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
+}
+
+func buildLogger() *slog.Logger {
+	if !logEnabled {
+		return slog.New(slog.DiscardHandler)
+	}
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+		Level:     logLevel,
+	}
+	var h slog.Handler
+	switch logFormat {
+	case "text":
+		h = slog.NewTextHandler(os.Stderr, opts)
+	default: // "json"
+		h = slog.NewJSONHandler(os.Stderr, opts)
+	}
+	return slog.New(h)
 }
 
 var rootCmd = &cobra.Command{
@@ -162,7 +224,15 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,
-	RunE:          runRoot,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		logger = buildLogger()
+		slog.SetDefault(logger)
+		cmd.SetContext(contextkey.WithSlogLogger(cmd.Context(), logger))
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		cmd.SetContext(contextkey.WithSlogLogger(cmd.Context(), logger))
+	},
+	RunE: runRoot,
 }
 
 var (
@@ -381,7 +451,8 @@ Do not generate any of these — they look superficially shorter but break the l
 - **Skipping `cmdsignals`.** Always generated for scaffold; `main.go` imports it.
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
 - **Reading flags via `cmd.Flags().Get*`** when a package-level `*T` pointer exists. Use the pointer.
-- **Putting business logic inside `RunE`.** Business logic lives outside `./cmd` per `go-general-design.instructions.md`.
+- **Putting business logic inside `RunE`.** Business logic lives outside `./cmd`; `RunE` is wiring only.
+- **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/pkg/<name>/cli/`. `RunE` calls into that package and returns its error.
 
 ## Out of scope
 

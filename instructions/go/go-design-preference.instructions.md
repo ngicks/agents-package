@@ -1,15 +1,16 @@
 ---
-description: "General Go design philosophy"
+description: "General Go Design Preference"
 applyTo: "**/*.go"
 ---
 
-### Go design philosophy
+### Go Personal Design Preference
 
-Single source of truth for Go-wide design rules. **Layout specifics belong elsewhere** (`go-edit-cobra` skill for `./cmd`, individual project conventions for the rest). **Go-version idioms belong in `go-basics.instructions.md`.**
+Trigger `go-edit-cobra` skill when editing `./cmd/**/*`.
 
 #### Keep entrypoints thin
 
 - **No business logic under `./cmd`.** Files under `./cmd` only parse flags / arguments and hand off to a service. Same rule for any other binary entrypoint package — it composes, it does not compute.
+- **No CLI-presentation logic under `./cmd` either.** Printing, prompts, table rendering, color, terminal capability detection, spinners, and other terminal control belong in `<root>/pkg/<name>/cli/` (or a similarly named package outside `./cmd`). `./cmd` calls into that package; it does not implement it.
 - Run / `main` functions return errors; never `os.Exit` from inside business code.
 - When editing or creating files under `./cmd/`, use the **`go-edit-cobra` skill**. It owns Cobra-specific structure, naming, helpers, and edit operations.
 
