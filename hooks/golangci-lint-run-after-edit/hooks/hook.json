@@ -5,7 +5,7 @@
       {
         "type": "command",
         "matcher": "Edit|Write|MultiEdit",
-        "bash": "./scripts/run.sh",
+        "bash": "./run.sh",
         "timeoutSec": 300
       }
     ]

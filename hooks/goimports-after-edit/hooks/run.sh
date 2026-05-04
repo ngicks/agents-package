@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-file=$(
-	sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
-		head -n 1
-)
+file=$(jq -r '.tool_input.file_path // empty')
 
 case "$file" in
 *.go) ;;
