@@ -5,8 +5,7 @@
       {
         "type": "command",
         "matcher": "Edit|Write|MultiEdit",
-        "bash": "file=$(cat | sed -n 's/.*\"file_path\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' | head -1)\ncase \"$file\" in *.go) ;; *) exit 0;; esac\ntest -f go.mod || exit 0\ncommand -v golangci-lint >/dev/null 2>&1 || exit 0\ngolangci-lint fmt \"$file\"",
-        "powershell": "$h = [Console]::In.ReadToEnd() | ConvertFrom-Json\n$file = $h.tool_input.file_path\nif (-not $file -or $file -notlike '*.go') { exit 0 }\nif (-not (Test-Path go.mod)) { exit 0 }\nif (-not (Get-Command golangci-lint -ErrorAction SilentlyContinue)) { exit 0 }\ngolangci-lint fmt $file\nexit $LASTEXITCODE",
+        "bash": "./scripts/run.sh",
         "timeoutSec": 120
       }
     ]
