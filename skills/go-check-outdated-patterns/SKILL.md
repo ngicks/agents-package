@@ -1,11 +1,24 @@
 ---
-description: "Up to date basic Go rules (Go 1.22 - 1.26)"
-applyTo: "**/*.go"
+name: go-check-outdated-patterns
+description: "Use this right before stop to review your change if you have edited Go code."
 ---
 
-### Go Version Cheat Sheet (1.22 → 1.26)
+# Go Outdated Pattern Checklist
 
-Apply rules from the highest Go version declared in `go.mod`. Lower versions inherit prior rules unless superseded.
+Use this checklist to find old Go writing and replace it with idioms and APIs available in the module's declared Go version.
+
+## How to use this skill
+
+- 1. Identify the active module's Go version.
+  - Use `go mod edit -json | jq -r ".Go"`
+  - You may face a mono-repo and therefore you may not be below a module root. In that case you would change cwd for the command.
+- 2. Apply the checklist for that version and all earlier versions below, unless a later version supersedes a rule.
+- 3. Treat **DON'T** items as patterns to flag or replace.
+- 4. Treat **DO** items as preferred replacements when they fit the code's behavior.
+  - If following **DO** items changes behavior of code, ask the user how to change.
+- 5. Do not upgrade `go.mod`
+
+## Checklist
 
 #### Go 1.26
 

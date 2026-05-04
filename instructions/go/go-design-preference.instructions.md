@@ -5,7 +5,7 @@ applyTo: "**/*.go"
 
 ### Go Personal Design Preference
 
-Trigger `go-edit-cobra` skill when editing `./cmd/**/*`.
+Trigger `go-edit-cobra` skill when editing empty or `github.com/spf13/cobra`-backed `./cmd/**/*` .
 
 #### Keep entrypoints thin
 
