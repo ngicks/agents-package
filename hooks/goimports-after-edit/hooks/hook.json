@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "matcher": "Edit|Write|MultiEdit",
+        "bash": "file=$(cat | sed -n 's/.*\"file_path\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' | head -1)\ncase \"$file\" in *.go) ;; *) exit 0;; esac\ntest -f go.mod || exit 0\ncommand -v goimports >/dev/null 2>&1 || exit 0\ngoimports -w \"$file\"",
+        "powershell": "$h = [Console]::In.ReadToEnd() | ConvertFrom-Json\n$file = $h.tool_input.file_path\nif (-not $file -or $file -notlike '*.go') { exit 0 }\nif (-not (Test-Path go.mod)) { exit 0 }\nif (-not (Get-Command goimports -ErrorAction SilentlyContinue)) { exit 0 }\ngoimports -w $file\nexit $LASTEXITCODE",
+        "timeoutSec": 60
+      }
+    ]
+  }
+}
