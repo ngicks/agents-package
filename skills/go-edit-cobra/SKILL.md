@@ -33,7 +33,7 @@ These rules are Cobra-specific. The "thin run function" rule is the Cobra-mechan
 - **Run functions are named** (`run{{Name}}`) and live at package level. **Run functions are thin wiring**: read positional args, call a service, return its error. Business logic is forbidden under `./cmd`.
 - **`RunE` is either a direct reference (`RunE: run{{Name}}`) or a thin closure adapter** that forwards captured flag values: `RunE: func(cmd *cobra.Command, args []string) error { return run{{Name}}(cmd, args, flagFoo, flagBar) }`. The closure body must contain only that single forwarding call — no logic.
 - **Group parents**: no `RunE`, no `Args` by default. They MAY own persistent flags, aliases, or pre-run hooks when intentional. When a persistent flag must reach a child's run function, declare the flag's `var` in the parent wrapper and pass its address as an extra parameter to the child wrapper (`{{child}}Cmd(cmd, &flagShared)`).
-- **Non-subcommand files inside `commands/` MUST be prefixed with `_`** (e.g. `_logger.go`, `_helpers.go`). Files without the `_` prefix are reserved for the canonical subcommand mapping (`<name>.go` for flat leaves and group parents, `<parent>_<child>.go` for nested leaves). The `_` prefix marks shared helpers, logger glue, and any other package-level code that is not a single subcommand definition.
+- **Non-subcommand files inside `commands/` MUST be prefixed with `zz_`** (e.g. `zz_helpers.go`, `zz_validation.go`). Files without the `zz_` prefix are reserved for the canonical subcommand mapping (`<name>.go` for flat leaves and group parents, `<parent>_<child>.go` for nested leaves). The `zz_` prefix marks shared helpers and any other package-level code that is not a single subcommand definition. (A leading single `_` cannot be used: `cmd/go` ignores any file whose name starts with `_` or `.`. The `zz_` form is Go-compatible and sorts last in directory listings, mirroring the `zz_generated_*.go` convention.)
 
 ### Canonical flag pattern
 
@@ -79,14 +79,15 @@ Exception: when a flag must bind into an external configuration struct, pass the
 │   │   ├── main.go
 │   │   └── commands/
 │   │       ├── root.go                  # rootCmd() + Execute(ctx) + runRoot
-│   │       ├── _logger.go               # logger glue (non-subcommand file; prefix _)
-│   │       ├── _<helper>.go             # any other non-subcommand helper file
+│   │       ├── zz_<helper>.go           # any non-subcommand helper file (prefix zz_)
 │   │       ├── <subcmd>.go              # one per flat leaf
 │   │       ├── <parent>.go              # one per group (no RunE)
 │   │       └── <parent>_<child>.go      # one per nested leaf
 │   └── internal/
 │       ├── cmdsignals/
 │       │   └── signals.go               # always present
+│       ├── loggerfactory/
+│       │   └── loggerfactory.go         # always present; --log / --log-level wiring
 │       └── stdiopipe/                   # only when a subcommand needs cancellable stdio
 │           └── stdiopipe.go
 └── pkg/
@@ -103,7 +104,7 @@ Why this shape:
 - `cmd/internal/` is a sibling of all binary packages, sharing helpers under Go's `internal/` rule.
 - `pkg/<name>/` holds the actual service. `./cmd` is wiring only — flags, positional args, and (logger-only) env vars feed into a service constructed from `pkg/<name>`.
 - `pkg/<name>/cli/` holds CLI-presentation code (printing, prompts, tables, colors, spinners). `RunE` calls into it and returns its error.
-- The `_` prefix on non-subcommand files makes the file → subcommand mapping unambiguous: any file without `_` is a single subcommand definition.
+- The `zz_` prefix on non-subcommand files makes the file → subcommand mapping unambiguous: any file without `zz_` is a single subcommand definition. (`_` prefix is **not** usable — `cmd/go` ignores files starting with `_` or `.`.)
   - as per Go's file name rule, `<helper>` can not be `test`, `$GOARCH`(e.g. `amd64`, etc), `$GOOS`(e.g. `windows`, etc)
 - Never put `commands/` directly at the module root. See "Anti-patterns".
 
@@ -113,7 +114,7 @@ The CLI binary is wiring; the service is `./pkg/<name>`. Two rules govern where 
 
 ### Env vars
 
-Env vars MUST NOT be read anywhere under `./cmd`. The only exceptions, read inside `_logger.go`, are:
+Env vars MUST NOT be read anywhere under `./cmd`. The only exceptions, read inside the `loggerfactory` helper, are:
 
 - `<NAME>_LOG_LEVEL` — overrides the `--log-level` default.
 - `<NAME>_LOG_FORMAT` — overrides the `--log` default.
@@ -158,9 +159,10 @@ Path resolution order:
 
 ### Non-subcommand files
 
-- **File name prefix**: leading `_`. Examples: `_logger.go`, `_helpers.go`, `_validation.go`.
-- These files contain helpers, logger glue, shared types — anything that is part of the `commands` package but is not a single subcommand definition.
-- The file name has no other constraint beyond the `_` prefix.
+- **File name prefix**: leading `zz_`. Examples: `zz_helpers.go`, `zz_validation.go`.
+- These files contain helpers, shared types — anything that is part of the `commands` package but is not a single subcommand definition.
+- The file name has no other constraint beyond the `zz_` prefix.
+- Do **not** use a leading `_`: `cmd/go` silently ignores files (and directories) whose names begin with `_` or `.`, so an `_logger.go` would never be compiled.
 
 ## Templates
 
@@ -199,7 +201,7 @@ func main() {
 
 ### `cmd/{{NAME}}/commands/root.go`
 
-Owns the root command and its `runRoot`. The root wrapper installs the `PersistentPreRun` hook that builds the logger and injects it into `cmd.Context()`. Logger flag registration and `buildLogger` itself live in `_logger.go` (see below).
+Owns the root command and its `runRoot`. The root wrapper delegates persistent log-flag registration to the `loggerfactory` helper and installs a `PersistentPreRun` hook that builds the logger and injects it into `cmd.Context()`. There is **no** logger glue file under `commands/` — all of it lives in `{{MODULE}}/cmd/internal/loggerfactory`.
 
 ```go
 package commands
@@ -210,6 +212,8 @@ import (
 
 	"github.com/ngicks/go-common/contextkey"
 	"github.com/spf13/cobra"
+
+	"{{MODULE}}/cmd/internal/loggerfactory"
 )
 
 func Execute(ctx context.Context) error {
@@ -217,7 +221,7 @@ func Execute(ctx context.Context) error {
 }
 
 func rootCmd() *cobra.Command {
-	var logConfig *loggerConfig
+	var logConfig *loggerfactory.Config
 
 	cmd := &cobra.Command{
 		Use:           "{{NAME}}",
@@ -226,14 +230,14 @@ func rootCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			logger := buildLogger(logConfig)
+			logger := loggerfactory.BuildLogger(logConfig)
 			slog.SetDefault(logger)
 			cmd.SetContext(contextkey.WithSlogLogger(cmd.Context(), logger))
 		},
 		RunE: runRoot,
 	}
 
-	logConfig = registerLogFlags(cmd)
+	logConfig = loggerfactory.RegisterFlags(cmd)
 
 	// TODO: declare root flags inside a `var (...)` block above the literal and
 	// bind them with `cmd.PersistentFlags().<Type>Var(&flag, ...)`. When `runRoot`
@@ -257,101 +261,12 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 The TODO comments are markers for the implementor — leave them.
 
-### `cmd/{{NAME}}/commands/_logger.go`
-
-Non-subcommand file (prefix `_`). Owns logger config, the persistent log flags, and `buildLogger`. Logging is **opt-in** via two persistent flags declared with `pflag.BoolFunc` (presence enables, optional `=value` overrides the default):
+The `loggerfactory` helper (see "Helper catalog") owns logger config, the persistent log flags, and the `BuildLogger` constructor. Logging is **opt-in** via two persistent flags declared with `pflag.BoolFunc` (presence enables, optional `=value` overrides the default):
 
 - `--log[=text|json]` — enables logging; chooses format. Default format when `--log` is given without a value: `json`. Values are case-insensitive.
 - `--log-level[=trace|debug|info|warn|error|fatal]` — enables logging; chooses level. Default level when `--log-level` is given without a value: `info`. Levels map to `slog.Level` values: `trace`=-8, `debug`=-4, `info`=0, `warn`=4, `error`=8, `fatal`=12. Values are case-insensitive.
 
-The presence of either flag enables logging. When both are absent, the logger is `slog.DiscardHandler`. `registerLogFlags` returns the logger-related config struct pointer populated by the parsed flags. `root.go` stores that config and its `PersistentPreRun` calls `buildLogger(logConfig)` to construct the configured logger.
-
-```go
-package commands
-
-import (
-	"fmt"
-	"log/slog"
-	"os"
-	"strings"
-
-	"github.com/spf13/cobra"
-)
-
-const (
-	logLevelTrace = slog.Level(-8)
-	logLevelFatal = slog.Level(12)
-)
-
-type loggerConfig struct {
-	enabled bool
-	format  string
-	level   slog.Level
-}
-
-func registerLogFlags(cmd *cobra.Command) *loggerConfig {
-	config := &loggerConfig{
-		format: "json",
-		level:  slog.LevelInfo,
-	}
-	f := cmd.PersistentFlags()
-
-	f.BoolFunc("log", `enable logging; format "text" or "json" (case-insensitive; default "json")`, func(s string) error {
-		config.enabled = true
-		switch v := strings.ToLower(s); v {
-		case "true": // presence only
-			return nil
-		case "text", "json":
-			config.format = v
-			return nil
-		}
-		return fmt.Errorf(`--log: must be "text" or "json" (case-insensitive), got %q`, s)
-	})
-
-	f.BoolFunc("log-level", `enable logging; level "trace" | "debug" | "info" | "warn" | "error" | "fatal" (case-insensitive; default "info")`, func(s string) error {
-		config.enabled = true
-		switch strings.ToLower(s) {
-		case "true": // presence only
-			return nil
-		case "trace":
-			config.level = logLevelTrace
-		case "debug":
-			config.level = slog.LevelDebug
-		case "info":
-			config.level = slog.LevelInfo
-		case "warn":
-			config.level = slog.LevelWarn
-		case "error":
-			config.level = slog.LevelError
-		case "fatal":
-			config.level = logLevelFatal
-		default:
-			return fmt.Errorf(`--log-level: must be one of "trace", "debug", "info", "warn", "error", "fatal" (case-insensitive); got %q`, s)
-		}
-		return nil
-	})
-
-	return config
-}
-
-func buildLogger(config *loggerConfig) *slog.Logger {
-	if !config.enabled {
-		return slog.New(slog.DiscardHandler)
-	}
-	opts := &slog.HandlerOptions{
-		AddSource: true,
-		Level:     config.level,
-	}
-	var h slog.Handler
-	switch config.format {
-	case "text":
-		h = slog.NewTextHandler(os.Stderr, opts)
-	default: // "json"
-		h = slog.NewJSONHandler(os.Stderr, opts)
-	}
-	return slog.New(h)
-}
-```
+The presence of either flag enables logging. When both are absent, the logger is `slog.DiscardHandler`. `loggerfactory.RegisterFlags(cmd)` returns the logger-related `*Config` populated during flag parsing; `root.go` stores it and its `PersistentPreRun` calls `loggerfactory.BuildLogger(logConfig)` to construct the configured logger.
 
 ### `cmd/{{NAME}}/commands/<subcmd>.go` (flat leaf)
 
@@ -486,14 +401,13 @@ Generation steps (relative to module root):
 2. Write `go.mod` (with placeholder `v0.0.0` lines per the template).
 3. Write `cmd/<name>/main.go`.
 4. Write `cmd/<name>/commands/root.go`.
-5. Write `cmd/<name>/commands/_logger.go`.
-6. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
-7. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
-8. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
-9. For each direct dep in `go.mod`: `go get <module>@latest`.
-10. `go mod tidy`.
-11. Run the post-edit validation chain (see below).
-12. Report the generated file list to the user.
+5. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
+6. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
+7. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `helpers/cmd/internal/loggerfactory/loggerfactory.go` → `<root>/cmd/internal/loggerfactory/loggerfactory.go`. Copy `stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
+8. For each direct dep in `go.mod`: `go get <module>@latest`.
+9. `go mod tidy`.
+10. Run the post-edit validation chain (see below).
+11. Report the generated file list to the user.
 
 Use **Write** for every file. Write creates parent directories — do not run `mkdir` separately.
 
@@ -542,10 +456,11 @@ Pre-flight checks first (Cobra detection, layout classification). Then pick the 
 
 Brief catalog only — full source lives at `${SKILL-DIR}/helpers/cmd/internal/<helper>/`. To emit, copy the file into `<project-root>/cmd/internal/<helper>/...` (paths line up 1:1).
 
-| Helper       | Import path                          | Purpose                                                          | Signature(s)                                                                           | Use when                                                                                                    |
-| ------------ | ------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `cmdsignals` | `{{MODULE}}/cmd/internal/cmdsignals` | exit-signal list for `signal.NotifyContext`                      | `var ExitSignals [...]os.Signal`                                                       | Always when scaffolding (main.go imports it). For existing projects, only when adopting this template.      |
-| `stdiopipe`  | `{{MODULE}}/cmd/internal/stdiopipe`  | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe` | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser` | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics. |
+| Helper           | Import path                              | Purpose                                                          | Signature(s)                                                                                                                          | Use when                                                                                                    |
+| ---------------- | ---------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `cmdsignals`     | `{{MODULE}}/cmd/internal/cmdsignals`     | exit-signal list for `signal.NotifyContext`                      | `var ExitSignals [...]os.Signal`                                                                                                      | Always when scaffolding (main.go imports it). For existing projects, only when adopting this template.      |
+| `loggerfactory`  | `{{MODULE}}/cmd/internal/loggerfactory`  | `--log` / `--log-level` flag wiring + opt-in `*slog.Logger`      | `RegisterFlags(cmd) *Config`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`    | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.      |
+| `stdiopipe`      | `{{MODULE}}/cmd/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe` | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics. |
 
 ## Post-edit validation
 
@@ -567,14 +482,16 @@ Do not generate any of these — they look superficially shorter but break the l
 - **`internal/` at the module root for these helpers.** They go at `cmd/internal/`. (A separate module-root `internal/` for non-CLI library code is fine.)
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
 - **Skipping `cmdsignals`.** Always generated for scaffold; `main.go` imports it.
+- **Skipping `loggerfactory`.** Always generated for scaffold; `root.go` imports it for `--log` / `--log-level` wiring.
+- **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `cmd/internal/loggerfactory`. Do not copy them back into a `zz_logger.go` or any file under `commands/`.
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
 - **Package-level `var xxxCmd = &cobra.Command{...}`** or any `init()` that calls `AddCommand`. All Cobra construction lives inside the wrapper function `{{name}}Cmd(parent)`; wiring happens via the parent calling its children's wrappers.
 - **Pointer-returning flag APIs (`Flags().String(...)`, `Flags().Int(...)`)** at any scope. Always use the `*Var` family with a local declared in the wrapper's `var (...)` block. This keeps the binding shape uniform with `pflag.BoolFunc`.
 - **Reading flags via `cmd.Flags().Get*`.** Use the captured flag variable from the wrapper's `var (...)` block; pass it into `run{{Name}}` via a `RunE` closure adapter when needed.
-- **Non-subcommand files in `commands/` without the `_` prefix.** Anything that isn't a single subcommand definition (logger glue, shared helpers, package-internal types) MUST be `_<name>.go`.
+- **Non-subcommand files in `commands/` without the `zz_` prefix.** Anything that isn't a single subcommand definition (shared helpers, package-internal types) MUST be `zz_<name>.go`. **Never use a leading `_`** — `cmd/go` ignores files starting with `_` or `.`, so they would silently never compile.
 - **Putting business logic inside `RunE`.** Business logic lives outside `./cmd`; `RunE` is wiring only — either a direct `run{{Name}}` reference or a thin closure adapter that forwards captured flag values.
 - **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/pkg/<name>/cli/`. `RunE` calls into that package and returns its error.
-- **Reading env vars under `./cmd`.** Only `<NAME>_LOG_LEVEL` and `<NAME>_LOG_FORMAT` are allowed (in `_logger.go`). Every other env var lives in `./pkg/<name>/config.go`.
+- **Reading env vars under `./cmd`.** Only `<NAME>_LOG_LEVEL` and `<NAME>_LOG_FORMAT` are allowed (in `cmd/internal/loggerfactory`). Every other env var lives in `./pkg/<name>/config.go`.
 
 ## Out of scope
 
