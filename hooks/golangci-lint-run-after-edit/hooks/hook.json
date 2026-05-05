@@ -5,8 +5,13 @@
       {
         "type": "command",
         "matcher": "Edit|Write|MultiEdit",
-        "bash": "./run.sh",
-        "timeoutSec": 300
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./run.sh",
+            "timeoutSec": 300
+          }
+        ]
       }
     ]
   }

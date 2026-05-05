@@ -3,10 +3,14 @@
   "hooks": {
     "PostToolUse": [
       {
-        "type": "command",
         "matcher": "Edit|Write|MultiEdit",
-        "bash": "./run.sh",
-        "timeoutSec": 120
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./run.sh",
+            "timeout": 120
+          }
+        ]
       }
     ]
   }
