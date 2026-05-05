@@ -74,30 +74,70 @@ Exception: when a flag must bind into an external configuration struct, pass the
 ```
 <module-root>/
 ├── go.mod
-└── cmd/
-    ├── <name>/
-    │   ├── main.go
-    │   └── commands/
-    │       ├── root.go                  # rootCmd() + Execute(ctx) + runRoot
-    │       ├── _logger.go               # logger glue (non-subcommand file; prefix _)
-    │       ├── _<helper>.go             # any other non-subcommand helper file
-    │       ├── <subcmd>.go              # one per flat leaf
-    │       ├── <parent>.go              # one per group (no RunE)
-    │       └── <parent>_<child>.go      # one per nested leaf
-    └── internal/
-        ├── cmdsignals/
-        │   └── signals.go               # always present
-        └── stdiopipe/                   # only when a subcommand needs cancellable stdio
-            └── stdiopipe.go
+├── cmd/
+│   ├── <name>/
+│   │   ├── main.go
+│   │   └── commands/
+│   │       ├── root.go                  # rootCmd() + Execute(ctx) + runRoot
+│   │       ├── _logger.go               # logger glue (non-subcommand file; prefix _)
+│   │       ├── _<helper>.go             # any other non-subcommand helper file
+│   │       ├── <subcmd>.go              # one per flat leaf
+│   │       ├── <parent>.go              # one per group (no RunE)
+│   │       └── <parent>_<child>.go      # one per nested leaf
+│   └── internal/
+│       ├── cmdsignals/
+│       │   └── signals.go               # always present
+│       └── stdiopipe/                   # only when a subcommand needs cancellable stdio
+│           └── stdiopipe.go
+└── pkg/
+    └── <name>/
+        ├── config.go                    # service config struct + env + config-file loader
+        ├── <service>.go                 # internal service implementation
+        └── cli/                         # CLI-presentation code (printing, prompts, tables, colors)
+            └── <ui>.go
 ```
 
 Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
 - `cmd/internal/` is a sibling of all binary packages, sharing helpers under Go's `internal/` rule.
+- `pkg/<name>/` holds the actual service. `./cmd` is wiring only — flags, positional args, and (logger-only) env vars feed into a service constructed from `pkg/<name>`.
+- `pkg/<name>/cli/` holds CLI-presentation code (printing, prompts, tables, colors, spinners). `RunE` calls into it and returns its error.
 - The `_` prefix on non-subcommand files makes the file → subcommand mapping unambiguous: any file without `_` is a single subcommand definition.
   - as per Go's file name rule, `<helper>` can not be `test`, `$GOARCH`(e.g. `amd64`, etc), `$GOOS`(e.g. `windows`, etc)
 - Never put `commands/` directly at the module root. See "Anti-patterns".
+
+## Service package & configuration
+
+The CLI binary is wiring; the service is `./pkg/<name>`. Two rules govern where inputs are read.
+
+### Env vars
+
+Env vars MUST NOT be read anywhere under `./cmd`. The only exceptions, read inside `_logger.go`, are:
+
+- `<NAME>_LOG_LEVEL` — overrides the `--log-level` default.
+- `<NAME>_LOG_FORMAT` — overrides the `--log` default.
+
+`<NAME>` is the project name in upper-case with hyphens converted to underscores (e.g. `mytool` → `MYTOOL_LOG_LEVEL`, `my-tool` → `MY_TOOL_LOG_LEVEL`). Every other env-var read lives in `./pkg/<name>/config.go`.
+
+### `./pkg/<name>/config.go`
+
+`config.go` owns the service's configuration struct and centralizes its inputs:
+
+- Cobra flag bindings — the wrapper function under `./cmd/<name>/commands/` may pass `&config.Field` to `*Var` (the "external configuration struct" exception in "Canonical flag pattern").
+- Env-var reads.
+- Configuration-file unmarshaling.
+
+A single struct definition typically serves both flag binding and file unmarshaling. Split only when an actual conflict appears (e.g. the flag-friendly shape diverges from the on-disk shape).
+
+### Configuration file
+
+Path resolution order:
+
+1. `$<NAME>_CONF` if set.
+2. Otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/<name>/config.json`.
+
+`<NAME>` follows the upper-case rule above; `<name>` is the project name verbatim (matching the binary name used elsewhere in this layout).
 
 ## Naming conventions
 
@@ -534,6 +574,7 @@ Do not generate any of these — they look superficially shorter but break the l
 - **Non-subcommand files in `commands/` without the `_` prefix.** Anything that isn't a single subcommand definition (logger glue, shared helpers, package-internal types) MUST be `_<name>.go`.
 - **Putting business logic inside `RunE`.** Business logic lives outside `./cmd`; `RunE` is wiring only — either a direct `run{{Name}}` reference or a thin closure adapter that forwards captured flag values.
 - **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/pkg/<name>/cli/`. `RunE` calls into that package and returns its error.
+- **Reading env vars under `./cmd`.** Only `<NAME>_LOG_LEVEL` and `<NAME>_LOG_FORMAT` are allowed (in `_logger.go`). Every other env var lives in `./pkg/<name>/config.go`.
 
 ## Out of scope
 
