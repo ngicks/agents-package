@@ -1,6 +1,6 @@
 ---
 name: go-check-outdated-patterns
-description: "Use this right before stop to review your change if you have edited Go code."
+description: "Use this to review your change if you have edited Go code."
 ---
 
 # Go Outdated Pattern Checklist

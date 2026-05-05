@@ -159,7 +159,7 @@ func main() {
 
 ### `cmd/{{NAME}}/commands/root.go`
 
-Owns the root command and its `runRoot`. The root wrapper installs the `PersistentPreRun` / `PersistentPostRun` hooks that build the logger and inject it into `cmd.Context()`. Logger storage, flag registration, and `buildLogger` itself live in `_logger.go` (see below).
+Owns the root command and its `runRoot`. The root wrapper installs the `PersistentPreRun` hook that builds the logger and injects it into `cmd.Context()`. Logger flag registration and `buildLogger` itself live in `_logger.go` (see below).
 
 ```go
 package commands
@@ -177,6 +177,8 @@ func Execute(ctx context.Context) error {
 }
 
 func rootCmd() *cobra.Command {
+	var logConfig *loggerConfig
+
 	cmd := &cobra.Command{
 		Use:           "{{NAME}}",
 		Short:         "{{SHORT_DESCRIPTION}}",
@@ -184,17 +186,14 @@ func rootCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			logger = buildLogger()
+			logger := buildLogger(logConfig)
 			slog.SetDefault(logger)
-			cmd.SetContext(contextkey.WithSlogLogger(cmd.Context(), logger))
-		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
 			cmd.SetContext(contextkey.WithSlogLogger(cmd.Context(), logger))
 		},
 		RunE: runRoot,
 	}
 
-	registerLogFlags(cmd)
+	logConfig = registerLogFlags(cmd)
 
 	// TODO: declare root flags inside a `var (...)` block above the literal and
 	// bind them with `cmd.PersistentFlags().<Type>Var(&flag, ...)`. When `runRoot`
@@ -220,12 +219,12 @@ The TODO comments are markers for the implementor — leave them.
 
 ### `cmd/{{NAME}}/commands/_logger.go`
 
-Non-subcommand file (prefix `_`). Owns logger storage, the persistent log flags, and `buildLogger`. Logging is **opt-in** via two persistent flags declared with `pflag.BoolFunc` (presence enables, optional `=value` overrides the default):
+Non-subcommand file (prefix `_`). Owns logger config, the persistent log flags, and `buildLogger`. Logging is **opt-in** via two persistent flags declared with `pflag.BoolFunc` (presence enables, optional `=value` overrides the default):
 
 - `--log[=text|json]` — enables logging; chooses format. Default format when `--log` is given without a value: `json`. Values are case-insensitive.
 - `--log-level[=trace|debug|info|warn|error|fatal]` — enables logging; chooses level. Default level when `--log-level` is given without a value: `info`. Levels map to `slog.Level` values: `trace`=-8, `debug`=-4, `info`=0, `warn`=4, `error`=8, `fatal`=12. Values are case-insensitive.
 
-The presence of either flag enables logging. When both are absent, the logger is `slog.DiscardHandler`. `root.go`'s `PersistentPreRun` calls `buildLogger()` to construct the configured logger from the parsed flags.
+The presence of either flag enables logging. When both are absent, the logger is `slog.DiscardHandler`. `registerLogFlags` returns the logger-related config struct pointer populated by the parsed flags. `root.go` stores that config and its `PersistentPreRun` calls `buildLogger(logConfig)` to construct the configured logger.
 
 ```go
 package commands
@@ -244,63 +243,67 @@ const (
 	logLevelFatal = slog.Level(12)
 )
 
-var (
-	logEnabled bool
-	logFormat  = "json"
-	logLevel   = slog.LevelInfo
+type loggerConfig struct {
+	enabled bool
+	format  string
+	level   slog.Level
+}
 
-	logger = slog.New(slog.DiscardHandler)
-)
-
-func registerLogFlags(cmd *cobra.Command) {
+func registerLogFlags(cmd *cobra.Command) *loggerConfig {
+	config := &loggerConfig{
+		format: "json",
+		level:  slog.LevelInfo,
+	}
 	f := cmd.PersistentFlags()
 
 	f.BoolFunc("log", `enable logging; format "text" or "json" (case-insensitive; default "json")`, func(s string) error {
-		logEnabled = true
+		config.enabled = true
 		switch v := strings.ToLower(s); v {
 		case "true": // presence only
 			return nil
 		case "text", "json":
-			logFormat = v
+			config.format = v
 			return nil
 		}
 		return fmt.Errorf(`--log: must be "text" or "json" (case-insensitive), got %q`, s)
 	})
 
 	f.BoolFunc("log-level", `enable logging; level "trace" | "debug" | "info" | "warn" | "error" | "fatal" (case-insensitive; default "info")`, func(s string) error {
-		logEnabled = true
+		config.enabled = true
 		switch strings.ToLower(s) {
 		case "true": // presence only
 			return nil
 		case "trace":
-			logLevel = logLevelTrace
+			config.level = logLevelTrace
 		case "debug":
-			logLevel = slog.LevelDebug
+			config.level = slog.LevelDebug
 		case "info":
-			logLevel = slog.LevelInfo
+			config.level = slog.LevelInfo
 		case "warn":
-			logLevel = slog.LevelWarn
+			config.level = slog.LevelWarn
 		case "error":
-			logLevel = slog.LevelError
+			config.level = slog.LevelError
 		case "fatal":
-			logLevel = logLevelFatal
+			config.level = logLevelFatal
 		default:
 			return fmt.Errorf(`--log-level: must be one of "trace", "debug", "info", "warn", "error", "fatal" (case-insensitive); got %q`, s)
 		}
 		return nil
 	})
+
+	return config
 }
 
-func buildLogger() *slog.Logger {
-	if !logEnabled {
+func buildLogger(config *loggerConfig) *slog.Logger {
+	if !config.enabled {
 		return slog.New(slog.DiscardHandler)
 	}
 	opts := &slog.HandlerOptions{
 		AddSource: true,
-		Level:     logLevel,
+		Level:     config.level,
 	}
 	var h slog.Handler
-	switch logFormat {
+	switch config.format {
 	case "text":
 		h = slog.NewTextHandler(os.Stderr, opts)
 	default: // "json"
