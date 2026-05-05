@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/golangci-lint-fmt-after-edit/hooks/run.sh",
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/golangci-lint-run-after-edit/hooks/run.sh",
+            "timeoutSec": 300
+          }
+        ]
+      }
+    ]
+  }
+}

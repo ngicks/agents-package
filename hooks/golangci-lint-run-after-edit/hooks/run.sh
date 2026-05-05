@@ -11,4 +11,7 @@ esac
 test -f go.mod || exit 0
 command -v golangci-lint >/dev/null 2>&1 || exit 0
 
-golangci-lint run "$(dirname -- "$file")"
+if ! output=$(golangci-lint run "$(dirname -- "$file")" 2>&1); then
+	printf '%s\n' "$output" >&2
+	exit 2
+fi
