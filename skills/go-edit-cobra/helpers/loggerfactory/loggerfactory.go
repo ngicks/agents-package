@@ -61,7 +61,8 @@ func RegisterFlags(cmd *cobra.Command) *Config {
 
 	f.BoolFunc(
 		"log-level",
-		`enable logging; level "trace" | "debug" | "info" | "warn" | "error" | "fatal" (case-insensitive; default "info")`,
+		`enable logging; level "trace" | "debug" | "info" | "warn" | "error" | "fatal"`+
+			` (case-insensitive; default "info")`,
 		func(s string) error {
 			config.Enabled = true
 			switch strings.ToLower(s) {
