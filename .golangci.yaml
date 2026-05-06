@@ -12,7 +12,7 @@ linters:
     # modernize
     - modernize
     # dangerous unicode check
-    - bidichk 
+    - bidichk
     # check a := a in loop
     - copyloopvar
     - gocritic
