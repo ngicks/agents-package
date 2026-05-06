@@ -88,8 +88,9 @@ Exception: when a flag must bind into an external configuration struct, pass the
 │       │   └── signals.go               # always present
 │       └── stdiopipe/                   # only when a subcommand needs cancellable stdio
 │           └── stdiopipe.go
-├── loggerfactory/
-│   └── loggerfactory.go                 # always present; --log / --log-level wiring
+├── internal/
+│   └── loggerfactory/
+│       └── loggerfactory.go             # always present; --log / --log-level wiring
 └── pkg/
     └── <name>/
         ├── config.go                    # service config struct + env + config-file loader
@@ -102,7 +103,7 @@ Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
 - `cmd/internal/` is a sibling of all binary packages, sharing helpers under Go's `internal/` rule.
-- `loggerfactory/` sits at module root (not under `cmd/internal/`) so `pkg/<name>` code can import its level constants — notably `LevelTrace` and `LevelFatal` — and emit records at levels the CLI knows how to render. The flag wiring is still CLI-only; the package is shared because the level constants are shared.
+- `internal/loggerfactory/` sits at the module-root `internal/` (not under `cmd/internal/`) so `pkg/<name>` code can import its level constants — notably `LevelTrace` and `LevelFatal` — and emit records at levels the CLI knows how to render. The module-root `internal/` placement keeps it reachable from both `./cmd` and `./pkg/<name>` while blocking external consumers. The flag wiring is still CLI-only; the package is shared because the level constants are shared.
 - `pkg/<name>/` holds the actual service. `./cmd` is wiring only — flags, positional args, and (logger-only) env vars feed into a service constructed from `pkg/<name>`.
 - `pkg/<name>/cli/` holds CLI-presentation code (printing, prompts, tables, colors, spinners). `RunE` calls into it and returns its error.
 - The `zz_` prefix on non-subcommand files makes the file → subcommand mapping unambiguous: any file without `zz_` is a single subcommand definition. (`_` prefix is **not** usable — `cmd/go` ignores files starting with `_` or `.`.)
@@ -199,7 +200,7 @@ func main() {
 
 ### `cmd/{{NAME}}/commands/root.go`
 
-Owns the root command and its `runRoot`. The root wrapper delegates persistent log-flag registration to the `loggerfactory` helper and installs a `PersistentPreRun` hook that builds the logger and injects it into `cmd.Context()`. There is **no** logger glue file under `commands/` — all of it lives in `{{MODULE}}/loggerfactory`.
+Owns the root command and its `runRoot`. The root wrapper delegates persistent log-flag registration to the `loggerfactory` helper and installs a `PersistentPreRun` hook that builds the logger and injects it into `cmd.Context()`. There is **no** logger glue file under `commands/` — all of it lives in `{{MODULE}}/internal/loggerfactory`.
 
 ```go
 package commands
@@ -213,7 +214,7 @@ import (
 	"github.com/ngicks/go-common/contextkey"
 	"github.com/spf13/cobra"
 
-	"{{MODULE}}/loggerfactory"
+	"{{MODULE}}/internal/loggerfactory"
 )
 
 func Execute(ctx context.Context) error {
@@ -406,7 +407,7 @@ Generation steps (relative to module root):
 4. Write `cmd/<name>/commands/root.go`.
 5. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
 6. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
-7. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `helpers/loggerfactory/loggerfactory.go` → `<root>/loggerfactory/loggerfactory.go`. Copy `helpers/cmd/internal/stdiopipe/stdiopipe.go` → `<root>/cmd/internal/stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
+7. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `helpers/internal/loggerfactory/loggerfactory.go` → `<root>/internal/loggerfactory/loggerfactory.go`. Copy `helpers/cmd/internal/stdiopipe/stdiopipe.go` → `<root>/cmd/internal/stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
 8. For each direct dep in `go.mod`: `go get <module>@latest`.
 9. `go mod tidy`.
 10. Run the post-edit validation chain (see below).
@@ -457,12 +458,12 @@ Pre-flight checks first (Cobra detection, layout classification). Then pick the 
 
 ## Helper catalog
 
-Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`. The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/cmd/internal/cmdsignals/` → `<project-root>/cmd/internal/cmdsignals/`, `helpers/loggerfactory/` → `<project-root>/loggerfactory/`, etc.
+Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`. The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/cmd/internal/cmdsignals/` → `<project-root>/cmd/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, etc.
 
 | Helper           | Import path                              | Purpose                                                          | Signature(s)                                                                                                                          | Use when                                                                                                    |
 | ---------------- | ---------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `cmdsignals`     | `{{MODULE}}/cmd/internal/cmdsignals`     | exit-signal list for `signal.NotifyContext`                      | `var ExitSignals [...]os.Signal`                                                                                                      | Always when scaffolding (main.go imports it). For existing projects, only when adopting this template.      |
-| `loggerfactory`  | `{{MODULE}}/loggerfactory`               | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `pkg/<name>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal` | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.      |
+| `loggerfactory`  | `{{MODULE}}/internal/loggerfactory`      | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `pkg/<name>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal` | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.      |
 | `stdiopipe`      | `{{MODULE}}/cmd/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe` | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics. |
 
 ## Post-edit validation
@@ -482,11 +483,11 @@ Do not generate any of these — they look superficially shorter but break the l
 
 - **`commands/` at the module root** (i.e. `<root>/commands/...` instead of `<root>/cmd/<name>/commands/...`). A second binary forces a rename of every import path.
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
-- **`internal/` at the module root for these helpers.** They go at `cmd/internal/`. (A separate module-root `internal/` for non-CLI library code is fine.)
+- **CLI-only helpers under module-root `internal/`.** `cmdsignals` and `stdiopipe` go at `cmd/internal/`, not `<root>/internal/`. The module-root `internal/` is reserved for packages shared between `./cmd` and `./pkg/<name>` — currently just `loggerfactory` (its `Level*` constants are imported from `pkg/<name>`).
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
 - **Skipping `cmdsignals`.** Always generated for scaffold; `main.go` imports it.
 - **Skipping `loggerfactory`.** Always generated for scaffold; `root.go` imports it for `--log` / `--log-level` wiring.
-- **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/loggerfactory`. Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package under `cmd/internal/` — `pkg/<name>` needs to import its `Level` constants.
+- **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/internal/loggerfactory`. Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package under `cmd/internal/` — `pkg/<name>` needs to import its `Level` constants.
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
 - **Package-level `var xxxCmd = &cobra.Command{...}`** or any `init()` that calls `AddCommand`. All Cobra construction lives inside the wrapper function `{{name}}Cmd(parent)`; wiring happens via the parent calling its children's wrappers.
 - **Pointer-returning flag APIs (`Flags().String(...)`, `Flags().Int(...)`)** at any scope. Always use the `*Var` family with a local declared in the wrapper's `var (...)` block. This keeps the binding shape uniform with `pflag.BoolFunc`.
