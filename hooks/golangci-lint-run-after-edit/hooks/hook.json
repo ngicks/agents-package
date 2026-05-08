@@ -13,6 +13,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./run.sh",
+            "timeoutSec": 600
+          }
+        ]
+      }
     ]
   }
 }

@@ -12,6 +12,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./run.sh",
+            "timeout": 120
+          }
+        ]
+      }
     ]
   }
 }
