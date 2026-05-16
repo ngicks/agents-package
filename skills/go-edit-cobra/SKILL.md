@@ -79,6 +79,7 @@ Exception: when a flag must bind into an external configuration struct, pass the
 │   │   ├── main.go
 │   │   └── commands/
 │   │       ├── root.go                  # rootCmd() + Execute(ctx) + runRoot
+│   │       ├── version.go               # always present; "version" subcommand + --version alias
 │   │       ├── zz_<helper>.go           # any non-subcommand helper file (prefix zz_)
 │   │       ├── <subcmd>.go              # one per flat leaf
 │   │       ├── <parent>.go              # one per group (no RunE)
@@ -89,10 +90,16 @@ Exception: when a flag must bind into an external configuration struct, pass the
 │       └── stdiopipe/                   # only when a subcommand needs cancellable stdio
 │           └── stdiopipe.go
 ├── internal/
-│   └── loggerfactory/
-│       └── loggerfactory.go             # always present; --log / --log-level wiring
+│   ├── cmd/
+│   │   └── release/
+│   │       └── main.go                  # always present; cross-platform release helper
+│   ├── loggerfactory/
+│   │   └── loggerfactory.go             # always present; --log / --log-level wiring
+│   └── versioninfo/
+│       └── versioninfo.go               # always present; ReadVersionInfo (Version + VCS info)
 └── pkg/
     └── <name>/
+        ├── version.go                   # always present; release-controlled `const Version`
         ├── config.go                    # service config struct + env + config-file loader
         ├── <service>.go                 # internal service implementation
         └── cli/                         # CLI-presentation code (printing, prompts, tables, colors)
@@ -108,6 +115,8 @@ Why this shape:
 - `pkg/<name>/cli/` holds CLI-presentation code (printing, prompts, tables, colors, spinners). `RunE` calls into it and returns its error.
 - The `zz_` prefix on non-subcommand files makes the file → subcommand mapping unambiguous: any file without `zz_` is a single subcommand definition. (`_` prefix is **not** usable — `cmd/go` ignores files starting with `_` or `.`.)
   - as per Go's file name rule, `<helper>` can not be `test`, `$GOARCH`(e.g. `amd64`, etc), `$GOOS`(e.g. `windows`, etc)
+- `version.go` is split across **three** packages by design. `pkg/<name>/version.go` declares only `const Version`, kept import-free so external consumers of `pkg/<name>` don't drag in `internal/`. `internal/versioninfo/versioninfo.go` provides `ReadVersionInfo(version) Info` — the reusable VCS-info combiner consumed by the binary. `cmd/<name>/commands/version.go` is the thin CLI presentation layer that calls `versioninfo.ReadVersionInfo(<name>.Version)`. `version.go` is the one canonical-mapping leaf that does **not** need the `zz_` prefix because `version` is itself a real subcommand.
+- `internal/cmd/release/` is a `main` package, not a runtime helper. It lives under `internal/` so it cannot be `go install`ed by external modules (it's a build-time tool of this module only). One Go source base replaces what would otherwise be parallel bash + PowerShell scripts.
 - Never put `commands/` directly at the module root. See "Anti-patterns".
 
 ## Service package & configuration
@@ -138,6 +147,63 @@ Path resolution order:
 2. Otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/<name>/config.json`.
 
 `<NAME>` follows the upper-case rule above; `<name>` is the project name verbatim (matching the binary name used elsewhere in this layout).
+
+## Versioning
+
+Every project carries a release-controlled version. Four pieces collaborate:
+
+| Piece                              | Responsibility                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pkg/<name>/version.go`            | Source of truth for the version string. Declares `const Version = "v0.0.0-devel"` and **nothing else** — kept import-free so external consumers of `pkg/<name>` don't pull `internal/`. |
+| `internal/versioninfo`             | Reusable helper exporting `type Info` and `ReadVersionInfo(version string) Info`. Combines the supplied `Version` with VCS info from `runtime/debug.ReadBuildInfo`.             |
+| `cmd/<name>/commands/version.go`   | The `version` subcommand. Imports both `pkg/<name>` (for `Version`) and `internal/versioninfo` (for `ReadVersionInfo`); prints to `cmd.OutOrStdout()`. Wired by `rootCmd()` unconditionally. |
+| `cmd/<name>/commands/root.go`      | Declares `--version` as a local (not persistent) flag on the root command. The root's `RunE` closure dispatches to `runVersion` when the flag is set.                           |
+| `internal/cmd/release`             | Cross-platform Go `main` package. Rewrites `pkg/<name>/version.go`'s `Version` line, commits, tags, then bumps to the next `-devel` and commits again. Run with `go run ./internal/cmd/release ...`. |
+
+Design notes:
+
+- **`Version` is a `const`.** The release tool rewrites the source line, commits, and tags — that is the canonical mutation path, so build-time `-ldflags=-X` override would be redundant (and doesn't work on `const` anyway). Tests do not swap the value.
+- **`pkg/<name>/version.go` has no imports.** Anything richer (VCS info, etc.) lives in `internal/versioninfo`. Keep `pkg/<name>` cleanly publishable.
+- **`--version` is local, not persistent.** `mytool serve --version` is intentionally an unknown-flag error; only the root command exposes the alias.
+- **`mytool --version` and `mytool version` produce identical output.** They share `runVersion`; the alias is implemented as a closure dispatch, not a duplicated command.
+- **The version subcommand is the only `commands/` file that imports `pkg/<name>` directly.** Other commands go through the service constructed in their wrappers / `runRoot`.
+- **One Go source base, every host OS.** The release helper is a Go `main` package precisely so Linux, macOS, and Windows users do not have to maintain parallel bash + PowerShell scripts. Running it requires only the Go toolchain, which the project already needs.
+
+### Release flow
+
+`go run ./internal/cmd/release` automates the version dance. It is the canonical release entry point; do not re-introduce shell scripts in parallel.
+
+Steps the tool performs:
+
+1. Validate the requested release version (`vMAJOR.MINOR.PATCH[-suffix]`, must NOT end in `-devel`) and the next-dev version (must end in `-devel`). Both may carry an optional submodule path prefix — see "Submodule tags" below.
+2. Auto-detect `<prefix>/pkg/*/version.go` (must match exactly one; override with `-file <path>`). The prefix is empty for root-module releases.
+3. Refuse if the working tree is dirty or the release tag already exists.
+4. Rewrite the `Version` line to the release version (bare, no prefix), `git add` + `git commit -m "release: <tag>"`, then `git tag -a <tag> -m <tag>`.
+5. Rewrite the `Version` line to the next-dev version (bare, no prefix), `git add` + `git commit -m "start <tag> development cycle"`.
+6. Print the `git push` invocation needed to publish — the tool does **not** push automatically.
+
+Usage:
+
+```sh
+go run ./internal/cmd/release v0.2.0                # next dev defaults to v0.2.1-devel
+go run ./internal/cmd/release v0.2.0 v0.3.0-devel   # explicit next dev (must end in -devel; the tool does NOT append it)
+go run ./internal/cmd/release -file pkg/other/version.go v0.2.0
+go run ./internal/cmd/release subpkg/v0.2.0         # Go submodule at ./subpkg/; tags as subpkg/v0.2.0
+go run ./internal/cmd/release nested/dir/v0.2.0     # deeper submodule at ./nested/dir/
+```
+
+The default next-dev calculation bumps the patch component. If the release is a minor or major bump, pass the next-dev explicitly. The argument must already include the `-devel` suffix — the tool validates rather than appends so a typo can't silently produce an unexpected version.
+
+#### Submodule tags
+
+A Go repository can host multiple modules. Submodule versions are tagged with the directory as a prefix (`subpkg/v1.0.0`, `nested/dir/v1.0.0`); `go list -m <module>@<prefixed-tag>` is how Go resolves them. The release tool accepts these tags and applies a two-rule split:
+
+- **Tag-shaped names** (`subpkg/v0.2.0`, `subpkg/v0.2.1-devel`) — the full prefixed string is the git tag, commit message, and `go push` reference.
+- **File-shaped content** (`const Version = "v0.2.0"`) — only the bare version is written into `version.go`. The submodule's package doesn't know about the path prefix; only git tooling does.
+
+Auto-detection of the version file follows the prefix: `subpkg/v0.2.0` ⇒ `subpkg/pkg/*/version.go`. The same `pkg/<name>/version.go` convention applies inside each submodule. If the submodule deviates from this layout, pass `-file <path>` explicitly.
+
+`defaultNextDev` preserves the prefix: `subpkg/v0.2.0` ⇒ `subpkg/v0.2.1-devel`. The patch-bump rule and `-devel` suffix policy are otherwise unchanged.
 
 ## Naming conventions
 
@@ -222,7 +288,10 @@ func Execute(ctx context.Context) error {
 }
 
 func rootCmd() *cobra.Command {
-	var logConfig *loggerfactory.Config
+	var (
+		logConfig   *loggerfactory.Config
+		flagVersion bool
+	)
 
 	cmd := &cobra.Command{
 		Use:           "{{NAME}}",
@@ -238,19 +307,24 @@ func rootCmd() *cobra.Command {
 			slog.SetDefault(logger)
 			cmd.SetContext(contextkey.WithSlogLogger(cmd.Context(), logger))
 		},
-		RunE: runRoot,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if flagVersion {
+				return runVersion(cmd, args)
+			}
+			return runRoot(cmd, args)
+		},
 	}
 
 	logConfig = loggerfactory.RegisterFlags(cmd)
+	cmd.Flags().BoolVar(&flagVersion, "version", false, "alias for the version subcommand")
 
-	// TODO: declare root flags inside a `var (...)` block above the literal and
-	// bind them with `cmd.PersistentFlags().<Type>Var(&flag, ...)`. When `runRoot`
-	// needs the value, switch RunE to a closure adapter:
-	//   RunE: func(cmd *cobra.Command, args []string) error {
-	//       return runRoot(cmd, args, flagName)
-	//   }
+	versionCmd(cmd)
 
-	// TODO: wire subcommands here, e.g.:
+	// TODO: declare additional root flags inside the `var (...)` block above
+	// and bind them with `cmd.PersistentFlags().<Type>Var(&flag, ...)`. Extend
+	// the RunE closure to forward captured values into runRoot.
+
+	// TODO: wire additional subcommands here, e.g.:
 	//   serveCmd(cmd)
 
 	// TODO: you may add initialization logic for root internal service construct here.
@@ -263,7 +337,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 }
 ```
 
-The TODO comments are markers for the implementor — leave them.
+The TODO comments are markers for the implementor — leave them. The `versionCmd(cmd)` call and the `--version` flag are **not** TODOs; they are part of the always-present version wiring (see "Versioning").
 
 The `loggerfactory` helper (see "Helper catalog") owns logger config, the persistent log flags, the env-var override reader, and the `BuildLogger` constructor. Logging is **opt-in** via two persistent flags declared with `pflag.BoolFunc` (presence enables, optional `=value` overrides the default):
 
@@ -365,6 +439,93 @@ Differences vs. flat:
 - Child wrapper concatenates: `serverStartCmd`.
 - Child is wired from the **parent group's wrapper**, not from `rootCmd()`. 3-level follows the same pattern (`server_start_foo.go` is wired from inside `serverStartCmd`).
 
+### `pkg/{{NAME}}/version.go` (always present)
+
+Source of truth for the version string. Deliberately tiny: only the `const Version` declaration, no imports, so external consumers of `pkg/{{NAME}}` are not forced to pull `internal/`.
+
+```go
+// Package {{NAME}} implements the {{NAME}} service backing the binary of the
+// same name.
+package {{NAME}}
+
+// Version is the human-readable version string. The release helper at
+// internal/cmd/release rewrites this declaration when cutting a release,
+// then bumps it to the next "-devel" version after tagging.
+//
+// Edit by hand only when the release helper is unavailable (e.g. cherry-pick
+// of a release commit).
+const Version = "v0.0.0-devel"
+```
+
+The release helper matches this exact line shape: `^const\s+Version\s*=\s*"..."`. Do not rename the identifier or switch to `var` without updating `internal/cmd/release/main.go` (the regex literal and the format-string constant) in lockstep.
+
+`pkg/{{NAME}}/version.go` should remain import-free. Combine the `Version` value with VCS info via `internal/versioninfo.ReadVersionInfo(Version)` from the call site (typically `cmd/{{NAME}}/commands/version.go`).
+
+If the project name contains characters invalid in a Go identifier (e.g. `my-tool`), use a stripped form for the package declaration and import alias: `package mytool` for `pkg/my-tool/`, then `import mytool "{{MODULE}}/pkg/my-tool"` in `cmd/<name>/commands/version.go`.
+
+### `internal/versioninfo/versioninfo.go` (always present)
+
+Reusable, project-agnostic helper. Copied verbatim from `${SKILL-DIR}/helpers/internal/versioninfo/versioninfo.go`. Exposes `type Info` and `ReadVersionInfo(version string) Info`. The caller passes the project's `Version` constant; the helper layers VCS info from `runtime/debug.ReadBuildInfo` on top.
+
+This file is **not** a template; copy it as-is. See "Helper catalog" for the full path.
+
+### `internal/cmd/release/main.go` (always present)
+
+Cross-platform release helper. Copied verbatim from `${SKILL-DIR}/helpers/internal/cmd/release/main.go`. A `main` package living under `internal/` so it cannot be `go install`ed externally — it's a build-time tool of this module only. Runs as `go run ./internal/cmd/release`.
+
+This file is **not** a template; copy it as-is. The same source compiles on Linux, macOS, and Windows; that is the entire reason for picking a Go program over parallel shell + PowerShell scripts.
+
+### `cmd/{{NAME}}/commands/version.go` (always present)
+
+The `version` subcommand. Wired by `rootCmd()` unconditionally; also reachable via the `--version` alias on the root command. `runVersion` lives here so the root's `RunE` closure can dispatch to it.
+
+```go
+package commands
+
+import (
+	"github.com/spf13/cobra"
+
+	"{{MODULE}}/internal/versioninfo"
+	"{{MODULE}}/pkg/{{NAME}}"
+)
+
+func versionCmd(parent *cobra.Command) {
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Args:  cobra.NoArgs,
+		RunE:  runVersion,
+	}
+
+	parent.AddCommand(cmd)
+}
+
+func runVersion(cmd *cobra.Command, args []string) error {
+	info := versioninfo.ReadVersionInfo({{NAME}}.Version)
+	cmd.Printf("version:     %s\n", info.Version)
+	if info.Commit != "" {
+		modified := ""
+		if info.Modified {
+			modified = " (modified)"
+		}
+		cmd.Printf("commit:      %s%s\n", info.Commit, modified)
+	}
+	if info.CommitTime != "" {
+		cmd.Printf("commit time: %s\n", info.CommitTime)
+	}
+	if info.GoVersion != "" {
+		cmd.Printf("go version:  %s\n", info.GoVersion)
+	}
+	return nil
+}
+```
+
+Differences from a regular flat-leaf:
+
+- File name (`version.go`) collides with the canonical `<sub>.go` mapping intentionally — `version` IS the canonical subcommand for that file.
+- Wired by `rootCmd()` unconditionally; do **not** add a TODO around the `versionCmd(cmd)` call.
+- Imports two packages: `pkg/{{NAME}}` for the `Version` var, and `internal/versioninfo` for the `ReadVersionInfo` helper. It's the only `commands/` file that imports `pkg/{{NAME}}` directly.
+
 ### `go.mod`
 
 ```
@@ -404,14 +565,17 @@ Generation steps (relative to module root):
 1. Resolve all parameters.
 2. Write `go.mod` (with placeholder `v0.0.0` lines per the template).
 3. Write `cmd/<name>/main.go`.
-4. Write `cmd/<name>/commands/root.go`.
-5. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
-6. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
-7. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `helpers/internal/loggerfactory/loggerfactory.go` → `<root>/internal/loggerfactory/loggerfactory.go`. Copy `helpers/cmd/internal/stdiopipe/stdiopipe.go` → `<root>/cmd/internal/stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
-8. For each direct dep in `go.mod`: `go get <module>@latest`.
-9. `go mod tidy`.
-10. Run the post-edit validation chain (see below).
-11. Report the generated file list to the user.
+4. Write `cmd/<name>/commands/root.go` (the template already wires `versionCmd(cmd)` and the `--version` flag — leave that in place).
+5. Write `pkg/<name>/version.go` (`pkg/{{NAME}}/version.go` template). The initial `Version` value is `v0.0.0-devel`.
+6. Write `cmd/<name>/commands/version.go` (`cmd/{{NAME}}/commands/version.go` template).
+7. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
+8. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
+9. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `helpers/internal/loggerfactory/loggerfactory.go` → `<root>/internal/loggerfactory/loggerfactory.go`. Copy `helpers/internal/versioninfo/versioninfo.go` → `<root>/internal/versioninfo/versioninfo.go`. Copy `helpers/cmd/internal/stdiopipe/stdiopipe.go` → `<root>/cmd/internal/stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
+10. Copy `helpers/internal/cmd/release/main.go` → `<root>/internal/cmd/release/main.go`. (No build-time edits needed; the helper auto-detects `pkg/*/version.go`.)
+11. For each direct dep in `go.mod`: `go get <module>@latest`.
+12. `go mod tidy`.
+13. Run the post-edit validation chain (see below).
+14. Report the generated file list to the user.
 
 Use **Write** for every file. Write creates parent directories — do not run `mkdir` separately.
 
@@ -458,13 +622,31 @@ Pre-flight checks first (Cobra detection, layout classification). Then pick the 
 
 ## Helper catalog
 
-Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`. The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/cmd/internal/cmdsignals/` → `<project-root>/cmd/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, etc.
+Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`. The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/cmd/internal/cmdsignals/` → `<project-root>/cmd/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, `helpers/internal/cmd/release/` → `<project-root>/internal/cmd/release/`, etc.
+
+### Library packages (copied verbatim)
 
 | Helper           | Import path                              | Purpose                                                          | Signature(s)                                                                                                                          | Use when                                                                                                    |
 | ---------------- | ---------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `cmdsignals`     | `{{MODULE}}/cmd/internal/cmdsignals`     | exit-signal list for `signal.NotifyContext`                      | `var ExitSignals [...]os.Signal`                                                                                                      | Always when scaffolding (main.go imports it). For existing projects, only when adopting this template.      |
 | `loggerfactory`  | `{{MODULE}}/internal/loggerfactory`      | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `pkg/<name>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal` | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.      |
+| `versioninfo`    | `{{MODULE}}/internal/versioninfo`        | combine the project's `Version` with VCS info from `runtime/debug.ReadBuildInfo` | `ReadVersionInfo(version string) Info`, `type Info`                                                                  | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `stdiopipe`      | `{{MODULE}}/cmd/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe` | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics. |
+
+### Build-time `main` packages (copied verbatim)
+
+| Helper    | Source                                       | Destination                              | Purpose                                                                                                                                  | Use when                                                                                                |
+| --------- | -------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `release` | `helpers/internal/cmd/release/main.go`       | `<root>/internal/cmd/release/main.go`    | Cross-platform release helper. Validates inputs, rewrites `pkg/<name>/version.go`'s `const Version`, commits + tags, bumps to next `-devel`. | Always when scaffolding. Invoke during a release with `go run ./internal/cmd/release <release-version> [<next-dev-version>]`. |
+
+The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree or duplicate tag. It does **not** push; it prints the `git push` invocation instead. See the Versioning section for the contract it expects.
+
+### Templates (filled per project; not copied verbatim)
+
+| Template                            | Destination                            | Purpose                                                                                                  |
+| ----------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `pkg/{{NAME}}/version.go`           | `<root>/pkg/<name>/version.go`         | Declares `const Version`. Rewritten by `internal/cmd/release`. No imports.                              |
+| `cmd/{{NAME}}/commands/version.go`  | `<root>/cmd/<name>/commands/version.go` | The `version` subcommand and `runVersion`. Wired unconditionally by `rootCmd()`; alias of `--version`. |
 
 ## Post-edit validation
 
@@ -483,10 +665,19 @@ Do not generate any of these — they look superficially shorter but break the l
 
 - **`commands/` at the module root** (i.e. `<root>/commands/...` instead of `<root>/cmd/<name>/commands/...`). A second binary forces a rename of every import path.
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
-- **CLI-only helpers under module-root `internal/`.** `cmdsignals` and `stdiopipe` go at `cmd/internal/`, not `<root>/internal/`. The module-root `internal/` is reserved for packages shared between `./cmd` and `./pkg/<name>` — currently just `loggerfactory` (its `Level*` constants are imported from `pkg/<name>`).
+- **CLI-only helpers under module-root `internal/`.** `cmdsignals` and `stdiopipe` go at `cmd/internal/`, not `<root>/internal/`. The module-root `internal/` is reserved for two cases: (a) library packages shared between `./cmd` and `./pkg/<name>` — `loggerfactory` (whose `Level*` constants are imported from `pkg/<name>`) and `versioninfo` (consumed by `commands/version.go`); and (b) build-time `main` packages such as `internal/cmd/release` that should not be `go install`-able by external modules.
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
 - **Skipping `cmdsignals`.** Always generated for scaffold; `main.go` imports it.
 - **Skipping `loggerfactory`.** Always generated for scaffold; `root.go` imports it for `--log` / `--log-level` wiring.
+- **Skipping `versioninfo`.** Always generated for scaffold; `commands/version.go` imports it.
+- **Skipping `internal/cmd/release`.** Always generated for scaffold; the release flow assumes it. The Go program intentionally replaces parallel bash + PowerShell scripts; do not re-introduce them.
+- **Skipping `version.go` (either copy).** Both `pkg/<name>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
+- **Hand-editing `const Version = "..."` outside a release.** Use `go run ./internal/cmd/release`; manual edits drift from the tag/commit pair the helper produces.
+- **Renaming `Version` or switching it to `var`.** The release helper's regex matches `^const\s+Version\s*=\s*"..."` exactly. If you must change the shape, update `internal/cmd/release/main.go` (the `versionLineRE` and `versionLineFormat` constants) in lockstep. There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
+- **Adding imports to `pkg/<name>/version.go`.** It must stay import-free so external consumers of `pkg/<name>` are not forced to pull `internal/`. Anything richer (VCS info, runtime/debug glue) lives in `internal/versioninfo`.
+- **Putting version printing under any other subcommand or in `main.go`.** Version output lives in `runVersion` only. The root `--version` flag is implemented as a closure dispatch into `runVersion`, not a copy.
+- **Making `--version` persistent.** It is a local flag on the root command. `mytool serve --version` is intentionally an unknown-flag error; only `mytool --version` and `mytool version` print the version.
+- **Putting the release helper anywhere other than `internal/cmd/release/`.** Specifically: not `cmd/release/` (that would make it `go install`-able by external consumers) and not `scripts/` (no shell-script parity to maintain).
 - **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/internal/loggerfactory`. Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package under `cmd/internal/` — `pkg/<name>` needs to import its `Level` constants.
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
 - **Package-level `var xxxCmd = &cobra.Command{...}`** or any `init()` that calls `AddCommand`. All Cobra construction lives inside the wrapper function `{{name}}Cmd(parent)`; wiring happens via the parent calling its children's wrappers.
