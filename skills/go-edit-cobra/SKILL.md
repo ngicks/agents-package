@@ -178,9 +178,9 @@ Steps the tool performs:
 1. Validate the requested release version (`vMAJOR.MINOR.PATCH[-suffix]`, must NOT end in `-devel`) and the next-dev version (must end in `-devel`). Both may carry an optional submodule path prefix — see "Submodule tags" below.
 2. Auto-detect `<prefix>/pkg/*/version.go` (must match exactly one; override with `-file <path>`). The prefix is empty for root-module releases.
 3. Refuse if the working tree is dirty or the release tag already exists.
-4. Rewrite the `Version` line to the release version (bare, no prefix), `git add` + `git commit -m "release: <tag>"`, then `git tag -a <tag> -m <tag>`.
-5. Rewrite the `Version` line to the next-dev version (bare, no prefix), `git add` + `git commit -m "start <tag> development cycle"`.
-6. Print the `git push` invocation needed to publish — the tool does **not** push automatically.
+4. Rewrite the `Version` line to the release version (bare, no prefix), commit, and create an annotated tag `<tag>`.
+5. Rewrite the `Version` line to the next-dev version (bare, no prefix) and commit.
+6. `git push` the branch, then `git push origin <tag>` to publish the new tag. The tool aborts if either push fails (e.g. missing upstream, network failure, remote rejection); fix and re-push manually since the commits and tag already exist locally.
 
 Usage:
 
@@ -457,7 +457,7 @@ package {{NAME}}
 const Version = "v0.0.0-devel"
 ```
 
-The release helper matches this exact line shape: `^const\s+Version\s*=\s*"..."`. Do not rename the identifier or switch to `var` without updating `internal/cmd/release/main.go` (the regex literal and the format-string constant) in lockstep.
+The contract with the release helper is a single top-level `const Version = "..."` line, identifier spelled `Version`. Anything that changes this shape (renaming the identifier, switching to `var`, multiple declarations, struct-wrapping) breaks the helper's rewrite; update the helper in lockstep if you must change the shape.
 
 `pkg/{{NAME}}/version.go` should remain import-free. Combine the `Version` value with VCS info via `internal/versioninfo.ReadVersionInfo(Version)` from the call site (typically `cmd/{{NAME}}/commands/version.go`).
 
@@ -639,7 +639,7 @@ Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/
 | --------- | -------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `release` | `helpers/internal/cmd/release/main.go`       | `<root>/internal/cmd/release/main.go`    | Cross-platform release helper. Validates inputs, rewrites `pkg/<name>/version.go`'s `const Version`, commits + tags, bumps to next `-devel`. | Always when scaffolding. Invoke during a release with `go run ./internal/cmd/release <release-version> [<next-dev-version>]`. |
 
-The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree or duplicate tag. It does **not** push; it prints the `git push` invocation instead. See the Versioning section for the contract it expects.
+The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree or duplicate tag. It pushes the branch and the new tag to `origin` on success; if either push fails it aborts and leaves the local commits + tag in place for manual re-push. See the Versioning section for the contract it expects.
 
 ### Templates (filled per project; not copied verbatim)
 
@@ -673,7 +673,7 @@ Do not generate any of these — they look superficially shorter but break the l
 - **Skipping `internal/cmd/release`.** Always generated for scaffold; the release flow assumes it. The Go program intentionally replaces parallel bash + PowerShell scripts; do not re-introduce them.
 - **Skipping `version.go` (either copy).** Both `pkg/<name>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
 - **Hand-editing `const Version = "..."` outside a release.** Use `go run ./internal/cmd/release`; manual edits drift from the tag/commit pair the helper produces.
-- **Renaming `Version` or switching it to `var`.** The release helper's regex matches `^const\s+Version\s*=\s*"..."` exactly. If you must change the shape, update `internal/cmd/release/main.go` (the `versionLineRE` and `versionLineFormat` constants) in lockstep. There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
+- **Renaming `Version` or switching it to `var`.** The required source shape is a single top-level `const Version = "..."`; the release helper relies on it. Update the helper in lockstep if you must diverge. There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
 - **Adding imports to `pkg/<name>/version.go`.** It must stay import-free so external consumers of `pkg/<name>` are not forced to pull `internal/`. Anything richer (VCS info, runtime/debug glue) lives in `internal/versioninfo`.
 - **Putting version printing under any other subcommand or in `main.go`.** Version output lives in `runVersion` only. The root `--version` flag is implemented as a closure dispatch into `runVersion`, not a copy.
 - **Making `--version` persistent.** It is a local flag on the root command. `mytool serve --version` is intentionally an unknown-flag error; only `mytool --version` and `mytool version` print the version.
