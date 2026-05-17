@@ -8,19 +8,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./run.sh",
+            "command": "crabswarm hook exec --ft go 'golangci-lint run {{dirname .File}}'",
             "timeoutSec": 300
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "./run.sh",
-            "timeoutSec": 600
           }
         ]
       }

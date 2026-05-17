@@ -7,19 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./run.sh",
+            "command": "crabswarm hook exec --ft go 'golangci-lint fmt {{.File}}'",
             "timeout": 120
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "./run.sh",
-            "timeout": 300
           }
         ]
       }

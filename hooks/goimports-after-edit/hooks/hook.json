@@ -7,19 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./run.sh",
+            "command": "crabswarm hook exec --ft go 'goimports -w {{.File}}'",
             "timeout": 60
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "./run.sh",
-            "timeout": 120
           }
         ]
       }
