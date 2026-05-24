@@ -5,6 +5,8 @@ applyTo: "**/*.go"
 
 ### Go basic DOs and DON'Ts
 
+### Concurrent Go
+
 Use:
 
 - golang.org/x/sync/errgroup for multiple simultaneous works
@@ -15,3 +17,7 @@ Use:
 Rules:
 
 - Do not wire `sync.WaitGroup` and `chan struct{}` by yourself as long as errgroup, semaphore and/or singleflight cover(s) the usecase.
+
+### Algorithm
+
+- Do not use `sort` package for sort. Use `slices.Sort` instead
