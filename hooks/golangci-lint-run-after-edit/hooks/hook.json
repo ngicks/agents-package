@@ -3,13 +3,12 @@
   "hooks": {
     "PostToolUse": [
       {
-        "type": "command",
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": "crabswarm hook exec --ft go 'golangci-lint run {{dirname .File}}'",
-            "timeoutSec": 300
+            "timeout": 300
           }
         ]
       }
