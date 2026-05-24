@@ -215,3 +215,60 @@ Use this checklist to find old Go writing and replace it with idioms and APIs av
 - **DO** use `go/version` to validate/compare Go versions.
 - **DON'T** use `reflect.PtrTo` — use `reflect.PointerTo`.
 - **DON'T** use `go/ast` resolution helpers (`Ident.Obj`, `Object`, `Scope`, `File.Scope`, `File.Unresolved`, `Importer`, `Package`, `NewPackage`) — use `go/types` (`Info.Uses`, `Info.Defs`).
+
+#### Go 1.21
+
+##### Language — New Builtins
+
+- **DO** use the `min` / `max` builtins instead of helper functions or `if`/`else` comparisons.
+- **DO** use the `clear` builtin to empty a map (`clear(m)`) or zero a slice (`clear(s)`).
+  - **DON'T** loop `for k := range m { delete(m, k) }` just to empty a map.
+- **DON'T** call `panic(nil)` — in `go 1.21+` modules it raises `*runtime.PanicNilError` and `recover()` returns non-nil.
+
+##### Standard Library — New Packages (`slices` / `maps` / `cmp`)
+
+- **DON'T** use `sort.Strings`, `sort.Ints`, `sort.Float64s` — **DO** use `slices.Sort`.
+- **DON'T** use `sort.Slice` / `sort.SliceStable` — **DO** use `slices.SortFunc` / `slices.SortStableFunc` with a `func(a, b E) int` comparator (build it with `cmp.Compare`).
+  ```go
+  slices.SortFunc(users, func(a, b User) int {
+      return cmp.Compare(a.Name, b.Name)
+  })
+  ```
+  - `sort.Sort` over a genuine custom `sort.Interface` (non-slice) is still fine.
+- **DON'T** use `sort.SearchInts` / `sort.SearchStrings` / a hand-rolled `sort.Search` over a sorted slice — **DO** use `slices.BinarySearch` / `slices.BinarySearchFunc`.
+- **MIND the comparator direction.** `slices.SortFunc` / `SortStableFunc` / `BinarySearchFunc` / `CompareFunc` take a three-way `func(a, b) int` that must return a **negative** number when `a` sorts **before** `b` (same direction as `cmp.Compare(a, b)`). This is **not** the boolean `less func(i, j) bool` of `sort.Slice` (or the old `golang.org/x/exp/slices.SortFunc`); reusing boolean logic or flipping the sign silently reverses the order and breaks the search. **DO** build it from `cmp.Compare` rather than a hand-rolled `if` ladder.
+  - `sort` has no `BinarySearch`: `sort.Search` takes a bool predicate (`data[i] >= x`), so porting it means rewriting the predicate as a three-way comparator (or just use `slices.BinarySearch` for `cmp.Ordered` elements).
+- **DON'T** use `sort.IntsAreSorted` / `sort.StringsAreSorted` — **DO** use `slices.IsSorted` / `slices.IsSortedFunc`.
+- **DON'T** hand-write membership or index loops — **DO** use `slices.Contains` / `slices.ContainsFunc` / `slices.Index` / `slices.IndexFunc`.
+- **DON'T** hand-write min/max-over-slice loops — **DO** use `slices.Max` / `slices.Min` / `slices.MaxFunc` / `slices.MinFunc`.
+- **DO** use `slices.{Clone,Equal,EqualFunc,Compare,CompareFunc,Compact,CompactFunc,Delete,DeleteFunc,Insert,Replace,Reverse,Grow,Clip}` instead of manual slice surgery.
+- **DON'T** depend on `golang.org/x/exp/slices` / `golang.org/x/exp/maps` — **DO** use the stdlib `slices` / `maps`.
+- **DO** use `maps.{Clone,Copy,Equal,EqualFunc,DeleteFunc}` instead of manual map loops. (Iterator-based `maps.Keys`/`Values` are Go 1.23.)
+- **DO** use `cmp.Compare` / `cmp.Less` and the `cmp.Ordered` constraint for generic ordering.
+
+##### Structured Logging
+
+- **DO** use `log/slog` for structured logging in new code.
+- **DO** validate custom `slog.Handler` implementations with `testing/slogtest`.
+
+##### sync / context / errors
+
+- **DO** use `sync.OnceFunc` / `sync.OnceValue` / `sync.OnceValues` instead of a hand-written `sync.Once` plus captured variables.
+- **DO** use `context.WithoutCancel`, `context.WithDeadlineCause`, `context.WithTimeoutCause`, and `context.AfterFunc`.
+- **DO** wrap/return `errors.ErrUnsupported` to signal an unsupported operation; detect it with `errors.Is(err, errors.ErrUnsupported)`.
+
+##### reflect
+
+- **DON'T** use `reflect.SliceHeader` / `reflect.StringHeader` (deprecated) — **DO** use `unsafe.Slice`, `unsafe.SliceData`, `unsafe.String`, `unsafe.StringData`.
+- **DO** use `reflect.Value.Clear()` to empty a map or zero a slice via reflection.
+
+##### Crypto
+
+- **DON'T** use `crypto/elliptic` `Curve` methods or `GenerateKey`/`Marshal`/`Unmarshal` (deprecated) — **DO** use `crypto/ecdh`.
+- **DON'T** use `crypto/x509.RevocationList.RevokedCertificates` (deprecated) — **DO** use `RevokedCertificateEntries` with `RevocationListEntry`.
+
+##### Other Stdlib Additions
+
+- **DO** use `binary.NativeEndian` for machine-native byte order.
+- **DO** use `bytes.Buffer.Available()` / `AvailableBuffer()` for allocation-free appends.
+- **DO** use `flag.BoolFunc` for boolean flags that take no argument.
