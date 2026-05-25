@@ -570,12 +570,11 @@ Generation steps (relative to module root):
 6. Write `cmd/<name>/commands/version.go` (`cmd/{{NAME}}/commands/version.go` template).
 7. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
 8. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
-9. Copy `helpers/cmd/internal/cmdsignals/signals.go` → `<root>/cmd/internal/cmdsignals/signals.go`. Copy `helpers/internal/loggerfactory/loggerfactory.go` → `<root>/internal/loggerfactory/loggerfactory.go`. Copy `helpers/internal/versioninfo/versioninfo.go` → `<root>/internal/versioninfo/versioninfo.go`. Copy `helpers/cmd/internal/stdiopipe/stdiopipe.go` → `<root>/cmd/internal/stdiopipe/stdiopipe.go` only if a subcommand needs cancellable stdio.
-10. Copy `helpers/internal/cmd/release/main.go` → `<root>/internal/cmd/release/main.go`. (No build-time edits needed; the helper auto-detects `pkg/*/version.go`.)
-11. For each direct dep in `go.mod`: `go get <module>@latest`.
-12. `go mod tidy`.
-13. Run the post-edit validation chain (see below).
-14. Report the generated file list to the user.
+9. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio). This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `cmd/internal/stdiopipe`. No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
+10. For each direct dep in `go.mod`: `go get <module>@latest`.
+11. `go mod tidy`.
+12. Run the post-edit validation chain (see below).
+13. Report the generated file list to the user.
 
 Use **Write** for every file. Write creates parent directories — do not run `mkdir` separately.
 
@@ -623,6 +622,8 @@ Pre-flight checks first (Cobra detection, layout classification). Then pick the 
 ## Helper catalog
 
 Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`. The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/cmd/internal/cmdsignals/` → `<project-root>/cmd/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, `helpers/internal/cmd/release/` → `<project-root>/internal/cmd/release/`, etc.
+
+Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on packages (`cmdsignals`, `loggerfactory`, `versioninfo`, `internal/cmd/release`) — source and tests — in one step; add `--stdiopipe` to also copy `cmd/internal/stdiopipe`. `<project-root>` must already exist.
 
 ### Library packages (copied verbatim)
 
