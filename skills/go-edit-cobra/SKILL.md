@@ -28,6 +28,7 @@ These rules are Cobra-specific. The "thin run function" rule is the Cobra-mechan
 - **`RunE` only**, never `Run`. Return errors; do not `os.Exit` from a command body.
 - **Root command**: `SilenceUsage: true`, `SilenceErrors: true`. Delegate to a named `runRoot`.
 - **Default `Args`**: `cobra.NoArgs`. **Change it** when positional arguments fit the command better — e.g. `cobra.ExactArgs(1)`, `cobra.MinimumNArgs(1)`, `cobra.MaximumNArgs(2)`, `cobra.RangeArgs(1, 3)`, `cobra.MatchAll(cobra.ExactArgs(1), customValidator)`. Treat positional args as the natural shape when the command operates on a target (`mytool inspect <path>`, `mytool delete <id>...`); flags are for options on top of that target. The templates set `cobra.NoArgs` as a safe placeholder, not a recommendation.
+- **Positional-argument completion (`ValidArgsFunction`)**: fill `ValidArgsFunction` on a leaf command's literal to control shell completion of its positional args. The stub leaf templates ship this as a TODO — fill it to match `Args`. When the command takes no completable positional args (the `cobra.NoArgs` default), set `cobra.NoFileCompletions` so the shell does not fall back to file completion. When it does take them, assign a dynamic completion function, a static `ValidArgs` slice, or `cobra.FixedCompletions(...)`. `ValidArgs` and `ValidArgsFunction` are mutually exclusive — set at most one (Cobra reports an error when both are present).
 - **One wrapper function per command.** Every Cobra construction lives inside an unexported `func {{name}}Cmd(parent *cobra.Command)`. The function builds the `cobra.Command` literal, declares flag variables in a local `var (...)` block, binds them via `cmd.Flags().<Type>Var(...)`, calls children's wrapper functions on the new `cmd`, and ends with `parent.AddCommand(cmd)`. There are **no package-level `*Cmd` variables** and **no `init()` functions** for wiring.
 - **Root is the special case.** `func rootCmd() *cobra.Command` (no `parent`). It returns the configured root and is invoked from `Execute(ctx)`. All top-level subcommands are wired by `rootCmd()` calling each subcommand's wrapper function.
 - **Run functions are named** (`run{{Name}}`) and live at package level. **Run functions are thin wiring**: read positional args, call a service, return its error. Business logic is forbidden under `./cmd`.
@@ -358,7 +359,9 @@ func {{subCamel}}Cmd(parent *cobra.Command) {
 		Use:   "{{sub-name}}",
 		Short: "{{Sub short description}}",
 		Args:  cobra.NoArgs,
-		RunE:  run{{SubPascal}},
+		// TODO: set ValidArgsFunction to control positional-argument completion,
+		// e.g. cobra.NoFileCompletions to disable the default file completion.
+		RunE: run{{SubPascal}},
 	}
 
 	// TODO: declare flags inside a `var (...)` block above the literal and bind
@@ -413,7 +416,9 @@ func {{parentCamel}}{{ChildPascal}}Cmd(parent *cobra.Command) {
 		Use:   "{{child-name}}",
 		Short: "{{Child short description}}",
 		Args:  cobra.NoArgs,
-		RunE:  run{{ParentPascal}}{{ChildPascal}},
+		// TODO: set ValidArgsFunction to control positional-argument completion,
+		// e.g. cobra.NoFileCompletions to disable the default file completion.
+		RunE: run{{ParentPascal}}{{ChildPascal}},
 	}
 
 	// TODO: declare flags inside a `var (...)` block above the literal and bind
@@ -616,7 +621,7 @@ Pre-flight checks first (Cobra detection, layout classification). Then pick the 
 
 #### Completion
 
-- **Positional-argument completion**: set `ValidArgs`, `ValidArgsFunction`, or `cobra.FixedCompletions(...)` on the `cobra.Command` literal inside the wrapper.
+- **Positional-argument completion**: set `ValidArgsFunction` (dynamic), `ValidArgs` (static slice), or `cobra.FixedCompletions(...)` on the `cobra.Command` literal inside the wrapper. The stub leaf templates leave this as a TODO — fill it to match the command's `Args`: use `cobra.NoFileCompletions` when the command takes no completable positional args (so the shell does not fall back to file completion), otherwise supply real completions. `ValidArgs` and `ValidArgsFunction` are mutually exclusive; Cobra reports an error when both are set.
 - **Flag-value completion**: call `cmd.RegisterFlagCompletionFunc(name, fn)` inside the wrapper, after binding the flag.
 
 ## Helper catalog
