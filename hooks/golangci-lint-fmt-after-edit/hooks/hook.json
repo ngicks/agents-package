@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "crabswarm hook exec --ft go 'golangci-lint fmt {{.File}}'",
+            "command": "crabswarm hook exec --ft go 'golangci-lint fmt {{quoteJoin .Files}}'",
             "timeout": 120
           }
         ]

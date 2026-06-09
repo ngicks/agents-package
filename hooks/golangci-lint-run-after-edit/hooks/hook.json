@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "crabswarm hook exec --ft go 'golangci-lint run {{dirname .File}}'",
+            "command": "crabswarm hook exec --ft go 'golangci-lint run {{quote (dirname .File)}}'",
             "timeout": 300
           }
         ]
