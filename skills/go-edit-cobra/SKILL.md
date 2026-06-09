@@ -236,7 +236,7 @@ These are templates. **Strictly follow** the order of elements. Do **NOT** reord
 
 ### `cmd/{{NAME}}/main.go`
 
-`main.go` only handles signal wiring and process exit. The final error is written unconditionally to stderr because logging is opt-in via `--log` / `--log-level`.
+`main.go` only handles signal wiring and process exit. It builds the root context with `cmdsignals.NotifyContext`, which subscribes to `ExitSignals` (`SIGINT` / `SIGTERM`) and returns a `blockOn` func, the cancellable `ctx`, and a `cancel(error)`. `blockOn` is what actually cancels `ctx` on a signal, so it runs in a goroutine via `sync.WaitGroup.Go` (Go 1.25+) for the duration of `Execute`; `cancel(nil)` + `wg.Wait()` then unwind it once `Execute` returns. Do **not** revert to the stdlib `signal.NotifyContext` — the helper's variant is what enables `Pause` / `Resume` (see "Helper catalog"). The final error is written unconditionally to stderr because logging is opt-in via `--log` / `--log-level`.
 
 ```go
 package main
@@ -245,20 +245,28 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
+	"sync"
 
 	"{{MODULE}}/cmd/{{NAME}}/commands"
 	"{{MODULE}}/cmd/internal/cmdsignals"
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(
-		context.Background(),
-		cmdsignals.ExitSignals[:]...,
-	)
-	defer stop()
+	blockOn, ctx, cancel := cmdsignals.NotifyContext(context.Background())
 
-	if err := commands.Execute(ctx); err != nil {
+	// blockOn watches ExitSignals and cancels ctx when one arrives; it must run
+	// for signal propagation to work, so start it before Execute. cancel + Wait
+	// tear the goroutine down afterwards — whether Execute returned on its own or
+	// because a signal already cancelled ctx (cancel is a no-op in that case).
+	var wg sync.WaitGroup
+	wg.Go(blockOn)
+
+	err := commands.Execute(ctx)
+
+	cancel(nil)
+	wg.Wait()
+
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
@@ -634,10 +642,12 @@ Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on package
 
 | Helper           | Import path                              | Purpose                                                          | Signature(s)                                                                                                                          | Use when                                                                                                    |
 | ---------------- | ---------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `cmdsignals`     | `{{MODULE}}/cmd/internal/cmdsignals`     | exit-signal list for `signal.NotifyContext`                      | `var ExitSignals [...]os.Signal`                                                                                                      | Always when scaffolding (main.go imports it). For existing projects, only when adopting this template.      |
+| `cmdsignals`     | `{{MODULE}}/cmd/internal/cmdsignals`     | signal-cancellable root context for `SIGINT` / `SIGTERM`, with pause/resume for temporarily forwarding signals to a child process | `NotifyContext(ctx) (blockOn func(), ctx context.Context, cancel func(error))`, `Pause(ctx, installHandler func()) bool`, `Resume(ctx, removeHandler func()) bool`, `var ExitSignals [...]os.Signal` | Always when scaffolding (`main.go` calls `NotifyContext`). For existing projects, only when adopting this template.      |
 | `loggerfactory`  | `{{MODULE}}/internal/loggerfactory`      | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `pkg/<name>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal` | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.      |
 | `versioninfo`    | `{{MODULE}}/internal/versioninfo`        | combine the project's `Version` with VCS info from `runtime/debug.ReadBuildInfo` | `ReadVersionInfo(version string) Info`, `type Info`                                                                  | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `stdiopipe`      | `{{MODULE}}/cmd/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe` | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics. |
+
+`cmdsignals.Pause` / `Resume` take the same `ctx` that `NotifyContext` produced (threaded through `cmd.Context()`). Reach for them only in a leaf's `run{{Name}}` that hands the terminal to a child process — exec'ing an editor, an interactive REPL, a `less` pager — where `SIGINT` should reach the child instead of cancelling the CLI. `Pause` stops this package's handler (its `installHandler` callback is where you install the child's own forwarding handler) and `Resume` restores it (`removeHandler` uninstalls yours); both no-op safely if the context carries no manager or is already cancelled. The default scaffold needs neither — `NotifyContext` alone gives the standard "signal cancels `ctx`" behavior.
 
 ### Build-time `main` packages (copied verbatim)
 
