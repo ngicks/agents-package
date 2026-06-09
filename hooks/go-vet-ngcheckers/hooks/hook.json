@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crabswarm hook exec --ft go 'go vet -vettool={{quote (which \"ngcheckers\")}} {{quote (dirname .File)}}'",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
