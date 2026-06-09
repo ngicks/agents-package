@@ -16,6 +16,14 @@ var ExitSignals = [...]os.Signal{
 	syscall.SIGTERM,
 }
 
+type SignalReceivedError struct {
+	Sig os.Signal
+}
+
+func (e *SignalReceivedError) Error() string {
+	return fmt.Sprintf("signal received: %q", e.Sig)
+}
+
 var signalChanMgrKey = new("signalChanMgr")
 
 type signalChanMgr struct {
@@ -48,7 +56,7 @@ func (mgr *signalChanMgr) blockOn() {
 				continue
 			}
 			mgr.mu.Unlock()
-			mgr.cancel(fmt.Errorf("signal received: %q", sig))
+			mgr.cancel(&SignalReceivedError{Sig: sig})
 		}
 		return
 	}
@@ -56,8 +64,27 @@ func (mgr *signalChanMgr) blockOn() {
 
 // NotifyContext wires up [ExitSignals] to cancel ctx when those signals are received.
 // blockOn must be called to make signal propagation work.
-// Callers are advised to call blockOn in [sync.WaitGroup]'s Go method.
-// Callers should call cancel in defer to clean up associated resources.
+//
+// The ctx will be cancelled with [*SignalReceivedError] when those listed in [ExitSignals]
+// received.
+// Callers are advised to check errors with [context.Cause].
+//
+//	err := work(ctx)
+//	if err != nil {
+//		if errors.Is(err, ctx.Err()) {
+//			if sigErr, ok := errors.AsType[*SignalReceivedError](context.Cause(ctx));  ok {
+//				// log as signal cancellation using sigErr.Sig
+//				// or print nothing and exit as if normal exit
+//				return
+//			}
+//		}
+//		// non-cancellation error.
+//	}
+//
+// As name suggests, blockOn blocks a calling goroutine.
+// So callers are advised to call it with `go` keyword (i.e. `go blockOn`)
+// or with [sync.WaitGroup.Go].
+// Callers should call cancel in every code path if they wish to clean up resources.
 //
 // [Pause] and [Resume] might be used to temporarily disable / re-enable
 // cancellation. This is useful when forwarding signals to another process,

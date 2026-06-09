@@ -236,13 +236,14 @@ These are templates. **Strictly follow** the order of elements. Do **NOT** reord
 
 ### `cmd/{{NAME}}/main.go`
 
-`main.go` only handles signal wiring and process exit. It builds the root context with `cmdsignals.NotifyContext`, which subscribes to `ExitSignals` (`SIGINT` / `SIGTERM`) and returns a `blockOn` func, the cancellable `ctx`, and a `cancel(error)`. `blockOn` is what actually cancels `ctx` on a signal, so it runs in a goroutine via `sync.WaitGroup.Go` (Go 1.25+) for the duration of `Execute`; `cancel(nil)` + `wg.Wait()` then unwind it once `Execute` returns. Do **not** revert to the stdlib `signal.NotifyContext` — the helper's variant is what enables `Pause` / `Resume` (see "Helper catalog"). The final error is written unconditionally to stderr because logging is opt-in via `--log` / `--log-level`.
+`main.go` only handles signal wiring and process exit. It builds the root context with `cmdsignals.NotifyContext`, which subscribes to `ExitSignals` (`SIGINT` / `SIGTERM`) and returns a `blockOn` func, the cancellable `ctx`, and a `cancel(error)`. `blockOn` is what actually cancels `ctx` on a signal, so it runs in a goroutine via `sync.WaitGroup.Go` (Go 1.25+) for the duration of `Execute`; `cancel(nil)` + `wg.Wait()` then unwind it once `Execute` returns. Do **not** revert to the stdlib `signal.NotifyContext` — the helper's variant is what enables `Pause` / `Resume` (see "Helper catalog"). When a signal triggered the shutdown, `Execute` returns the bare `context.Canceled` sentinel; `main` recovers the real reason from `context.Cause(ctx)` as a `*cmdsignals.SignalReceivedError` (via `errors.AsType`, Go 1.26+) so the printed message names the signal instead of the opaque `context canceled`. The guard is `errors.Is(err, ctx.Err())`, **not** the bare `context.Canceled` sentinel: `context.Canceled` is a public value any code may return without this context being cancelled, whereas `ctx.Err()` is non-nil only when *this* ctx was genuinely cancelled. It is checked **before** `cancel(nil)` — that cleanup call would otherwise set `ctx.Err()` itself and manufacture a false positive. The error is otherwise written unconditionally to stderr because logging is opt-in via `--log` / `--log-level`.
 
 ```go
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -263,6 +264,19 @@ func main() {
 
 	err := commands.Execute(ctx)
 
+	// Recover the cancellation reason while ctx still reflects it. The guard is
+	// errors.Is(err, ctx.Err()) — not the bare context.Canceled sentinel, which
+	// any code may return without this ctx being cancelled — so it fires only
+	// when *this* context was actually cancelled. Read it before cancel(nil)
+	// below, or that cleanup call would set ctx.Err() and manufacture a false
+	// positive. Execute surfaces only context.Canceled; the signal lives in the
+	// cause as *SignalReceivedError.
+	if err != nil && errors.Is(err, ctx.Err()) {
+		if sigErr, ok := errors.AsType[*cmdsignals.SignalReceivedError](context.Cause(ctx)); ok {
+			err = sigErr
+		}
+	}
+
 	cancel(nil)
 	wg.Wait()
 
@@ -272,6 +286,8 @@ func main() {
 	}
 }
 ```
+
+The template treats a signal as an error (prints it, exits non-zero). That is just one policy: **callers may instead treat signal cancellation as a normal exit, per an application-specific decision** — e.g. a graceful shutdown where `SIGINT` / `SIGTERM` is the expected stop button. In that case, in the `errors.AsType` branch where `sigErr` is recovered, return cleanly (print nothing, or a terse notice, and skip `os.Exit(1)`) rather than falling through to the error report; some tools additionally map the signal to the conventional `128 + signum` exit code (`sigErr.Sig`). The recovery itself — `ctx.Err()` guard, cause via `context.Cause` — stays the same; only what `main` *does* with `sigErr` changes.
 
 ### `cmd/{{NAME}}/commands/root.go`
 
@@ -642,7 +658,7 @@ Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on package
 
 | Helper           | Import path                              | Purpose                                                          | Signature(s)                                                                                                                          | Use when                                                                                                    |
 | ---------------- | ---------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `cmdsignals`     | `{{MODULE}}/cmd/internal/cmdsignals`     | signal-cancellable root context for `SIGINT` / `SIGTERM`, with pause/resume for temporarily forwarding signals to a child process | `NotifyContext(ctx) (blockOn func(), ctx context.Context, cancel func(error))`, `Pause(ctx, installHandler func()) bool`, `Resume(ctx, removeHandler func()) bool`, `var ExitSignals [...]os.Signal` | Always when scaffolding (`main.go` calls `NotifyContext`). For existing projects, only when adopting this template.      |
+| `cmdsignals`     | `{{MODULE}}/cmd/internal/cmdsignals`     | signal-cancellable root context for `SIGINT` / `SIGTERM`, with pause/resume for temporarily forwarding signals to a child process | `NotifyContext(ctx) (blockOn func(), ctx context.Context, cancel func(error))`, `Pause(ctx, installHandler func()) bool`, `Resume(ctx, removeHandler func()) bool`, `type SignalReceivedError{Sig os.Signal}` (cancellation cause; recover via `context.Cause` + `errors.AsType`), `var ExitSignals [...]os.Signal` | Always when scaffolding (`main.go` calls `NotifyContext`). For existing projects, only when adopting this template.      |
 | `loggerfactory`  | `{{MODULE}}/internal/loggerfactory`      | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `pkg/<name>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal` | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.      |
 | `versioninfo`    | `{{MODULE}}/internal/versioninfo`        | combine the project's `Version` with VCS info from `runtime/debug.ReadBuildInfo` | `ReadVersionInfo(version string) Info`, `type Info`                                                                  | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `stdiopipe`      | `{{MODULE}}/cmd/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe` | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics. |
