@@ -68,7 +68,7 @@ func runServe(cmd *cobra.Command, args []string, host string, port int) error {
 }
 ```
 
-Exception: when a flag must bind into an external configuration struct, pass the struct field's address to `*Var`. The local `var` form is the default.
+Exception: when a flag must bind into an external configuration struct, pass the struct field's address to `*Var`. The local `var` form is the default. **Caveat:** the service's layered `Config` (see "Service package & configuration") is **not** such a struct — do not bind flags into it with `&cfg.Field`, or a flag's default value will clobber the file/env layers. Bind those to locals and overlay only the explicitly-set ones via `cmd.Flags().Changed(...)`.
 
 ## Project layout (canonical)
 
@@ -101,7 +101,8 @@ Exception: when a flag must bind into an external configuration struct, pass the
 └── pkg/
     └── <name>/
         ├── version.go                   # always present; release-controlled `const Version`
-        ├── config.go                    # service config struct + env + config-file loader
+        ├── config.go                    # always present; Config + DefaultConfig, fileConfig, EnvLoader, LoadConfig
+        ├── config-env.go                # optional; env consts + EnvLoader, split from config.go past ~300 LoC
         ├── <service>.go                 # internal service implementation
         └── cli/                         # CLI-presentation code (printing, prompts, tables, colors)
             └── <ui>.go
@@ -122,32 +123,57 @@ Why this shape:
 
 ## Service package & configuration
 
-The CLI binary is wiring; the service is `./pkg/<name>`. Two rules govern where inputs are read.
+The CLI binary is wiring; the service is `./pkg/<name>`. Configuration is **always present**: every project carries `pkg/<name>/config.go`. Inputs arrive from four layers, lowest to highest precedence:
 
-### Env vars
+> **defaults < config file < environment < flags**
 
-Env vars MUST NOT be read directly anywhere under `./cmd`. All env-var reads live in `./pkg/<name>/config.go`.
+Each layer overlays the previous one **field by field** — a config file that sets only some keys still inherits defaults for the rest; a present env var overrides the file; an explicitly-set flag wins over everything. (`loggerfactory` is the one deliberate exception: for the *logger* config only, it layers env *over* flags.)
 
-The `loggerfactory` helper is the one delegated reader: `loggerfactory.ReadEnv(config, appName, env)` overrides the logger config from the supplied `env` slice (passed in by `root.go`, typically `os.Environ()`). The helper owns the variable names it recognizes; `./cmd` code never spells them out and never calls `os.Getenv`.
+### Where each input is read
 
-### `./pkg/<name>/config.go`
+- **Env vars MUST NOT be read anywhere under `./cmd`** — no `os.Getenv`, no `os.LookupEnv`, no scanning `os.Environ()`. All env reads live in `pkg/<name>/config.go` (or `config-env.go`). The single delegated exception reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the logger variable names.
+- **The config file is read only in `config.go`.**
+- **Flags are bound in `./cmd`** (the wrapper's `var (...)` block) and overlaid onto the loaded config in the run function — see "Flag overlay" below.
 
-`config.go` owns the service's configuration struct and centralizes its inputs:
+### The four pieces in `config.go`
 
-- Cobra flag bindings — the wrapper function under `./cmd/<name>/commands/` may pass `&config.Field` to `*Var` (the "external configuration struct" exception in "Canonical flag pattern").
-- Env-var reads.
-- Configuration-file unmarshaling.
+1. **`Config` + `DefaultConfig()`.** `Config` is the materialized struct the service consumes; `DefaultConfig()` returns the lowest layer.
+2. **`fileConfig` + `unmarshalConfigFile`.** `fileConfig` is a **sparse pointer mirror** of the JSON shape — each field a pointer, so an omitted key stays `nil` and does not clobber a lower layer. `unmarshalConfigFile` only reads + decodes into a fresh **zero** value and returns the zero value when the file is absent (ENOENT is not an error; any other read or parse error aborts). Decoding into a zero value — never a defaults-populated struct — sidesteps the v1 `encoding/json` merge edge cases that `encoding/json/v2` is designed to remove. Keep this function free of any merging.
+3. **Env constants + `EnvLoader`.** A `const (...)` group of `SCREAMING_SNAKE` names mirroring the OS variables verbatim (`ENV_ADDR = "<NAME>_ADDR"`), then an `EnvLoader` with one method per variable. Each method is a thin forwarder to the unexported `loadEnv<Field>` function directly **below** it that performs the lookup + conversion. Every method returns `(value T, present bool, err error)`; `err` is non-nil only when a present value is malformed — a hard error that aborts startup.
+4. **`LoadConfig`** — the synthesizer. Starts from `DefaultConfig()`, overlays the non-nil `fileConfig` fields, then overlays present env values. Name it `LoadConfig` while it lives in `package {{NAME}}`; rename to `Load` if promoted to a `config` sub-package (`config.LoadConfig` would stutter).
 
-A single struct definition typically serves both flag binding and file unmarshaling. Split only when an actual conflict appears (e.g. the flag-friendly shape diverges from the on-disk shape).
+### Config-file path resolution
 
-### Configuration file
+`config.go` resolves the path in order: the `--config` flag value (`""` when unset), then `$<NAME>_CONF`, then `os.UserConfigDir()/<name>/config.json`. Use **`os.UserConfigDir`**, not a hand-built `$HOME/.config` — it already consults `$XDG_CONFIG_HOME` and is platform-native (`Library/Application Support` on macOS, `%AppData%` on Windows), and it returns an error when no config dir is resolvable — propagate it. `<NAME>` is the uppercased project name; `<name>` is the project name verbatim. Exposing `--config` is recommended but optional — pass `""` to `LoadConfig` to rely on `$<NAME>_CONF` / `os.UserConfigDir` alone.
 
-Path resolution order:
+### Flag overlay (the flags-win step, in `./cmd`)
 
-1. `$<NAME>_CONF` if set.
-2. Otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/<name>/config.json`.
+Service-config flags are **not** bound directly into `Config` — that would let a flag's *default* value clobber file/env. Bind them to locals (the default flag pattern) and, in the run function, overlay only the **explicitly-set** ones onto the loaded config:
 
-`<NAME>` follows the upper-case rule above; `<name>` is the project name verbatim (matching the binary name used elsewhere in this layout).
+```go
+func runServe(cmd *cobra.Command, args []string, flagConfig, flagAddr string, flagPort int) error {
+	cfg, err := {{NAME}}.LoadConfig(flagConfig) // flagConfig = persistent --config value
+	if err != nil {
+		return err
+	}
+	if cmd.Flags().Changed("addr") {
+		cfg.Addr = flagAddr
+	}
+	if cmd.Flags().Changed("port") {
+		cfg.Port = flagPort
+	}
+	// construct the service from cfg, then run it
+	return nil
+}
+```
+
+`--config` is typically a persistent root flag, threaded to the run function as an extra parameter (the persistent-flag rule).
+
+### Lint, growth, and adding a field
+
+- **Lint.** The `SCREAMING_SNAKE` env constants trip Go naming lint (`revive` var-naming / `stylecheck` ST1003) where such linters run. If yours warns, add a `//nolint:revive,stylecheck` directive on the `const` block. The lint-clean alternative is MixedCaps identifiers — `EnvAddr = "<NAME>_ADDR"` — which needs no directive.
+- **Growth.** Start with one `config.go`. Past ~300 LoC, split the env loader — the const group + `EnvLoader` + `loadEnv*` functions — into `config-env.go` in the same package. If it keeps growing, promote configuration to a `pkg/<name>/config/` sub-package (`LoadConfig` → `config.Load`).
+- **Adding a config field** touches: `Config`, `DefaultConfig`, `fileConfig` (+ JSON tag), the overlay in `LoadConfig`, and — when env/flag-settable — an `EnvLoader` method (+ const) plus the flag binding and `Changed()` overlay in `./cmd`.
 
 ## Versioning
 
@@ -492,6 +518,171 @@ The contract with the release helper is a single top-level `const Version = "...
 
 If the project name contains characters invalid in a Go identifier (e.g. `my-tool`), use a stripped form for the package declaration and import alias: `package mytool` for `pkg/my-tool/`, then `import mytool "{{MODULE}}/pkg/my-tool"` in `cmd/<name>/commands/version.go`.
 
+### `pkg/{{NAME}}/config.go` (always present)
+
+The service configuration. Assembles **defaults < file < env**; the `./cmd` run function overlays explicitly-set flags on top (see "Service package & configuration" for the rules). Replace the example `Addr` / `Port` fields with the real config. Scaffold this as a **single** `config.go`; the second block below is the env loader that moves to `config-env.go` only once the file passes ~300 LoC.
+
+```go
+package {{NAME}}
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+)
+
+// Config is the materialized configuration the service consumes, after every
+// layer (defaults < file < env < flags) is applied. Flag overrides are layered
+// on by the ./cmd run function; everything else is assembled by LoadConfig.
+type Config struct {
+	Addr string
+	Port int
+}
+
+// DefaultConfig is the lowest-precedence layer.
+func DefaultConfig() Config {
+	return Config{
+		Addr: "0.0.0.0",
+		Port: 8080,
+	}
+}
+
+// fileConfig is the JSON shape of the config file. Its fields are pointers so an
+// omitted key stays nil and does NOT overwrite a lower layer (the default).
+// Decoding into its zero value (all nil) avoids unmarshaling into an already
+// populated struct — the v1 encoding/json merge edge cases encoding/json/v2 removes.
+type fileConfig struct {
+	Addr *string `json:"addr"`
+	Port *int    `json:"port"`
+}
+
+// LoadConfig assembles defaults < config file < environment. The ./cmd layer
+// applies explicitly-set flags on top (flags win). flagPath is the --config
+// value ("" when the flag is unset). Rename to config.Load in a sub-package.
+func LoadConfig(flagPath string) (Config, error) {
+	cfg := DefaultConfig()
+
+	path, err := configPath(flagPath)
+	if err != nil {
+		return cfg, err
+	}
+	fc, err := unmarshalConfigFile(path)
+	if err != nil {
+		return cfg, err
+	}
+	if fc.Addr != nil {
+		cfg.Addr = *fc.Addr
+	}
+	if fc.Port != nil {
+		cfg.Port = *fc.Port
+	}
+
+	var env EnvLoader
+	if v, ok, err := env.Addr(); err != nil {
+		return cfg, err
+	} else if ok {
+		cfg.Addr = v
+	}
+	if v, ok, err := env.Port(); err != nil {
+		return cfg, err
+	} else if ok {
+		cfg.Port = v
+	}
+
+	return cfg, nil
+}
+
+// unmarshalConfigFile only reads + decodes; it never merges. It decodes into a
+// fresh zero fileConfig and returns the zero value when the file does not exist.
+// A non-ENOENT read error or a JSON parse error aborts.
+func unmarshalConfigFile(path string) (fileConfig, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fileConfig{}, nil
+		}
+		return fileConfig{}, fmt.Errorf("read config %q: %w", path, err)
+	}
+	var fc fileConfig
+	if err := json.Unmarshal(b, &fc); err != nil {
+		return fileConfig{}, fmt.Errorf("parse config %q: %w", path, err)
+	}
+	return fc, nil
+}
+
+// configPath resolves the file path: --config (flagPath), else the path in
+// ENV_CONF, else os.UserConfigDir()/{{NAME}}/config.json.
+func configPath(flagPath string) (string, error) {
+	if flagPath != "" {
+		return flagPath, nil
+	}
+	if p, ok := os.LookupEnv(ENV_CONF); ok {
+		return p, nil
+	}
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "{{NAME}}", "config.json"), nil
+}
+```
+
+```go
+package {{NAME}}
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+)
+
+// Env var names mirror the OS environment verbatim, so they use SCREAMING_SNAKE.
+// The directive silences naming lint (revive/stylecheck) where it runs; the
+// lint-clean alternative is MixedCaps identifiers, e.g. EnvAddr = "{{NAME_UPPER}}_ADDR".
+//
+//nolint:revive,stylecheck // names mirror the OS environment variables verbatim
+const (
+	ENV_ADDR = "{{NAME_UPPER}}_ADDR"
+	ENV_PORT = "{{NAME_UPPER}}_PORT"
+	ENV_CONF = "{{NAME_UPPER}}_CONF"
+)
+
+// EnvLoader reads {{NAME}}'s environment variables. One method per variable, each
+// a thin forwarder to the unexported loadEnv* function directly below it that
+// holds the lookup + conversion. Methods return (value, present, error); error is
+// non-nil only when a present value has the wrong format. The split keeps each
+// loader unit-testable (t.Setenv) and the method trivial.
+type EnvLoader struct{}
+
+func (EnvLoader) Addr() (string, bool, error) { return loadEnvAddr() }
+
+func loadEnvAddr() (string, bool, error) {
+	v, ok := os.LookupEnv(ENV_ADDR)
+	return v, ok, nil
+}
+
+func (EnvLoader) Port() (int, bool, error) { return loadEnvPort() }
+
+func loadEnvPort() (int, bool, error) {
+	v, ok := os.LookupEnv(ENV_PORT)
+	if !ok {
+		return 0, false, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, true, fmt.Errorf("%s: %w", ENV_PORT, err)
+	}
+	return n, true, nil
+}
+```
+
+- The two blocks are **one** `config.go` at scaffold time; the second is what later moves to `config-env.go`.
+- `Config` carries no JSON tags — `fileConfig` is the JSON boundary. Keep the two field sets in sync.
+- Add a field by editing `Config`, `DefaultConfig`, `fileConfig`, the `LoadConfig` overlay, and (if env-settable) a const + `EnvLoader` method pair.
+
 ### `internal/versioninfo/versioninfo.go` (always present)
 
 Reusable, project-agnostic helper. Copied verbatim from `${SKILL-DIR}/helpers/internal/versioninfo/versioninfo.go`. Exposes `type Info` and `ReadVersionInfo(version string) Info`. The caller passes the project's `Version` constant; the helper layers VCS info from `runtime/debug.ReadBuildInfo` on top.
@@ -596,14 +787,15 @@ Generation steps (relative to module root):
 3. Write `cmd/<name>/main.go`.
 4. Write `cmd/<name>/commands/root.go` (the template already wires `versionCmd(cmd)` and the `--version` flag — leave that in place).
 5. Write `pkg/<name>/version.go` (`pkg/{{NAME}}/version.go` template). The initial `Version` value is `v0.0.0-devel`.
-6. Write `cmd/<name>/commands/version.go` (`cmd/{{NAME}}/commands/version.go` template).
-7. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
-8. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
-9. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio). This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `cmd/internal/stdiopipe`. No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
-10. For each direct dep in `go.mod`: `go get <module>@latest`.
-11. `go mod tidy`.
-12. Run the post-edit validation chain (see below).
-13. Report the generated file list to the user.
+6. Write `pkg/<name>/config.go` (`pkg/{{NAME}}/config.go` template). Fill in the real `Config` fields, `DefaultConfig`, the `fileConfig` mirror, the env constants + `EnvLoader` methods, and `LoadConfig`. Keep it one file; split `config-env.go` out only past ~300 LoC.
+7. Write `cmd/<name>/commands/version.go` (`cmd/{{NAME}}/commands/version.go` template).
+8. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
+9. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
+10. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio). This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `cmd/internal/stdiopipe`. No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
+11. For each direct dep in `go.mod`: `go get <module>@latest`.
+12. `go mod tidy`.
+13. Run the post-edit validation chain (see below).
+14. Report the generated file list to the user.
 
 Use **Write** for every file. Write creates parent directories — do not run `mkdir` separately.
 
@@ -678,6 +870,7 @@ The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree o
 | Template                            | Destination                            | Purpose                                                                                                  |
 | ----------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `pkg/{{NAME}}/version.go`           | `<root>/pkg/<name>/version.go`         | Declares `const Version`. Rewritten by `internal/cmd/release`. No imports.                              |
+| `pkg/{{NAME}}/config.go`            | `<root>/pkg/<name>/config.go`          | `Config` + `DefaultConfig`, the sparse `fileConfig` + isolated `unmarshalConfigFile`, `EnvLoader`, and `LoadConfig` (defaults < file < env). Split the env loader into `config-env.go` past ~300 LoC. |
 | `cmd/{{NAME}}/commands/version.go`  | `<root>/cmd/<name>/commands/version.go` | The `version` subcommand and `runVersion`. Wired unconditionally by `rootCmd()`; alias of `--version`. |
 
 ## Post-edit validation
@@ -718,7 +911,11 @@ Do not generate any of these — they look superficially shorter but break the l
 - **Non-subcommand files in `commands/` without the `zz_` prefix.** Anything that isn't a single subcommand definition (shared helpers, package-internal types) MUST be `zz_<name>.go`. **Never use a leading `_`** — `cmd/go` ignores files starting with `_` or `.`, so they would silently never compile.
 - **Putting business logic inside `RunE`.** Business logic lives outside `./cmd`; `RunE` is wiring only — either a direct `run{{Name}}` reference or a thin closure adapter that forwards captured flag values.
 - **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/pkg/<name>/cli/`. `RunE` calls into that package and returns its error.
-- **Reading env vars under `./cmd`.** No `os.Getenv`, no `os.LookupEnv`, no manual scanning of `os.Environ()`. The only allowed env-var consumer reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the variable names. Every other env var lives in `./pkg/<name>/config.go`.
+- **Reading env vars under `./cmd`.** No `os.Getenv`, no `os.LookupEnv`, no manual scanning of `os.Environ()`. The only allowed env-var consumer reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the variable names. Every other env var lives in `./pkg/<name>/config.go` (or `config-env.go`).
+- **Skipping `pkg/<name>/config.go`.** Configuration is always present; every project carries it (even when `Config` starts with a single field).
+- **Unmarshaling the config file into a defaults-populated (non-zero) struct.** Decode into a fresh zero `fileConfig` (the sparse pointer mirror) and overlay non-nil fields. Merging JSON into an already-populated struct hits the v1 `encoding/json` edge cases; keep `unmarshalConfigFile` decode-only.
+- **Binding service-config flags directly into `Config` (`&cfg.Field`).** That lets a flag's default clobber file/env values, inverting the `defaults < file < env < flags` order. Bind to locals and overlay only `cmd.Flags().Changed(...)` ones in the run function. (`loggerfactory` is the lone env-over-flags exception, and only for logger config.)
+- **Hand-building the config path as `$HOME/.config/...`.** Use `os.UserConfigDir()` — it honors `$XDG_CONFIG_HOME` and is platform-native on macOS / Windows. Resolution order: `--config` flag, then `$<NAME>_CONF`, then `os.UserConfigDir()`.
 
 ## Out of scope
 
