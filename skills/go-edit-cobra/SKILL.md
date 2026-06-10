@@ -81,6 +81,7 @@ Exception: when a flag must bind into an external configuration struct, pass the
 │   │   └── commands/
 │   │       ├── root.go                  # rootCmd() + Execute(ctx) + runRoot
 │   │       ├── version.go               # always present; "version" subcommand + --version alias
+│   │       ├── config.go                # always present; "config" subcommand (prints resolved config)
 │   │       ├── zz_<helper>.go           # any non-subcommand helper file (prefix zz_)
 │   │       ├── <subcmd>.go              # one per flat leaf
 │   │       ├── <parent>.go              # one per group (no RunE)
@@ -167,7 +168,7 @@ func runServe(cmd *cobra.Command, args []string, flagConfig, flagAddr string, fl
 }
 ```
 
-`--config` is typically a persistent root flag, threaded to the run function as an extra parameter (the persistent-flag rule).
+`--config` (the config-file path) is a **persistent flag on the root command**, declared once in `rootCmd()` and threaded to each config-loading run function as a `*string` parameter (the persistent-flag rule) — including the mandatory `config` subcommand, wired as `configCmd(cmd, &flagConfig)`. Implementors MAY rename it (e.g. `--conf`, `--config-file`) if `--config` would collide with a more-local flag name; keep the name consistent across the binary.
 
 ### Lint, growth, and adding a field
 
@@ -193,7 +194,7 @@ Design notes:
 - **`pkg/<name>/version.go` has no imports.** Anything richer (VCS info, etc.) lives in `internal/versioninfo`. Keep `pkg/<name>` cleanly publishable.
 - **`--version` is local, not persistent.** `mytool serve --version` is intentionally an unknown-flag error; only the root command exposes the alias.
 - **`mytool --version` and `mytool version` produce identical output.** They share `runVersion`; the alias is implemented as a closure dispatch, not a duplicated command.
-- **The version subcommand is the only `commands/` file that imports `pkg/<name>` directly.** Other commands go through the service constructed in their wrappers / `runRoot`.
+- **The `version` and `config` subcommands are the `commands/` files that import `pkg/<name>` directly** (`version` for `Version`, `config` for `Config` + `LoadConfig`). Other commands go through the service constructed in their wrappers / `runRoot`.
 - **One Go source base, every host OS.** The release helper is a Go `main` package precisely so Linux, macOS, and Windows users do not have to maintain parallel bash + PowerShell scripts. Running it requires only the Go toolchain, which the project already needs.
 
 ### Release flow
@@ -342,6 +343,7 @@ func rootCmd() *cobra.Command {
 	var (
 		logConfig   *loggerfactory.Config
 		flagVersion bool
+		flagConfig  string
 	)
 
 	cmd := &cobra.Command{
@@ -368,15 +370,18 @@ func rootCmd() *cobra.Command {
 
 	logConfig = loggerfactory.RegisterFlags(cmd)
 	cmd.Flags().BoolVar(&flagVersion, "version", false, "alias for the version subcommand")
+	cmd.PersistentFlags().StringVar(&flagConfig, "config", "", "config file path; overrides the default location")
 
 	versionCmd(cmd)
+	configCmd(cmd, &flagConfig)
 
 	// TODO: declare additional root flags inside the `var (...)` block above
 	// and bind them with `cmd.PersistentFlags().<Type>Var(&flag, ...)`. Extend
 	// the RunE closure to forward captured values into runRoot.
 
-	// TODO: wire additional subcommands here, e.g.:
-	//   serveCmd(cmd)
+	// TODO: wire additional subcommands here, passing &flagConfig to the ones
+	// that load config, e.g.:
+	//   serveCmd(cmd, &flagConfig)
 
 	// TODO: you may add initialization logic for root internal service construct here.
 
@@ -388,7 +393,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 }
 ```
 
-The TODO comments are markers for the implementor — leave them. The `versionCmd(cmd)` call and the `--version` flag are **not** TODOs; they are part of the always-present version wiring (see "Versioning").
+The TODO comments are markers for the implementor — leave them. The `versionCmd(cmd)` / `configCmd(cmd, &flagConfig)` calls, the `--version` flag, and the persistent `--config` flag are **not** TODOs; they are always-present wiring for the two mandatory subcommands — `version` (see "Versioning") and `config` (see "Service package & configuration"). `--config` is persistent so every config-loading subcommand shares one flag; its value is threaded into those wrappers as `&flagConfig`.
 
 The `loggerfactory` helper (see "Helper catalog") owns logger config, the persistent log flags, the env-var override reader, and the `BuildLogger` constructor. Logging is **opt-in** via two persistent flags declared with `pflag.BoolFunc` (presence enables, optional `=value` overrides the default):
 
@@ -537,9 +542,10 @@ import (
 // Config is the materialized configuration the service consumes, after every
 // layer (defaults < file < env < flags) is applied. Flag overrides are layered
 // on by the ./cmd run function; everything else is assembled by LoadConfig.
+// The json tags match fileConfig so the `config` subcommand can marshal it.
 type Config struct {
-	Addr string
-	Port int
+	Addr string `json:"addr"`
+	Port int    `json:"port"`
 }
 
 // DefaultConfig is the lowest-precedence layer.
@@ -680,7 +686,7 @@ func loadEnvPort() (int, bool, error) {
 ```
 
 - The two blocks are **one** `config.go` at scaffold time; the second is what later moves to `config-env.go`.
-- `Config` carries no JSON tags — `fileConfig` is the JSON boundary. Keep the two field sets in sync.
+- `Config` and `fileConfig` carry the **same** JSON tags: the `config` subcommand marshals `Config`, and the file unmarshals into `fileConfig`. Keep both in sync.
 - Add a field by editing `Config`, `DefaultConfig`, `fileConfig`, the `LoadConfig` overlay, and (if env-settable) a const + `EnvLoader` method pair.
 
 ### `internal/versioninfo/versioninfo.go` (always present)
@@ -744,7 +750,77 @@ Differences from a regular flat-leaf:
 
 - File name (`version.go`) collides with the canonical `<sub>.go` mapping intentionally — `version` IS the canonical subcommand for that file.
 - Wired by `rootCmd()` unconditionally; do **not** add a TODO around the `versionCmd(cmd)` call.
-- Imports two packages: `pkg/{{NAME}}` for the `Version` var, and `internal/versioninfo` for the `ReadVersionInfo` helper. It's the only `commands/` file that imports `pkg/{{NAME}}` directly.
+- Imports two packages: `pkg/{{NAME}}` for the `Version` var, and `internal/versioninfo` for the `ReadVersionInfo` helper. Together with `config.go` it is one of the two `commands/` files that import `pkg/{{NAME}}` directly.
+
+### `cmd/{{NAME}}/commands/config.go` (always present)
+
+The `config` subcommand — the runtime counterpart of the `version` subcommand. Wired by `rootCmd()` unconditionally via `configCmd(cmd, &flagConfig)`. It loads the configuration through the canonical `{{NAME}}.LoadConfig` (defaults < file < env) and prints it as indented JSON, or renders a Go `text/template` against the `Config` value when `--template`/`-t` is given. The file is selected by the root's **persistent `--config`** flag (threaded in as a `*string`; empty → default location).
+
+```go
+package commands
+
+import (
+	"encoding/json"
+	"fmt"
+	"text/template"
+
+	"github.com/spf13/cobra"
+
+	"{{MODULE}}/pkg/{{NAME}}"
+)
+
+func configCmd(parent *cobra.Command, flagConfig *string) {
+	var flagTemplate string
+
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "Print the resolved configuration",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runConfig(cmd, args, *flagConfig, flagTemplate)
+		},
+	}
+
+	cmd.Flags().StringVarP(&flagTemplate, "template", "t", "", "Go text/template rendered against the config instead of JSON")
+
+	parent.AddCommand(cmd)
+}
+
+func runConfig(cmd *cobra.Command, args []string, flagConfig, flagTemplate string) error {
+	cfg, err := {{NAME}}.LoadConfig(flagConfig)
+	if err != nil {
+		return err
+	}
+
+	if flagTemplate != "" {
+		tmpl, err := template.New("config").Parse(flagTemplate)
+		if err != nil {
+			return err
+		}
+		if err := tmpl.Execute(cmd.OutOrStdout(), cfg); err != nil {
+			return err
+		}
+		fmt.Fprintln(cmd.OutOrStdout())
+		return nil
+	}
+
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	cmd.Println(string(b))
+	return nil
+}
+```
+
+Notes:
+
+- **Mandatory**, like `version`: `rootCmd()` calls `configCmd(cmd, &flagConfig)` unconditionally — no TODO around it. The subcommand owns only the local `--template` flag; the config-path flag is the root's **persistent `--config`**, threaded in as a `*string` (the persistent-flag rule — never read it with `cmd.Flags().Get*`).
+- **Flag name.** `--config` is the canonical config-path flag name. Implementors MAY rename it (e.g. `--conf`, `--config-file`) when `--config` would collide with a more-local flag name on some subcommand; keep the chosen name consistent across the binary.
+- **What it shows**: the `defaults < file < env` layers — *not* a specific service command's flag overrides, which are applied per-command in that command's run function.
+- **`--template`** renders against the `Config` value with Go `text/template`: e.g. `mytool config -t '{{.Port}}'` prints just the port; an empty template prints indented JSON (which is why `Config` carries JSON tags).
+- **Secrets**: if `Config` carries credentials, give it a `MarshalJSON` that redacts them (or omit those fields) — `config` prints to stdout.
+- If the project name is not a valid Go identifier, alias the import as in `version.go` (`import {{NAME}} "{{MODULE}}/pkg/my-tool"`).
 
 ### `go.mod`
 
@@ -789,13 +865,14 @@ Generation steps (relative to module root):
 5. Write `pkg/<name>/version.go` (`pkg/{{NAME}}/version.go` template). The initial `Version` value is `v0.0.0-devel`.
 6. Write `pkg/<name>/config.go` (`pkg/{{NAME}}/config.go` template). Fill in the real `Config` fields, `DefaultConfig`, the `fileConfig` mirror, the env constants + `EnvLoader` methods, and `LoadConfig`. Keep it one file; split `config-env.go` out only past ~300 LoC.
 7. Write `cmd/<name>/commands/version.go` (`cmd/{{NAME}}/commands/version.go` template).
-8. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
-9. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
-10. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio). This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `cmd/internal/stdiopipe`. No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
-11. For each direct dep in `go.mod`: `go get <module>@latest`.
-12. `go mod tidy`.
-13. Run the post-edit validation chain (see below).
-14. Report the generated file list to the user.
+8. Write `cmd/<name>/commands/config.go` (`cmd/{{NAME}}/commands/config.go` template). The root template already declares the persistent `--config` flag and wires `configCmd(cmd, &flagConfig)` beside `versionCmd(cmd)` — leave that in place.
+9. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
+10. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
+11. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio). This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `cmd/internal/stdiopipe`. No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
+12. For each direct dep in `go.mod`: `go get <module>@latest`.
+13. `go mod tidy`.
+14. Run the post-edit validation chain (see below).
+15. Report the generated file list to the user.
 
 Use **Write** for every file. Write creates parent directories — do not run `mkdir` separately.
 
@@ -872,6 +949,7 @@ The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree o
 | `pkg/{{NAME}}/version.go`           | `<root>/pkg/<name>/version.go`         | Declares `const Version`. Rewritten by `internal/cmd/release`. No imports.                              |
 | `pkg/{{NAME}}/config.go`            | `<root>/pkg/<name>/config.go`          | `Config` + `DefaultConfig`, the sparse `fileConfig` + isolated `unmarshalConfigFile`, `EnvLoader`, and `LoadConfig` (defaults < file < env). Split the env loader into `config-env.go` past ~300 LoC. |
 | `cmd/{{NAME}}/commands/version.go`  | `<root>/cmd/<name>/commands/version.go` | The `version` subcommand and `runVersion`. Wired unconditionally by `rootCmd()`; alias of `--version`. |
+| `cmd/{{NAME}}/commands/config.go`   | `<root>/cmd/<name>/commands/config.go`  | The `config` subcommand and `runConfig`. Wired unconditionally by `rootCmd()`; prints `LoadConfig` as JSON, or via a `--template`. |
 
 ## Post-edit validation
 
@@ -897,6 +975,7 @@ Do not generate any of these — they look superficially shorter but break the l
 - **Skipping `versioninfo`.** Always generated for scaffold; `commands/version.go` imports it.
 - **Skipping `internal/cmd/release`.** Always generated for scaffold; the release flow assumes it. The Go program intentionally replaces parallel bash + PowerShell scripts; do not re-introduce them.
 - **Skipping `version.go` (either copy).** Both `pkg/<name>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
+- **Skipping the `config` subcommand.** `cmd/<name>/commands/config.go` is mandatory alongside `pkg/<name>/config.go`; `rootCmd()` wires `configCmd(cmd, &flagConfig)` unconditionally. It prints `LoadConfig`'s result as JSON, or renders `--template` against it.
 - **Hand-editing `const Version = "..."` outside a release.** Use `go run ./internal/cmd/release`; manual edits drift from the tag/commit pair the helper produces.
 - **Renaming `Version` or switching it to `var`.** The required source shape is a single top-level `const Version = "..."`; the release helper relies on it. Update the helper in lockstep if you must diverge. There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
 - **Adding imports to `pkg/<name>/version.go`.** It must stay import-free so external consumers of `pkg/<name>` are not forced to pull `internal/`. Anything richer (VCS info, runtime/debug glue) lives in `internal/versioninfo`.
