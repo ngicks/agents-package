@@ -1,6 +1,8 @@
 # `pkg/{{NAME}}/config.go` source template
 
-The service-side configuration source: `Config` + `DefaultConfig`, the exported `PartialConfig` + `Apply`, the isolated `unmarshalConfigFile`, and `LoadConfig`. The model these implement (layers, merge rules, precedence, path resolution, flag overlay) is documented in [configuration.md](configuration.md) — read it first.
+The service-side configuration source: `Config` + `DefaultConfig`, the exported `PartialConfig` + `Apply`, the isolated `unmarshalConfigFile`, and `LoadConfig`.
+
+The model these implement (layers, merge rules, precedence, path resolution, flag overlay) is documented in [configuration.md](configuration.md) — read it first.
 
 These are templates — **strictly follow** the order of elements; do **NOT** reorder.
 
@@ -11,7 +13,13 @@ These are templates — **strictly follow** the order of elements; do **NOT** re
 
 ## `pkg/{{NAME}}/config.go` (always present)
 
-The service configuration. Assembles **defaults < file < env** through one overlay primitive, `PartialConfig.Apply`; the `./cmd` run function overlays explicitly-set flags on top (see [Service package & configuration](configuration.md) and [Merge semantics](configuration.md#merge-semantics-partialconfigapply) for the rules). Replace the example fields with the real config. It is a **single** `config.go` — the env layer is just the package-level `envOptions` plus a direct `env.ParseWithOptions` call inside `LoadConfig`.
+The service configuration.
+
+Assembles **defaults < file < env** through one overlay primitive, `PartialConfig.Apply`; the `./cmd` run function overlays explicitly-set flags on top (see [Service package & configuration](configuration.md) and [Merge semantics](configuration.md#merge-semantics-partialconfigapply) for the rules).
+
+Replace the example fields with the real config.
+
+It is a **single** `config.go` — the env layer is just the package-level `envOptions` plus a direct `env.ParseWithOptions` call inside `LoadConfig`.
 
 The example deliberately exercises all four merge kinds: a **scalar** (`Addr`, `Port`), a **nested sub-config** (`Server` — deep-merged; note its `TLS bool` defaults `true`, a zero-meaningful field the pointer mirror handles for free), a **map** (`Labels` — deep-merged by key), and a **slice** (`Hosts` — overwritten wholesale).
 
@@ -234,16 +242,42 @@ func configPath(flagPath string) (string, error) {
 }
 ```
 
-- `Config` and `PartialConfig` mirror each other and carry the **same** json **and** yaml keys (`Config` is what the `config` subcommand marshals; `PartialConfig` is the file/env decode target). `PartialConfig` additionally carries `env:` / `envPrefix:` tags for caarlos0/env. Keep all of them — and each nested `Sub` / `PartialSub` pair — in sync. The json/yaml tags are present even in a JSON-only project, so adopting YAML later is an import + `configPath`/`unmarshalConfigFile` change, never a field change.
-- **Spell serialized keys in `snake_case`** (multi-word: `max_conns`, not `maxConns`/`MaxConns`) in both the json and yaml tags — idiomatic across YAML and TOML, and a clean match to the `SCREAMING_SNAKE` env names. The example fields above are single-word, so they are simply lowercase. See [Key naming in configuration.md](configuration.md#config-file-format-json-yaml-or-both).
-- This template is the **JSON-only** file default (no YAML dependency). For YAML-only or both-format projects, swap `unmarshalConfigFile`/`configPath` and `go.mod` per the [YAML support block](#yaml-support-yaml-only-or-both-formats) below. The env layer (caarlos0/env) is unchanged across all file formats.
-- **caarlos0/env handles maps and slices from env natively** — `{{NAME_UPPER}}_LABELS=k:v,k2:v2` and `{{NAME_UPPER}}_HOSTS=a,b,c` (override the separators with `envSeparator` / `envKeyValSeparator` tags). A field with **no** `env`/`envPrefix` tag is simply not env-settable (file-only).
-- **Nested sub-configs are VALUE structs, not pointers.** caarlos0/env populates a value nested struct (via `envPrefix`) but leaves a nil pointer-struct unset, so a pointer here would silently never read its env vars. The value form costs nothing: a zero sub-partial merges nothing in `Apply` and is omitted on marshal (`omitzero` drops a zero struct; YAML `omitempty` drops a struct whose public fields are all zero).
-- **Apply is pure w.r.t. its base**: it returns a new `Config` and allocates a fresh map rather than mutating the base's map. That makes `PartialConfig` + `Apply` reusable outside `LoadConfig` (tests, programmatic overrides) without aliasing surprises.
+- `Config` and `PartialConfig` mirror each other and carry the **same** json **and** yaml keys (`Config` is what the `config` subcommand marshals; `PartialConfig` is the file/env decode target).
+
+  `PartialConfig` additionally carries `env:` / `envPrefix:` tags for caarlos0/env.
+
+  Keep all of them — and each nested `Sub` / `PartialSub` pair — in sync.
+
+  The json/yaml tags are present even in a JSON-only project, so adopting YAML later is an import + `configPath`/`unmarshalConfigFile` change, never a field change.
+
+- **Spell serialized keys in `snake_case`** (multi-word: `max_conns`, not `maxConns`/`MaxConns`) in both the json and yaml tags — idiomatic across YAML and TOML, and a clean match to the `SCREAMING_SNAKE` env names.
+
+  The example fields above are single-word, so they are simply lowercase. See [Key naming in configuration.md](configuration.md#config-file-format-json-yaml-or-both).
+
+- This template is the **JSON-only** file default (no YAML dependency).
+
+  For YAML-only or both-format projects, swap `unmarshalConfigFile`/`configPath` and `go.mod` per the [YAML support block](#yaml-support-yaml-only-or-both-formats) below.
+
+  The env layer (caarlos0/env) is unchanged across all file formats.
+- **caarlos0/env handles maps and slices from env natively** — `{{NAME_UPPER}}_LABELS=k:v,k2:v2` and `{{NAME_UPPER}}_HOSTS=a,b,c` (override the separators with `envSeparator` / `envKeyValSeparator` tags).
+
+  A field with **no** `env`/`envPrefix` tag is simply not env-settable (file-only).
+
+- **Nested sub-configs are VALUE structs, not pointers.** caarlos0/env populates a value nested struct (via `envPrefix`) but leaves a nil pointer-struct unset, so a pointer here would silently never read its env vars.
+
+  The value form costs nothing: a zero sub-partial merges nothing in `Apply` and is omitted on marshal (`omitzero` drops a zero struct; YAML `omitempty` drops a struct whose public fields are all zero).
+
+- **Apply is pure w.r.t. its base**: it returns a new `Config` and allocates a fresh map rather than mutating the base's map.
+
+  That makes `PartialConfig` + `Apply` reusable outside `LoadConfig` (tests, programmatic overrides) without aliasing surprises.
 
 ## YAML support (YAML-only or both formats)
 
-The fields already carry `yaml:` tags. To accept YAML, add a YAML decoder and make `unmarshalConfigFile` pick by extension; for _both_ mode, make `configPath` probe YAML before JSON (YAML wins; one file only — never blended). Add the dependency with `go get go.yaml.in/yaml/v4@v4.0.0-rc.5` (pinned — v4 is pre-release; check for a newer rc/GA first) — or `go.yaml.in/yaml/v3` / `github.com/goccy/go-yaml`, for which the `yaml.Unmarshal` call is identical.
+The fields already carry `yaml:` tags.
+
+To accept YAML, add a YAML decoder and make `unmarshalConfigFile` pick by extension; for _both_ mode, make `configPath` probe YAML before JSON (YAML wins; one file only — never blended).
+
+Add the dependency with `go get go.yaml.in/yaml/v4@v4.0.0-rc.5` (pinned — v4 is pre-release; check for a newer rc/GA first) — or `go.yaml.in/yaml/v3` / `github.com/goccy/go-yaml`, for which the `yaml.Unmarshal` call is identical.
 
 ```go
 import (
@@ -325,4 +359,6 @@ func configPath(flagPath string) (string, error) {
 }
 ```
 
-For **YAML-only**, drop the `encoding/json` branch (and import) and the `config.json` probe entry; decode with `yaml.Unmarshal` unconditionally and default the path to `config.yaml`. For **both**, keep the switch as shown.
+For **YAML-only**, drop the `encoding/json` branch (and import) and the `config.json` probe entry; decode with `yaml.Unmarshal` unconditionally and default the path to `config.yaml`.
+
+For **both**, keep the switch as shown.

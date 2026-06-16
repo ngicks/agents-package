@@ -5,13 +5,19 @@ description: "Use when authoring or editing a Go CLI built on spf13/cobra. Auto-
 
 # Cobra CLI authoring
 
-Scaffold a new Cobra CLI, edit an existing one, or apply Cobra-specific design rules. Cobra-only — see [Out of scope](#out-of-scope) for non-Cobra layouts.
+Scaffold a new Cobra CLI, edit an existing one, or apply Cobra-specific design rules.
 
-This page holds the always-applied core: pre-flight checks, the Cobra design rules, and the post-edit validation chain. Everything else — layout, templates, the configuration model, versioning, and the scaffold/edit procedures — lives in the reference files below; read the one a task needs.
+Cobra-only — see [Out of scope](#out-of-scope) for non-Cobra layouts.
+
+This page holds the always-applied core: pre-flight checks, the Cobra design rules, and the post-edit validation chain.
+
+Everything else — layout, templates, the configuration model, versioning, and the scaffold/edit procedures — lives in the reference files below; read the one a task needs.
 
 ## Reference files
 
-- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout, naming conventions (files / wrappers / run functions / package name), and the anti-patterns list. Read before deciding where a file goes or how to name it.
+- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout, naming conventions (files / wrappers / run functions / package name), and the anti-patterns list.
+
+  Read before deciding where a file goes or how to name it.
 - **[reference/command-templates.md](reference/command-templates.md)** — the command-tree code templates: `main.go`, `root.go`, flat-leaf / parent-group / nested-leaf subcommands, and `go.mod` + version policy.
 - **[reference/configuration.md](reference/configuration.md)** — the configuration model (layers, `PartialConfig.Apply` merge semantics, file format, path resolution, flag overlay, add-a-field) and the `config` subcommand template.
 - **[reference/config-source.md](reference/config-source.md)** — the `pkg/<name>/config.go` source template (JSON base) plus the YAML-only / both-format support block.
@@ -34,33 +40,87 @@ Run before any edit.
 
 ## Cobra design rules
 
-These rules are Cobra-specific. The "thin run function" rule is the Cobra-mechanics consequence of the broader "no business logic under `./cmd`" rule. They are grouped below by what they govern: error handling, positional args, command construction, and file naming.
+These rules are Cobra-specific.
+
+The "thin run function" rule is the Cobra-mechanics consequence of the broader "no business logic under `./cmd`" rule.
+
+They are grouped below by what they govern: error handling, positional args, command construction, and file naming.
 
 ### Errors & the root command
 
-- **`RunE` only**, never `Run`. Return errors; do not `os.Exit` from a command body.
-- **Root command**: `SilenceUsage: true`, `SilenceErrors: true`. Delegate to a named `runRoot`.
+- **`RunE` only**, never `Run`.
+
+  Return errors; do not `os.Exit` from a command body.
+
+- **Root command**: `SilenceUsage: true`, `SilenceErrors: true`.
+
+  Delegate to a named `runRoot`.
 
 ### Positional arguments & completion
 
-- **Default `Args`**: `cobra.NoArgs`. **Change it** when positional arguments fit the command better — e.g. `cobra.ExactArgs(1)`, `cobra.MinimumNArgs(1)`, `cobra.MaximumNArgs(2)`, `cobra.RangeArgs(1, 3)`, `cobra.MatchAll(cobra.ExactArgs(1), customValidator)`. Treat positional args as the natural shape when the command operates on a target (`mytool inspect <path>`, `mytool delete <id>...`); flags are for options on top of that target. The templates set `cobra.NoArgs` as a safe placeholder, not a recommendation.
-- **Positional-argument completion (`ValidArgsFunction`)**: fill `ValidArgsFunction` on a leaf command's literal to control shell completion of its positional args. The stub leaf templates ship this as a TODO — fill it to match `Args`. When the command takes no completable positional args (the `cobra.NoArgs` default), set `cobra.NoFileCompletions` so the shell does not fall back to file completion. When it does take them, assign a dynamic completion function, a static `ValidArgs` slice, or `cobra.FixedCompletions(...)`. `ValidArgs` and `ValidArgsFunction` are mutually exclusive — set at most one (Cobra reports an error when both are present).
+- **Default `Args`**: `cobra.NoArgs`.
+
+  **Change it** when positional arguments fit the command better — e.g. `cobra.ExactArgs(1)`, `cobra.MinimumNArgs(1)`, `cobra.MaximumNArgs(2)`, `cobra.RangeArgs(1, 3)`, `cobra.MatchAll(cobra.ExactArgs(1), customValidator)`.
+
+  Treat positional args as the natural shape when the command operates on a target (`mytool inspect <path>`, `mytool delete <id>...`); flags are for options on top of that target.
+
+  The templates set `cobra.NoArgs` as a safe placeholder, not a recommendation.
+
+- **Positional-argument completion (`ValidArgsFunction`)**: fill `ValidArgsFunction` on a leaf command's literal to control shell completion of its positional args.
+
+  The stub leaf templates ship this as a TODO — fill it to match `Args`.
+
+  When the command takes no completable positional args (the `cobra.NoArgs` default), set `cobra.NoFileCompletions` so the shell does not fall back to file completion.
+
+  When it does take them, assign a dynamic completion function, a static `ValidArgs` slice, or `cobra.FixedCompletions(...)`.
+
+  `ValidArgs` and `ValidArgsFunction` are mutually exclusive — set at most one (Cobra reports an error when both are present).
 
 ### Wrappers, run functions & wiring
 
-- **One wrapper function per command.** Every Cobra construction lives inside an unexported `func {{name}}Cmd(parent *cobra.Command)`. The function builds the `cobra.Command` literal, declares flag variables in a local `var (...)` block, binds them via `cmd.Flags().<Type>Var(...)`, calls children's wrapper functions on the new `cmd`, and ends with `parent.AddCommand(cmd)`. There are **no package-level `*Cmd` variables** and **no `init()` functions** for wiring.
-- **Root is the special case.** `func rootCmd() *cobra.Command` (no `parent`). It returns the configured root and is invoked from `Execute(ctx)`. All top-level subcommands are wired by `rootCmd()` calling each subcommand's wrapper function.
-- **Group parents**: no `RunE`, no `Args` by default. They MAY own persistent flags, aliases, or pre-run hooks when intentional. When a persistent flag must reach a child's run function, declare the flag's `var` in the parent wrapper and pass its address as an extra parameter to the child wrapper (`{{child}}Cmd(cmd, &flagShared)`).
-- **Run functions are named** (`run{{Name}}`) and live at package level. **Run functions are thin wiring**: read positional args, call a service, return its error. Business logic is forbidden under `./cmd`.
-- **`RunE` is either a direct reference (`RunE: run{{Name}}`) or a thin closure adapter** that forwards captured flag values: `RunE: func(cmd *cobra.Command, args []string) error { return run{{Name}}(cmd, args, flagFoo, flagBar) }`. The closure body must contain only that single forwarding call — no logic.
+- **One wrapper function per command.** Every Cobra construction lives inside an unexported `func {{name}}Cmd(parent *cobra.Command)`.
+
+  The function builds the `cobra.Command` literal, declares flag variables in a local `var (...)` block, binds them via `cmd.Flags().<Type>Var(...)`, calls children's wrapper functions on the new `cmd`, and ends with `parent.AddCommand(cmd)`.
+
+  There are **no package-level `*Cmd` variables** and **no `init()` functions** for wiring.
+
+- **Root is the special case.** `func rootCmd() *cobra.Command` (no `parent`).
+
+  It returns the configured root and is invoked from `Execute(ctx)`.
+
+  All top-level subcommands are wired by `rootCmd()` calling each subcommand's wrapper function.
+
+- **Group parents**: no `RunE`, no `Args` by default.
+
+  They MAY own persistent flags, aliases, or pre-run hooks when intentional.
+
+  When a persistent flag must reach a child's run function, declare the flag's `var` in the parent wrapper and pass its address as an extra parameter to the child wrapper (`{{child}}Cmd(cmd, &flagShared)`).
+
+- **Run functions are named** (`run{{Name}}`) and live at package level.
+
+  **Run functions are thin wiring**: read positional args, call a service, return its error.
+
+  Business logic is forbidden under `./cmd`.
+
+- **`RunE` is either a direct reference (`RunE: run{{Name}}`) or a thin closure adapter** that forwards captured flag values: `RunE: func(cmd *cobra.Command, args []string) error { return run{{Name}}(cmd, args, flagFoo, flagBar) }`.
+
+  The closure body must contain only that single forwarding call — no logic.
 
 ### File naming in `commands/`
 
-- **Non-subcommand files inside `commands/` MUST be prefixed with `zz_`** (e.g. `zz_helpers.go`, `zz_validation.go`). Files without the `zz_` prefix are reserved for the canonical subcommand mapping (`<name>.go` for flat leaves and group parents, `<parent>_<child>.go` for nested leaves). The `zz_` prefix marks shared helpers and any other package-level code that is not a single subcommand definition. (A leading single `_` cannot be used: `cmd/go` ignores any file whose name starts with `_` or `.`. The `zz_` form is Go-compatible and sorts last in directory listings, mirroring the `zz_generated_*.go` convention.)
+- **Non-subcommand files inside `commands/` MUST be prefixed with `zz_`** (e.g. `zz_helpers.go`, `zz_validation.go`).
+
+  Files without the `zz_` prefix are reserved for the canonical subcommand mapping (`<name>.go` for flat leaves and group parents, `<parent>_<child>.go` for nested leaves).
+
+  The `zz_` prefix marks shared helpers and any other package-level code that is not a single subcommand definition.
+
+  (A leading single `_` cannot be used: `cmd/go` ignores any file whose name starts with `_` or `.`. The `zz_` form is Go-compatible and sorts last in directory listings, mirroring the `zz_generated_*.go` convention.)
 
 ### Canonical flag pattern
 
-Inside the wrapper function, declare every flag as a local in a single `var (...)` block at the top, then bind it with the `*Var` family (`StringVar`, `IntVar`, `BoolVarP`, ...) — **never** the pointer-returning form (`String`, `Int`, ...). This keeps the binding API uniform with `BoolFunc` (which never returns a pointer) and concentrates storage declarations in one block.
+Inside the wrapper function, declare every flag as a local in a single `var (...)` block at the top, then bind it with the `*Var` family (`StringVar`, `IntVar`, `BoolVarP`, ...) — **never** the pointer-returning form (`String`, `Int`, ...).
+
+This keeps the binding API uniform with `BoolFunc` (which never returns a pointer) and concentrates storage declarations in one block.
 
 ```go
 func serveCmd(parent *cobra.Command) {
@@ -90,18 +150,30 @@ func runServe(cmd *cobra.Command, args []string, host string, port int) error {
 }
 ```
 
-Exception: when a flag must bind into an external configuration struct, pass the struct field's address to `*Var`. The local `var` form is the default. **Caveat:** the service's layered `Config` (see [Service package & configuration](reference/configuration.md)) is **not** such a struct — do not bind flags into it with `&cfg.Field`, or a flag's default value will clobber the file/env layers. Bind those to locals and overlay only the explicitly-set ones via `cmd.Flags().Changed(...)`.
+Exception: when a flag must bind into an external configuration struct, pass the struct field's address to `*Var`. The local `var` form is the default.
+
+**Caveat:** the service's layered `Config` (see [Service package & configuration](reference/configuration.md)) is **not** such a struct — do not bind flags into it with `&cfg.Field`, or a flag's default value will clobber the file/env layers.
+
+Bind those to locals and overlay only the explicitly-set ones via `cmd.Flags().Changed(...)`.
 
 ## Post-edit validation
 
 Run after **every** edit and after scaffolding, in this order:
 
 1. `go mod tidy` — only when imports / dependencies changed.
-2. `goimports -w <changed_files>`. If `goimports` is missing, run `go install golang.org/x/tools/cmd/goimports@latest`. If install fails, fall back to `gofmt -w` and surface the install failure to the user.
-3. `go vet ./...` — full module. The wrapper-function chain crosses package boundaries on `parent.AddCommand`, so package-scoped vet is unsafe.
+2. `goimports -w <changed_files>`.
+
+   If `goimports` is missing, run `go install golang.org/x/tools/cmd/goimports@latest`.
+
+   If install fails, fall back to `gofmt -w` and surface the install failure to the user.
+3. `go vet ./...` — full module.
+
+   The wrapper-function chain crosses package boundaries on `parent.AddCommand`, so package-scoped vet is unsafe.
 4. `go test ./...` — full module.
 
-Edits in this skill are best-effort textual changes. The validation chain (vet + test) is the safety net for rename / move operations that touch identifiers across many files.
+Edits in this skill are best-effort textual changes.
+
+The validation chain (vet + test) is the safety net for rename / move operations that touch identifiers across many files.
 
 ## Out of scope
 

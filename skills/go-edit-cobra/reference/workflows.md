@@ -1,6 +1,8 @@
 # Workflows & helper catalog
 
-Step-by-step procedures for scaffolding a new project and editing an existing one, plus the catalog of bundled helper packages. The templates these steps reference live in [command-templates.md](command-templates.md), [configuration.md](configuration.md), [config-source.md](config-source.md), and [versioning.md](versioning.md).
+Step-by-step procedures for scaffolding a new project and editing an existing one, plus the catalog of bundled helper packages.
+
+The templates these steps reference live in [command-templates.md](command-templates.md), [configuration.md](configuration.md), [config-source.md](config-source.md), and [versioning.md](versioning.md).
 
 ## Contents
 
@@ -21,31 +23,72 @@ Interview (extract from user message inline; only ask for missing required field
 | Subcommands        | no       | _(none)_                   | `serve`, `migrate`         |
 | Config file format | no       | `json`                     | `json` / `yaml` / `both`   |
 
-Subcommands accept dot notation (`server.start`) or natural language ("a server group containing start and stop"). Dotted = parent group + child leaf.
+Subcommands accept dot notation (`server.start`) or natural language ("a server group containing start and stop").
+
+Dotted = parent group + child leaf.
 
 Generation steps (relative to module root):
 
-1. Resolve all parameters. **Derive the `pkg/<name>` package name now**: strip hyphens/underscores from the project name so the directory follows Go convention (`my-tool` → `pkg/mytool/`, `package mytool`) — see [Naming conventions › Package name](layout-and-naming.md#package-name-pkgname). `cmd/<name>/`, `Use:`, the env prefix, and the config-dir path keep the verbatim project name; only `pkg/<name>`, the `package` clause, and `{{MODULE}}/pkg/<name>` imports use the stripped form. When the project name is already a valid identifier they are identical.
+1. Resolve all parameters.
+
+   **Derive the `pkg/<name>` package name now**: strip hyphens/underscores from the project name so the directory follows Go convention (`my-tool` → `pkg/mytool/`, `package mytool`) — see [Naming conventions › Package name](layout-and-naming.md#package-name-pkgname).
+
+   `cmd/<name>/`, `Use:`, the env prefix, and the config-dir path keep the verbatim project name; only `pkg/<name>`, the `package` clause, and `{{MODULE}}/pkg/<name>` imports use the stripped form.
+
+   When the project name is already a valid identifier they are identical.
 2. Write `go.mod` (placeholder `v0.0.0` lines per the [template](command-templates.md#gomod), except the pinned `go.yaml.in/yaml/v4 v4.0.0-rc.5`).
 3. Write `cmd/<name>/main.go` ([template](command-templates.md#cmdnamemaingo)).
 4. Write `cmd/<name>/commands/root.go` ([template](command-templates.md#cmdnamecommandsrootgo) already wires `versionCmd(cmd)` and the `--version` flag — leave that in place).
-5. Write `pkg/<name>/version.go` ([template](versioning.md#pkgnameversiongo-always-present)). The initial `Version` value is `v0.0.0-devel`.
-6. Write `pkg/<name>/config.go` ([template](config-source.md)). Fill in the real `Config` fields + `DefaultConfig`, the mirrored `PartialConfig` + `Apply` (one overlay line per field, by kind — scalar / nested / map / slice), and `LoadConfig` (env layer via caarlos0/env's `ParseWithOptions` + the package-level `envOptions`). Give every field `json:`, `yaml:`, and `env:` (or `envPrefix:` for a nested sub-config) tags. For the chosen **config file format**: JSON-only uses the template as-is; for `yaml`/`both`, apply the [YAML support block](config-source.md#yaml-support-yaml-only-or-both-formats) (format-aware `unmarshalConfigFile`/`configPath` + the `go.yaml.in/yaml/v4` dep). Keep it one file.
+5. Write `pkg/<name>/version.go` ([template](versioning.md#pkgnameversiongo-always-present)).
+
+   The initial `Version` value is `v0.0.0-devel`.
+
+6. Write `pkg/<name>/config.go` ([template](config-source.md)).
+
+   Fill in the real `Config` fields + `DefaultConfig`, the mirrored `PartialConfig` + `Apply` (one overlay line per field, by kind — scalar / nested / map / slice), and `LoadConfig` (env layer via caarlos0/env's `ParseWithOptions` + the package-level `envOptions`).
+
+   Give every field `json:`, `yaml:`, and `env:` (or `envPrefix:` for a nested sub-config) tags.
+
+   For the chosen **config file format**: JSON-only uses the template as-is; for `yaml`/`both`, apply the [YAML support block](config-source.md#yaml-support-yaml-only-or-both-formats) (format-aware `unmarshalConfigFile`/`configPath` + the `go.yaml.in/yaml/v4` dep).
+
+   Keep it one file.
 7. Write `cmd/<name>/commands/version.go` ([template](versioning.md#cmdnamecommandsversiongo-always-present)).
-8. Write `cmd/<name>/commands/config.go` ([template](configuration.md#cmdnamecommandsconfiggo-always-present)). The root template already declares the persistent `--config` flag and wires `configCmd(cmd, &flagConfig)` beside `versionCmd(cmd)` — leave that in place.
-9. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf. Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
-10. For nested commands, write the parent **before** child files. Wire the parent into `rootCmd()`. Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
-11. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio). This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `cmd/internal/stdiopipe`. No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
-12. For each direct dep in `go.mod`: `go get <module>@latest` — using the correct `/vN` major path (e.g. `github.com/caarlos0/env/v11@latest`; confirm the current major first, see [Version policy](command-templates.md#gomod)). Exception: pin pre-release YAML with `go get go.yaml.in/yaml/v4@v4.0.0-rc.5` (or omit entirely for a JSON-only project).
+8. Write `cmd/<name>/commands/config.go` ([template](configuration.md#cmdnamecommandsconfiggo-always-present)).
+
+   The root template already declares the persistent `--config` flag and wires `configCmd(cmd, &flagConfig)` beside `versionCmd(cmd)` — leave that in place.
+
+9. Write one `cmd/<name>/commands/<subcmd>.go` per flat leaf.
+
+   Then edit `root.go` to call `{{subCamel}}Cmd(cmd)` inside `rootCmd()` for each.
+
+10. For nested commands, write the parent **before** child files.
+
+    Wire the parent into `rootCmd()`.
+
+    Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
+
+11. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio).
+
+    This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `cmd/internal/stdiopipe`.
+
+    No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
+
+12. For each direct dep in `go.mod`: `go get <module>@latest` — using the correct `/vN` major path (e.g. `github.com/caarlos0/env/v11@latest`; confirm the current major first, see [Version policy](command-templates.md#gomod)).
+
+    Exception: pin pre-release YAML with `go get go.yaml.in/yaml/v4@v4.0.0-rc.5` (or omit entirely for a JSON-only project).
 13. `go mod tidy`.
 14. Run the post-edit validation chain (see SKILL.md › Post-edit validation).
 15. Report the generated file list to the user.
 
-Use **Write** for every file. Write creates parent directories — do not run `mkdir` separately.
+Use **Write** for every file.
+
+Write creates parent directories — do not run `mkdir` separately.
 
 ## Edit an existing project
 
-Pre-flight checks first (Cobra detection, layout classification — see SKILL.md › Pre-flight checks). Then pick the operation; each entry below lists what to touch.
+Pre-flight checks first (Cobra detection, layout classification — see SKILL.md › Pre-flight checks).
+
+Then pick the operation; each entry below lists what to touch.
 
 ### Subcommand structure
 
@@ -77,18 +120,28 @@ Pre-flight checks first (Cobra detection, layout classification — see SKILL.md
 
 `Use`, `Short`, `Long`, `Example`, `Aliases`, `Annotations`, `SuggestFor`, `Hidden`, `Deprecated` — edit the `cobra.Command` literal inside the wrapper.
 
-`PreRunE`, `PostRunE`, `PersistentPreRunE`, `PersistentPostRunE` — set on the `cobra.Command` literal; assign a named function (`preRun{{Name}}`, `postRun{{Name}}`) defined in the same file. Use a closure adapter to forward captured flag values when needed, mirroring the `RunE` rule.
+`PreRunE`, `PostRunE`, `PersistentPreRunE`, `PersistentPostRunE` — set on the `cobra.Command` literal; assign a named function (`preRun{{Name}}`, `postRun{{Name}}`) defined in the same file.
+
+Use a closure adapter to forward captured flag values when needed, mirroring the `RunE` rule.
 
 ### Completion
 
-- **Positional-argument completion**: set `ValidArgsFunction` (dynamic), `ValidArgs` (static slice), or `cobra.FixedCompletions(...)` on the `cobra.Command` literal inside the wrapper. The stub leaf templates leave this as a TODO — fill it to match the command's `Args`: use `cobra.NoFileCompletions` when the command takes no completable positional args (so the shell does not fall back to file completion), otherwise supply real completions. `ValidArgs` and `ValidArgsFunction` are mutually exclusive; Cobra reports an error when both are set.
+- **Positional-argument completion**: set `ValidArgsFunction` (dynamic), `ValidArgs` (static slice), or `cobra.FixedCompletions(...)` on the `cobra.Command` literal inside the wrapper.
+
+  The stub leaf templates leave this as a TODO — fill it to match the command's `Args`: use `cobra.NoFileCompletions` when the command takes no completable positional args (so the shell does not fall back to file completion), otherwise supply real completions.
+
+  `ValidArgs` and `ValidArgsFunction` are mutually exclusive; Cobra reports an error when both are set.
 - **Flag-value completion**: call `cmd.RegisterFlagCompletionFunc(name, fn)` inside the wrapper, after binding the flag.
 
 ## Helper catalog
 
-Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`. The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/cmd/internal/cmdsignals/` → `<project-root>/cmd/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, `helpers/internal/cmd/release/` → `<project-root>/internal/cmd/release/`, etc.
+Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`.
 
-Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on packages (`cmdsignals`, `loggerfactory`, `versioninfo`, `internal/cmd/release`) — source and tests — in one step; add `--stdiopipe` to also copy `cmd/internal/stdiopipe`. `<project-root>` must already exist.
+The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/cmd/internal/cmdsignals/` → `<project-root>/cmd/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, `helpers/internal/cmd/release/` → `<project-root>/internal/cmd/release/`, etc.
+
+Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on packages (`cmdsignals`, `loggerfactory`, `versioninfo`, `internal/cmd/release`) — source and tests — in one step; add `--stdiopipe` to also copy `cmd/internal/stdiopipe`.
+
+`<project-root>` must already exist.
 
 ### Library packages (copied verbatim)
 
@@ -99,7 +152,13 @@ Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on package
 | `versioninfo`   | `{{MODULE}}/internal/versioninfo`    | combine the project's `Version` with VCS info from `runtime/debug.ReadBuildInfo`                                                         | `ReadVersionInfo(version string) Info`, `type Info`                                                                                                                                                                                                                                                                 | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `stdiopipe`     | `{{MODULE}}/cmd/internal/stdiopipe`  | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe`                                                                         | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                                                                                                                                                                                              | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics.           |
 
-`cmdsignals.Pause` / `Resume` take the same `ctx` that `NotifyContext` produced (threaded through `cmd.Context()`). Reach for them only in a leaf's `run{{Name}}` that hands the terminal to a child process — exec'ing an editor, an interactive REPL, a `less` pager — where `SIGINT` should reach the child instead of cancelling the CLI. `Pause` stops this package's handler (its `installHandler` callback is where you install the child's own forwarding handler) and `Resume` restores it (`removeHandler` uninstalls yours); both no-op safely if the context carries no manager or is already cancelled. The default scaffold needs neither — `NotifyContext` alone gives the standard "signal cancels `ctx`" behavior.
+`cmdsignals.Pause` / `Resume` take the same `ctx` that `NotifyContext` produced (threaded through `cmd.Context()`).
+
+Reach for them only in a leaf's `run{{Name}}` that hands the terminal to a child process — exec'ing an editor, an interactive REPL, a `less` pager — where `SIGINT` should reach the child instead of cancelling the CLI.
+
+`Pause` stops this package's handler (its `installHandler` callback is where you install the child's own forwarding handler) and `Resume` restores it (`removeHandler` uninstalls yours); both no-op safely if the context carries no manager or is already cancelled.
+
+The default scaffold needs neither — `NotifyContext` alone gives the standard "signal cancels `ctx`" behavior.
 
 ### Build-time `main` packages (copied verbatim)
 
@@ -107,7 +166,11 @@ Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on package
 | --------- | -------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `release` | `helpers/internal/cmd/release/main.go` | `<root>/internal/cmd/release/main.go` | Cross-platform release helper. Validates inputs, rewrites `pkg/<name>/version.go`'s `const Version`, commits + tags, bumps to next `-devel`. | Always when scaffolding. Invoke during a release with `go run ./internal/cmd/release <release-version> [<next-dev-version>]`. |
 
-The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree or duplicate tag. It pushes the branch and the new tag to `origin` on success; if either push fails it aborts and leaves the local commits + tag in place for manual re-push. See [Versioning & release](versioning.md) for the contract it expects.
+The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree or duplicate tag.
+
+It pushes the branch and the new tag to `origin` on success; if either push fails it aborts and leaves the local commits + tag in place for manual re-push.
+
+See [Versioning & release](versioning.md) for the contract it expects.
 
 ### Templates (filled per project; not copied verbatim)
 
