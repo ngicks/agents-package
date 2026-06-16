@@ -6,7 +6,7 @@ Structural conventions for a canonical Cobra project: where each file lives, how
 
 - [Project layout (canonical)](#project-layout-canonical)
 - [Naming conventions](#naming-conventions) — flat, nested, non-subcommand files, package name
-- [Anti-patterns](#anti-patterns)
+- [Anti-patterns](#anti-patterns) — grouped: layout & placement · mandatory pieces · naming · construction & wiring · run functions & the `./cmd` boundary · versioning · configuration model
 
 ## Project layout (canonical)
 
@@ -92,35 +92,55 @@ Why this shape:
 
 ## Anti-patterns
 
-Do not generate any of these — they look superficially shorter but break the layout contract.
+Do not generate any of these — they look superficially shorter but break the layout contract. Grouped by the part of the layout each one violates.
+
+### Layout & file placement
 
 - **`commands/` at the module root** (i.e. `<root>/commands/...` instead of `<root>/cmd/<name>/commands/...`). A second binary forces a rename of every import path.
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
 - **CLI-only helpers under module-root `internal/`.** `cmdsignals` and `stdiopipe` go at `cmd/internal/`, not `<root>/internal/`. The module-root `internal/` is reserved for two cases: (a) library packages shared between `./cmd` and `./pkg/<name>` — `loggerfactory` (whose `Level*` constants are imported from `pkg/<name>`) and `versioninfo` (consumed by `commands/version.go`); and (b) build-time `main` packages such as `internal/cmd/release` that should not be `go install`-able by external modules.
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
+- **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/internal/loggerfactory`. Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package under `cmd/internal/` — `pkg/<name>` needs to import its `Level` constants.
+- **Putting the release helper anywhere other than `internal/cmd/release/`.** Specifically: not `cmd/release/` (that would make it `go install`-able by external consumers) and not `scripts/` (no shell-script parity to maintain).
+- **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
+
+### Mandatory pieces — never skip these
+
 - **Skipping `cmdsignals`.** Always generated for scaffold; `main.go` imports it.
 - **Skipping `loggerfactory`.** Always generated for scaffold; `root.go` imports it for `--log` / `--log-level` wiring.
 - **Skipping `versioninfo`.** Always generated for scaffold; `commands/version.go` imports it.
 - **Skipping `internal/cmd/release`.** Always generated for scaffold; the release flow assumes it. The Go program intentionally replaces parallel bash + PowerShell scripts; do not re-introduce them.
 - **Skipping `version.go` (either copy).** Both `pkg/<name>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
 - **Skipping the `config` subcommand.** `cmd/<name>/commands/config.go` is mandatory alongside `pkg/<name>/config.go`; `rootCmd()` wires `configCmd(cmd, &flagConfig)` unconditionally. It prints `LoadConfig` as JSON, or renders `--template` against it.
+- **Skipping `pkg/<name>/config.go`.** Configuration is always present; every project carries it (even when `Config` starts with a single field).
+
+### Naming
+
+- **Non-subcommand files in `commands/` without the `zz_` prefix.** Anything that isn't a single subcommand definition (shared helpers, package-internal types) MUST be `zz_<name>.go`. **Never use a leading `_`** — `cmd/go` ignores files starting with `_` or `.`, so they would silently never compile.
+- **Hyphens or underscores in the `pkg/<name>` directory.** It is an importable package, so the name part must follow Go convention — `pkg/mytool/`, never `pkg/my-tool/` or `pkg/my_tool/`. Strip those characters from the project name for the directory, the `package` clause, and the `{{MODULE}}/pkg/<name>` import (they then agree, so no import alias is needed). The binary directory `cmd/<name>/` keeps the verbatim name. See [Naming conventions › Package name](#package-name-pkgname).
+
+### Command construction & wiring
+
+- **Package-level `var xxxCmd = &cobra.Command{...}`** or any `init()` that calls `AddCommand`. All Cobra construction lives inside the wrapper function `{{name}}Cmd(parent)`; wiring happens via the parent calling its children's wrappers.
+- **Pointer-returning flag APIs (`Flags().String(...)`, `Flags().Int(...)`)** at any scope. Always use the `*Var` family with a local declared in the wrapper's `var (...)` block. This keeps the binding shape uniform with `pflag.BoolFunc`.
+- **Reading flags via `cmd.Flags().Get*`.** Use the captured flag variable from the wrapper's `var (...)` block; pass it into `run{{Name}}` via a `RunE` closure adapter when needed.
+
+### Run functions & the `./cmd` boundary
+
+- **Putting business logic inside `RunE`.** Business logic lives outside `./cmd`; `RunE` is wiring only — either a direct `run{{Name}}` reference or a thin closure adapter that forwards captured flag values.
+- **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/pkg/<name>/cli/`. `RunE` calls into that package and returns its error.
+- **Reading env vars under `./cmd`.** No `os.Getenv`, no `os.LookupEnv`, no manual scanning of `os.Environ()`. The only allowed env-var consumer reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the variable names. Every other env var lives in `./pkg/<name>/config.go`.
+
+### Versioning
+
 - **Hand-editing `const Version = "..."` outside a release.** Use `go run ./internal/cmd/release`; manual edits drift from the tag/commit pair the helper produces.
 - **Renaming `Version` or switching it to `var`.** The required source shape is a single top-level `const Version = "..."`; the release helper relies on it. Update the helper in lockstep if you must diverge. There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
 - **Adding imports to `pkg/<name>/version.go`.** It must stay import-free so external consumers of `pkg/<name>` are not forced to pull `internal/`. Anything richer (VCS info, runtime/debug glue) lives in `internal/versioninfo`.
 - **Putting version printing under any other subcommand or in `main.go`.** Version output lives in `runVersion` only. The root `--version` flag is implemented as a closure dispatch into `runVersion`, not a copy.
 - **Making `--version` persistent.** It is a local flag on the root command. `mytool serve --version` is intentionally an unknown-flag error; only `mytool --version` and `mytool version` print the version.
-- **Putting the release helper anywhere other than `internal/cmd/release/`.** Specifically: not `cmd/release/` (that would make it `go install`-able by external consumers) and not `scripts/` (no shell-script parity to maintain).
-- **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/internal/loggerfactory`. Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package under `cmd/internal/` — `pkg/<name>` needs to import its `Level` constants.
-- **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
-- **Package-level `var xxxCmd = &cobra.Command{...}`** or any `init()` that calls `AddCommand`. All Cobra construction lives inside the wrapper function `{{name}}Cmd(parent)`; wiring happens via the parent calling its children's wrappers.
-- **Pointer-returning flag APIs (`Flags().String(...)`, `Flags().Int(...)`)** at any scope. Always use the `*Var` family with a local declared in the wrapper's `var (...)` block. This keeps the binding shape uniform with `pflag.BoolFunc`.
-- **Reading flags via `cmd.Flags().Get*`.** Use the captured flag variable from the wrapper's `var (...)` block; pass it into `run{{Name}}` via a `RunE` closure adapter when needed.
-- **Non-subcommand files in `commands/` without the `zz_` prefix.** Anything that isn't a single subcommand definition (shared helpers, package-internal types) MUST be `zz_<name>.go`. **Never use a leading `_`** — `cmd/go` ignores files starting with `_` or `.`, so they would silently never compile.
-- **Putting business logic inside `RunE`.** Business logic lives outside `./cmd`; `RunE` is wiring only — either a direct `run{{Name}}` reference or a thin closure adapter that forwards captured flag values.
-- **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/pkg/<name>/cli/`. `RunE` calls into that package and returns its error.
-- **Reading env vars under `./cmd`.** No `os.Getenv`, no `os.LookupEnv`, no manual scanning of `os.Environ()`. The only allowed env-var consumer reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the variable names. Every other env var lives in `./pkg/<name>/config.go`.
-- **Skipping `pkg/<name>/config.go`.** Configuration is always present; every project carries it (even when `Config` starts with a single field).
-- **Hyphens or underscores in the `pkg/<name>` directory.** It is an importable package, so the name part must follow Go convention — `pkg/mytool/`, never `pkg/my-tool/` or `pkg/my_tool/`. Strip those characters from the project name for the directory, the `package` clause, and the `{{MODULE}}/pkg/<name>` import (they then agree, so no import alias is needed). The binary directory `cmd/<name>/` keeps the verbatim name. See [Naming conventions › Package name](#package-name-pkgname).
+
+### Configuration model
+
 - **Decoding the config file (or env) into a defaults-populated struct.** Decode into a **fresh zero `PartialConfig`** (all `nil`) and let `Apply` do the merge. Unmarshaling JSON into an already-populated struct hits the v1 `encoding/json` merge edge cases; keep `unmarshalConfigFile` decode-only.
 - **Decoding the file straight into `Config`, or hand-rolling per-layer overlay code.** The file and env both decode/build into `PartialConfig` and merge through the one `Apply` method. Do not write separate `if x != "" { cfg.X = x }` overlay loops per layer — that is the duplicated, drift-prone ceremony `Apply` exists to replace. `Config` is materialized-only; nothing decodes into it.
 - **Getting the merge kind wrong in `Apply`.** Scalars and slices **overwrite** (a non-nil incoming value replaces); nested structs and maps **deep-merge** (recurse / key-union). Do not element-wise-merge a slice, and do not blind-overwrite a nested sub-config or map (that silently clears the user's other keys). Allocate a fresh map when merging so `Apply` does not mutate its base.

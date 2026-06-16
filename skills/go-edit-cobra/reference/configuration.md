@@ -102,7 +102,18 @@ func runServe(cmd *cobra.Command, args []string, flagConfig, flagAddr string, fl
 - **Env var names** live in `PartialConfig`'s `env:` / `envPrefix:` tags (bare names; the `{{NAME_UPPER}}_` prefix is applied via the package-level `envOptions`). There are no `SCREAMING_SNAKE` Go constants to trip naming lint — the only env-name identifier is the MixedCaps `envConfVar`, which needs no directive.
 - **Long lines.** The triple-tagged `PartialConfig` fields (`json:` + `yaml:` + `env:` on one line) routinely exceed line-length linters (`lll`, `revive`'s `line-length-limit`). Keep one field per line — do **not** wrap tags across lines. Suppress the rule for the whole declaration with `//nolint:lll // triple json/yaml/env tags` on its own line directly above each `type Partial<Xxx> struct` (nested sub-partials included). The directive form (`//nolint:` with no space) is excluded from rendered godoc, so it doesn't pollute the doc comment.
 - **Growth.** Start with one `config.go`. If configuration outgrows it (~300 LoC), promote it to a `pkg/<name>/config/` sub-package (`LoadConfig` → `config.Load`).
-- **Adding a config field** touches: `Config` (+ json/yaml tags), `DefaultConfig`, `PartialConfig` (+ matching json/yaml tags **and** an `env:` tag to make it env-settable), and the field's line in `PartialConfig.Apply` (pick the rule for its kind — scalar / nested / map / slice); when flag-settable, also the flag binding and `Changed()` overlay in `./cmd`. A **nested sub-config** field additionally needs its own value `Partial<Sub>` type (with the `//nolint:lll` directive above it) + `Apply` method and an `envPrefix:` tag (its inner fields carry the `env:` tags). Env-settability is now just a tag — no loader code or constant to add. No "is this zero-meaningful?" decision is needed.
+
+**Adding a config field** touches several sites in lockstep. For a plain scalar / map / slice field:
+
+1. `Config` — the field plus its `json:` and `yaml:` tags.
+2. `DefaultConfig` — its default value (initialize a map / sub-config so later layers deep-merge into a populated base).
+3. `PartialConfig` — the mirrored field with matching `json:` / `yaml:` tags **and** an `env:` tag (to make it env-settable).
+4. `PartialConfig.Apply` — one overlay line, picking the rule for its kind (scalar / nested / map / slice).
+5. `./cmd` (only when flag-settable) — the flag binding plus the `Changed()` overlay in the run function.
+
+A **nested sub-config** field additionally needs its own value `Partial<Sub>` type (with the `//nolint:lll` directive above it) + `Apply` method and an `envPrefix:` tag (its inner fields carry the `env:` tags).
+
+Env-settability is now just a tag — no loader code or constant to add. No "is this zero-meaningful?" decision is needed.
 
 ## `cmd/{{NAME}}/commands/config.go` (always present)
 
