@@ -7,13 +7,13 @@ set -e
 # <project-root>/internal/loggerfactory/. Every *.go file in the package
 # (source and _test.go alike) is copied.
 ALWAYS_DIRS=(
-  cmd/internal/cmdsignals
+  internal/cmdsignals
   internal/loggerfactory
   internal/versioninfo
   internal/cmd/release
 )
 # Copied only with --stdiopipe (a subcommand needs cancellable stdio).
-STDIOPIPE_DIR=cmd/internal/stdiopipe
+STDIOPIPE_DIR=internal/stdiopipe
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 HELPERS_DIR="$SCRIPT_DIR/helpers"
@@ -25,11 +25,11 @@ usage() {
   echo "Copies the go-edit-cobra verbatim helper packages (source and tests)"
   echo "into <project-root>, mirroring each package's path:"
   echo ""
-  echo "  cmd/internal/cmdsignals/    always"
+  echo "  internal/cmdsignals/        always"
   echo "  internal/loggerfactory/     always"
   echo "  internal/versioninfo/       always"
   echo "  internal/cmd/release/       always"
-  echo "  cmd/internal/stdiopipe/     only with --stdiopipe"
+  echo "  internal/stdiopipe/         only with --stdiopipe"
   echo ""
   echo "<project-root> must already exist (the module root containing go.mod)."
   exit 1

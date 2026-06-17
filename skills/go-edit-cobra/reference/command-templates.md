@@ -46,7 +46,7 @@ import (
 	"sync"
 
 	"{{MODULE}}/cmd/{{NAME}}/commands"
-	"{{MODULE}}/cmd/internal/cmdsignals"
+	"{{MODULE}}/internal/cmdsignals"
 )
 
 func main() {

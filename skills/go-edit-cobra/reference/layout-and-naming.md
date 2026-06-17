@@ -16,22 +16,21 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 <module-root>/
 ├── go.mod
 ├── cmd/
-│   ├── <name>/
-│   │   ├── main.go
-│   │   └── commands/
-│   │       ├── root.go                  # rootCmd() + Execute(ctx) + runRoot
-│   │       ├── version.go               # always present; "version" subcommand + --version alias
-│   │       ├── config.go                # always present; "config" subcommand (prints resolved config)
-│   │       ├── zz_<helper>.go           # any non-subcommand helper file (prefix zz_)
-│   │       ├── <subcmd>.go              # one per flat leaf
-│   │       ├── <parent>.go              # one per group (no RunE)
-│   │       └── <parent>_<child>.go      # one per nested leaf
-│   └── internal/
-│       ├── cmdsignals/
-│       │   └── signals.go               # always present
-│       └── stdiopipe/                   # only when a subcommand needs cancellable stdio
-│           └── stdiopipe.go
+│   └── <name>/
+│       ├── main.go
+│       └── commands/
+│           ├── root.go                  # rootCmd() + Execute(ctx) + runRoot
+│           ├── version.go               # always present; "version" subcommand + --version alias
+│           ├── config.go                # always present; "config" subcommand (prints resolved config)
+│           ├── zz_<helper>.go           # any non-subcommand helper file (prefix zz_)
+│           ├── <subcmd>.go              # one per flat leaf
+│           ├── <parent>.go              # one per group (no RunE)
+│           └── <parent>_<child>.go      # one per nested leaf
 ├── internal/
+│   ├── cmdsignals/
+│   │   └── signals.go                   # always present
+│   ├── stdiopipe/                       # only when a subcommand needs cancellable stdio
+│   │   └── stdiopipe.go
 │   ├── cmd/
 │   │   └── release/
 │   │       └── main.go                  # always present; cross-platform release helper
@@ -51,10 +50,10 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
-- `cmd/internal/` is a sibling of all binary packages, sharing helpers under Go's `internal/` rule.
-- `internal/loggerfactory/` sits at the module-root `internal/` (not under `cmd/internal/`) so `pkg/<name>` code can import its level constants — notably `LevelTrace` and `LevelFatal` — and emit records at levels the CLI knows how to render.
+- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `loggerfactory`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./pkg/<name>` while blocked to external modules under Go's `internal/` rule.
+- `internal/loggerfactory/` is genuinely shared, not CLI-only: `pkg/<name>` code imports its level constants — notably `LevelTrace` and `LevelFatal` — and emits records at levels the CLI knows how to render.
 
-  The module-root `internal/` placement keeps it reachable from both `./cmd` and `./pkg/<name>` while blocking external consumers.
+  That cross-package use is why the logger glue is a library under `internal/`, not `zz_`-prefixed code under `commands/`.
 
   The flag wiring is still CLI-only; the package is shared because the level constants are shared.
 
@@ -148,13 +147,13 @@ Grouped by the part of the layout each one violates.
 
 - **`commands/` at the module root** (i.e. `<root>/commands/...` instead of `<root>/cmd/<name>/commands/...`). A second binary forces a rename of every import path.
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
-- **CLI-only helpers under module-root `internal/`.** `cmdsignals` and `stdiopipe` go at `cmd/internal/`, not `<root>/internal/`.
+- **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./pkg/<name>` while blocked to external modules.
 
-  The module-root `internal/` is reserved for two cases: (a) library packages shared between `./cmd` and `./pkg/<name>` — `loggerfactory` (whose `Level*` constants are imported from `pkg/<name>`) and `versioninfo` (consumed by `commands/version.go`); and (b) build-time `main` packages such as `internal/cmd/release` that should not be `go install`-able by external modules.
+  The module-root `internal/` also holds build-time `main` packages such as `internal/cmd/release` that should not be `go install`-able by external modules. Do not reintroduce a `cmd/internal/` layer or scatter helpers beside the subcommand files.
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
 - **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/internal/loggerfactory`.
 
-  Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package under `cmd/internal/` — `pkg/<name>` needs to import its `Level` constants.
+  Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package anywhere under `cmd/` — `pkg/<name>` needs to import its `Level` constants, so it must stay at the module-root `internal/loggerfactory`.
 - **Putting the release helper anywhere other than `internal/cmd/release/`.** Specifically: not `cmd/release/` (that would make it `go install`-able by external consumers) and not `scripts/` (no shell-script parity to maintain).
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
 
