@@ -1,5 +1,14 @@
-/.codex
+# LLM stuff
+apm_modules/
 
-/PLAN.md
-/TODO.md
-/REVIEW*.md
+/.agents
+/.claude
+/.codex
+/.github/instructions
+/.github/skills
+
+CLAUDE*.md
+CODEX*.md
+
+CLAUDE.md
+AGENTS.md

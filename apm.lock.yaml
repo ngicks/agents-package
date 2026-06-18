@@ -1,0 +1,13 @@
+lockfile_version: '1'
+generated_at: '2026-06-18T13:04:24.369000+00:00'
+dependencies: []
+local_deployed_files:
+- .agents/skills/skill-review
+- .agents/skills/skill-review/SKILL.md
+- .claude/rules/base.local.md
+- .claude/skills/skill-review
+- .claude/skills/skill-review/SKILL.md
+local_deployed_file_hashes:
+  .agents/skills/skill-review/SKILL.md: sha256:5a864b4cd4f7d29ea598d31c30e8d8c533b2bbd4449968b920affd2657c3f938
+  .claude/rules/base.local.md: sha256:7739c9fd281de3c9eb06df3b582908cd714589482da8bf28bafa2b91c29e4f9b
+  .claude/skills/skill-review/SKILL.md: sha256:5a864b4cd4f7d29ea598d31c30e8d8c533b2bbd4449968b920affd2657c3f938
