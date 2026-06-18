@@ -116,6 +116,10 @@ They are grouped below by what they govern: error handling, positional args, com
 
   (A leading single `_` cannot be used: `cmd/go` ignores any file whose name starts with `_` or `.`. The `zz_` form is Go-compatible and sorts last in directory listings, mirroring the `zz_generated_*.go` convention.)
 
+- **A leaf file name must not end in an implicit build-constraint suffix.** Go reads a `GOOS` / `GOARCH` / `test` build constraint off the **trailing** `_`-segment(s) of a file name, so a nested-leaf file like `foo_windows.go`, `db_linux_amd64.go`, or `db_test.go` silently compiles on one platform only (or is treated as a test file) and the subcommand disappears from other builds.
+
+  Fix it by `zz`-prefixing the offending **trailing** segment in the file name only — `foo_windows.go` → `foo_zzwindows.go` — while the command's `Use:`, wrapper, and run function keep the real leaf name. Flat single-segment leaves (`windows.go`) and GOOS-named parents (`windows_sub.go`) are already safe and must not be mangled. Full rule: [layout-and-naming.md › Build-constraint suffix collisions](reference/layout-and-naming.md#build-constraint-suffix-collisions-in-leaf-file-names).
+
 ### Canonical flag pattern
 
 Inside the wrapper function, declare every flag as a local in a single `var (...)` block at the top, then bind it with the `*Var` family (`StringVar`, `IntVar`, `BoolVarP`, ...) — **never** the pointer-returning form (`String`, `Int`, ...).

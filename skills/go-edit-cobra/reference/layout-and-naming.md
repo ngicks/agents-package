@@ -25,7 +25,7 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │           ├── zz_<helper>.go           # any non-subcommand helper file (prefix zz_)
 │           ├── <subcmd>.go              # one per flat leaf
 │           ├── <parent>.go              # one per group (no RunE)
-│           └── <parent>_<child>.go      # one per nested leaf
+│           └── <parent>_<child>.go      # one per nested leaf (zz-prefix a trailing GOOS/GOARCH/test leaf: foo_windows.go → foo_zzwindows.go)
 ├── internal/
 │   ├── cmdsignals/
 │   │   └── signals.go                   # always present
@@ -69,7 +69,9 @@ Why this shape:
 
   (`_` prefix is **not** usable — `cmd/go` ignores files starting with `_` or `.`.)
 
-  - as per Go's file name rule, `<helper>` can not be `test`, `$GOARCH`(e.g. `amd64`, etc), `$GOOS`(e.g. `windows`, etc)
+  - as per Go's file name rule, `<helper>` (the part after `zz_`) can not be `test`, `$GOARCH`(e.g. `amd64`, etc), `$GOOS`(e.g. `windows`, etc) — `zz_windows.go` would compile on Windows only.
+
+    The same rule constrains a subcommand whose **leaf** file segment is such a token; the fix there is to `zz`-prefix that segment in place. See [Build-constraint suffix collisions in leaf file names](#build-constraint-suffix-collisions-in-leaf-file-names).
 
 - `version.go` is split across **three** packages by design.
 
@@ -114,6 +116,40 @@ Why this shape:
 - **Wiring**: parent's wrapper calls `{{parentCamel}}{{ChildPascal}}Cmd(cmd)`.
 
   3-level follows the same chain (`server_start_foo.go` is wired from inside `serverStartCmd`).
+
+### Build-constraint suffix collisions in leaf file names
+
+Go derives an implicit `GOOS` / `GOARCH` / `test` build constraint from the **trailing** `_`-delimited segment(s) of a file name (everything before the first `_` is exempt).
+
+A file whose name ends in `_<GOOS>`, `_<GOARCH>`, `_<GOOS>_<GOARCH>`, or `_test` is silently compiled only on the matching platform (or treated as a test file). A subcommand whose file name lands such a suffix then **vanishes from normal builds** — `go vet` / `go build` pass on your host, and the command is just missing elsewhere.
+
+This bites **nested-leaf file names**, and only when the offending name is in the **trailing** position (i.e. the leaf segment):
+
+- **Leaf segment is a GOOS / GOARCH / `test`** → constrained.
+
+  `foo windows` → `foo_windows.go` compiles on Windows only.
+
+  3-level `db linux amd64` → `db_linux_amd64.go` compiles on linux/amd64 only (the trailing `_linux_amd64` pair).
+
+  `db test` → `db_test.go` is treated as a test file, dropped from the normal build.
+- **Flat leaves and group parents are never affected.** A single-segment file has no `_`, so Go exempts it — `windows.go`, `linux.go`, `amd64.go` compile everywhere.
+- **A GOOS / GOARCH-named parent is harmless.** It sits before the first `_` (a non-trailing segment), which Go ignores.
+
+  `windows sub` → `windows_sub.go` (trailing `_sub`) compiles everywhere — leave it as is.
+
+**Fix — `zz`-prefix the offending trailing segment in the file name only:**
+
+- `foo_windows.go` → `foo_zzwindows.go`
+- `db_linux_amd64.go` → `db_linux_zzamd64.go`
+- `db_test.go` → `db_zztest.go`
+
+`zzwindows` / `zzamd64` / `zztest` are not known GOOS / GOARCH / `test` tokens, so the implicit constraint disappears.
+
+Only the **file name** changes. The command's `Use:` string, the wrapper function (`fooWindowsCmd`), and the run function (`runFooWindows`) keep the **real** leaf name — the command tree and wiring are unaffected.
+
+Do **not** over-apply: never mangle a non-trailing segment. `windows_sub.go` stays `windows_sub.go`, never `zzwindows_sub.go`. Only the last `_`-segment can carry the constraint, so only it ever needs the prefix.
+
+This is the same Go rule that constrains a `zz_<helper>` file's `<helper>` part (see [Non-subcommand files](#non-subcommand-files)); only the fix differs — a leaf file keeps its real name with the offending segment `zz`-prefixed in place, rather than gaining a leading `zz_`.
 
 ### Non-subcommand files
 
@@ -182,6 +218,10 @@ Grouped by the part of the layout each one violates.
   Strip those characters from the project name for the directory, the `package` clause, and the `{{MODULE}}/pkg/<name>` import (they then agree, so no import alias is needed).
 
   The binary directory `cmd/<name>/` keeps the verbatim name. See [Naming conventions › Package name](#package-name-pkgname).
+
+- **A leaf file name whose trailing `_`-segment is a GOOS / GOARCH / `test` token** (e.g. `foo_windows.go`, `db_linux_amd64.go`, `db_test.go`). Go gives it an implicit build constraint, so the subcommand silently drops out of builds on other platforms — green on your host, missing elsewhere.
+
+  `zz`-prefix the offending trailing segment in the file name only (`foo_windows.go` → `foo_zzwindows.go`), keeping the command's real name. Do **not** mangle a non-trailing GOOS/GOARCH-named parent — `windows_sub.go` is fine as is. See [Build-constraint suffix collisions in leaf file names](#build-constraint-suffix-collisions-in-leaf-file-names).
 
 ### Command construction & wiring
 
