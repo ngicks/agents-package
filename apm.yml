@@ -2,14 +2,12 @@ name: agents-package
 version: 0.0.1
 description: APM project for main
 author: ngicks
-# Which agent platforms to deploy to.
-# Resolution order: --target flag > this field > auto-detect from filesystem.
-# Accepted values: copilot, claude, cursor, opencode, codex, gemini, windsurf, all
 targets:
 - claude
 - codex
 dependencies:
-  apm: []
+  apm:
+  - anthropics/claude-plugins-official/plugins/skill-creator
   mcp: []
 includes: auto
 scripts: {}
