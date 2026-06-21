@@ -165,11 +165,13 @@ Bind those to locals and overlay only the explicitly-set ones via `cmd.Flags().C
 Run after **every** edit and after scaffolding, in this order:
 
 1. `go mod tidy` — only when imports / dependencies changed.
-2. `goimports -w <changed_files>`.
+2. **Format the changed files.**
 
-   If `goimports` is missing, run `go install golang.org/x/tools/cmd/goimports@latest`.
+   If the project has a golangci-lint config (`.golangci.{yaml,yml,toml,json}`) with a `formatters.enable` block, run `golangci-lint fmt <changed_files>` — this applies the project's configured formatters (e.g. `goimports`, `golines`) in their configured order.
 
-   If install fails, fall back to `gofmt -w` and surface the install failure to the user.
+   Otherwise, run `goimports -w <changed_files>`.
+
+   If `goimports` is missing, fall back to `gofmt -w` and report the missing tool to the user — do not install it.
 3. `go vet ./...` — full module.
 
    The wrapper-function chain crosses package boundaries on `parent.AddCommand`, so package-scoped vet is unsafe.
