@@ -36,6 +36,8 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │   │       └── main.go                  # always present; cross-platform release helper
 │   ├── loggerfactory/
 │   │   └── loggerfactory.go             # always present; --log / --log-level wiring
+│   ├── templateutil/
+│   │   └── templateutil.go              # always present; shared text/template FuncMap + FuncDocs (json, + project helpers)
 │   └── versioninfo/
 │       └── versioninfo.go               # always present; ReadVersionInfo (Version + VCS info)
 └── pkg/
@@ -44,13 +46,16 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
         ├── config.go                    # always present; Config + DefaultConfig, PartialConfig + Apply, LoadConfig
         ├── <service>.go                 # internal service implementation
         └── cli/                         # CLI-presentation code (printing, prompts, tables, colors)
+            ├── config.go                # always present; RenderConfig (config subcommand JSON / --format)
             └── <ui>.go
 ```
 
 Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
-- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `loggerfactory`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./pkg/<name>` while blocked to external modules under Go's `internal/` rule.
+- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `loggerfactory`, `templateutil`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./pkg/<name>` while blocked to external modules under Go's `internal/` rule.
+
+  `templateutil` is the shared `text/template` `FuncMap` + `FuncDocs` (`json` baseline, plus any project helpers) that every renderer exposes; the `config` subcommand's `--format` uses it via `pkg/<name>/cli`. One copy keeps the func set — and its help text — identical across call sites.
 - `internal/loggerfactory/` is genuinely shared, not CLI-only: `pkg/<name>` code imports its level constants — notably `LevelTrace` and `LevelFatal` — and emits records at levels the CLI knows how to render.
 
   That cross-package use is why the logger glue is a library under `internal/`, not `zz_`-prefixed code under `commands/`.
@@ -64,6 +69,8 @@ Why this shape:
 - `pkg/<name>/cli/` holds CLI-presentation code (printing, prompts, tables, colors, spinners).
 
   `RunE` calls into it and returns its error.
+
+  The `config` subcommand's rendering lives here as `cli.RenderConfig` (JSON default / `--format` template) — `./cmd` only loads the config and writes `RenderConfig`'s output to stdout.
 
 - The `zz_` prefix on non-subcommand files makes the file → subcommand mapping unambiguous: any file without `zz_` is a single subcommand definition.
 
@@ -204,7 +211,7 @@ Grouped by the part of the layout each one violates.
 - **Skipping `version.go` (either copy).** Both `pkg/<name>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
 - **Skipping the `config` subcommand.** `cmd/<name>/commands/config.go` is mandatory alongside `pkg/<name>/config.go`; `rootCmd()` wires `configCmd(cmd, &flagConfig)` unconditionally.
 
-  It prints `LoadConfig` as JSON, or renders `--template` against it.
+  It prints `LoadConfig` as JSON, or renders `--format` against it — via `cli.RenderConfig` in `pkg/<name>/cli`, using the `internal/templateutil` func map. All three files (`cmd` wiring, `cli/config.go`, `internal/templateutil`) are part of the mandatory set; see [configuration.md](configuration.md#cmdnamecommandsconfiggo-always-present).
 - **Skipping `pkg/<name>/config.go`.** Configuration is always present; every project carries it (even when `Config` starts with a single field).
 
 ### Naming

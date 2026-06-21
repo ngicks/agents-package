@@ -19,7 +19,7 @@ Everything else — layout, templates, the configuration model, versioning, and 
 
   Read before deciding where a file goes or how to name it.
 - **[reference/command-templates.md](reference/command-templates.md)** — the command-tree code templates: `main.go`, `root.go`, flat-leaf / parent-group / nested-leaf subcommands, and `go.mod` + version policy.
-- **[reference/configuration.md](reference/configuration.md)** — the configuration model (layers, `PartialConfig.Apply` merge semantics, file format, path resolution, flag overlay, add-a-field) and the `config` subcommand template.
+- **[reference/configuration.md](reference/configuration.md)** — the configuration model (layers, `PartialConfig.Apply` merge semantics, file format, path resolution, flag overlay, add-a-field) and the `config` subcommand (three-file split: `cmd` wiring + `pkg/<name>/cli` rendering + `internal/templateutil` funcs).
 - **[reference/config-source.md](reference/config-source.md)** — the `pkg/<name>/config.go` source template (JSON base) plus the YAML-only / both-format support block.
 - **[reference/versioning.md](reference/versioning.md)** — the four versioning pieces, the release-tool flow, submodule tags, and the `version.go` / `versioninfo` / `release` source.
 - **[reference/workflows.md](reference/workflows.md)** — step-by-step scaffold and edit procedures (subcommand / flag / metadata / completion operations) and the helper-package catalog.
