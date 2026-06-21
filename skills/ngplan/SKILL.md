@@ -23,29 +23,56 @@ specific to this codebase, not generic.
 - Resolve anything answerable by looking. Only unknowns that genuinely need the
   user become open questions.
 
-## Resolve the plan directory
+## Locate the plan directory
 
 - Restate, in one sentence, what the user wants planned. If they never said, ask.
 - Check `./doc/plan/` for an existing plan the user refers to. If one matches (or
   the user points at a directory), open it and elaborate it — work from its
   current files.
-- Otherwise compute a new location `./doc/plan/<NNNN>-<plan-name>`:
-  - `<NNNN>` is the next free 4-digit serial — scan `./doc/plan/` for existing
-    `NNNN-*` entries, take the highest + 1, zero-padded from `0001`. A missing
-    `./doc/plan/` simply means no entries, so start at `0001`.
-  - `<plan-name>` is a short kebab-case slug from the summary.
+- Otherwise compute a new location `./doc/plan/<YYYY-MM-DD>-NN-<plan_name>`:
+  - `<YYYY-MM-DD>` is today's date — get it from `date "+%Y-%m-%d"` rather than
+    guessing.
+  - `NN` is the next free 2-digit serial among that day's entries — scan
+    `./doc/plan/` for existing `<date>-NN-*` entries sharing today's date, take
+    the highest + 1, zero-padded from `01`. No entry for today means start at
+    `01`.
+  - `<plan_name>` is a short snake_case slug from the summary — use `_`, not
+    `-`, so it stays a single token that doesn't collide with the `-` joining
+    the date and `NN`.
 
 ## Emit the rough scaffold
 
 Write the plan directory now, as a rough first pass — do not wait for answers.
 
 - New plan — create the directory, including `./doc/plan/` itself if it does not
-  yet exist, then write the three canonical files below.
+  yet exist, then write the three canonical files defined under **Canonical
+  files** below.
 - Existing plan — update them in place; keep what still holds.
 - Fill what is known. Mark everything uncertain as a rough spot rather than
   guessing silently; an incomplete first pass is expected.
 - Tell the user where it was written and call out the rough spots so they can
   read them.
+
+## Canonical files
+
+- **PLAN.md** — the implementation plan: title and one-line summary; goal /
+  success criteria; scope and non-goals; context (real file paths, current
+  behavior); approach (chosen design plus rejected alternatives); ordered
+  implementation steps, each independently verifiable and naming real files and
+  symbols; testing and verification; risks; and a numbered **Open questions**
+  section that drains to empty as they resolve.
+- **STATUS.md** — living progress log: current state, a checklist mirroring the
+  PLAN.md steps, what is done / in progress / blocked, and the next action. Seed
+  a new one as "not started"; when elaborating, refresh it rather than reset it.
+- **DECISION.md** — decision log: one entry per material decision with the choice
+  made, the rationale, and the alternatives rejected. Seed stubs from the open
+  questions; append a finished entry as each one resolves, rather than rewriting
+  history.
+
+Other files are welcome — later agents may add notes, diagrams, or scratch while
+planning or implementing. Keep the three canonical files current.
+
+Reference actual file paths and symbols, never placeholders.
 
 ## Record open questions
 
@@ -78,24 +105,3 @@ After each answer, fold it back into the plan files immediately.
 - Append a DECISION.md entry with the choice, the rationale, and the rejected
   alternatives.
 - Refresh STATUS.md to reflect the now-current plan.
-
-### Canonical files
-
-- **PLAN.md** — the implementation plan: title and one-line summary; goal /
-  success criteria; scope and non-goals; context (real file paths, current
-  behavior); approach (chosen design plus rejected alternatives); ordered
-  implementation steps, each independently verifiable and naming real files and
-  symbols; testing and verification; risks; and a numbered **Open questions**
-  section that drains to empty as they resolve.
-- **STATUS.md** — living progress log: current state, a checklist mirroring the
-  PLAN.md steps, what is done / in progress / blocked, and the next action. Seed
-  a new one as "not started"; when elaborating, refresh it rather than reset it.
-- **DECISION.md** — decision log: one entry per material decision with the choice
-  made, the rationale, and the alternatives rejected. Seed stubs from the open
-  questions; append a finished entry as each one resolves, rather than rewriting
-  history.
-
-Other files are welcome — later agents may add notes, diagrams, or scratch while
-planning or implementing. Keep the three canonical files current.
-
-Reference actual file paths and symbols, never placeholders.

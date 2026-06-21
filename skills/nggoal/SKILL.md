@@ -10,17 +10,19 @@ them on **every** turn until the run ends — not just the first.
 
 ## Record progress in a STATUS file if `/goal` specifies plan files
 
-When `/goal` asks to implement a plan file (e.g. `/goal Implement ./doc/plan/<plan-name>/PLAN.md`)  
+When `/goal` asks to implement a plan file (e.g. `/goal Implement ./doc/plan/<YYYY-MM-DD>-NN-<plan_name>/PLAN.md`)  
 read `STATUS.md` and/or `DECISION.md` if they exist before any action.
 
+- A plan is a _directory_ under `./doc/plan/` (created by `/ngplan`), named
+  `<YYYY-MM-DD>-NN-<plan_name>`.
 - There may be `STATUS.md`, `DECISION.md` or similar files in the dir `PLAN.md` sits.
 
 Record progress after each task is done in `STATUS.md`.
 
 - Note what is done, what is next, and any decisions or blockers.
 
-You happen to be forced to decide by your own when you bump on unclear corners while implementing the plan.  
-Record your design decision in `DECISION.md`
+You might happen to need to decide unclear corners by yourself while implementing the plan.  
+In that case, record your design decision in `DECISION.md`
 
 ## Delegate tasks to subagents
 
