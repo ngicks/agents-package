@@ -1,0 +1,10 @@
+{
+  "name": "cc-workers",
+  "version": "0.0.1",
+  "description": "A fleet of cooperating Claude Code worker subagents.",
+  "author": {
+    "name": "ngicks"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/ngicks/agents-package"
+}
