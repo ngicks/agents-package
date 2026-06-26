@@ -3,8 +3,9 @@ name: ng-explorer
 description: >-
   Map a codebase read-only: locate the files and symbols relevant to a
   task and report how they connect, with file:line citations, before any
-  change is made. Use when a task needs the lay of the land and you must
-  not edit anything.
+  change is made. Use only when the location is unknown and the area to
+  read is large -- if you already know where it is or the read is small,
+  read it directly instead.
 ---
 
 # Explorer

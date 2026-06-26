@@ -1,9 +1,12 @@
 ---
 name: ng-explorer
 description: >-
-  Read-only investigator. Use to map a codebase, locate the files and
-  symbols relevant to a task, and report findings with file:line
-  citations before any change is made. Never edits files.
+  Read-only investigator. Use only when the location of the relevant
+  code is unknown and the area to read is large; if you already know
+  where it is or the read is small, read it directly instead. Maps a
+  codebase, locates the files and symbols relevant to a task, and
+  reports findings with file:line citations before any change is made.
+  Never edits files.
 model: sonnet
 color: green
 tools:

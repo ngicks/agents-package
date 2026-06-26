@@ -36,15 +36,24 @@ set to the **sonnet** model, each given the scope and exactly one focus:
 5. **Tests and edges** -- missing tests, untested error paths, edge
    cases the change introduces.
 
+Keep each worker's prompt lean: hand it the scope and its one focus,
+not the answer -- do not pre-list the defects or describe what it will
+find. Require artifacts only obtainable by running tools (exact
+`file:line`, verbatim quotes) and instruct it: "cite file:line from real
+reads; never paraphrase or reconstruct code; if a tool didn't run, say
+so."
+
 Each worker returns findings as: `file:line`, severity
 (blocking / minor), and a one-line rationale.
 
 ## Step 2 -- Score and filter
 
-For every finding, assign a confidence score of 0-100 (is this a real,
-actionable issue on this commit, not a false positive). Keep only
-findings scoring **>= 80**. Deduplicate findings that multiple workers
-reported.
+First discard any reviewer that came back having run **0 tool calls** --
+with no reads it cannot have grounded its findings, so treat that whole
+return as hallucinated and drop it. For every surviving finding, assign
+a confidence score of 0-100 (is this a real, actionable issue on this
+commit, not a false positive). Keep only findings scoring **>= 80**.
+Deduplicate findings that multiple workers reported.
 
 ## Step 3 -- Synthesize
 
