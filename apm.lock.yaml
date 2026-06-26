@@ -1,9 +1,10 @@
 lockfile_version: '1'
-generated_at: '2026-06-18T13:04:24.369000+00:00'
+generated_at: '2026-06-25T23:52:08.493491+00:00'
+apm_version: 0.21.0
 dependencies:
 - repo_url: anthropics/claude-plugins-official
   host: github.com
-  resolved_commit: b3c128f664740eae0faaa6301649ffae8e25c42a
+  resolved_commit: a8237e1537e987a92c9f33e5cd650acbe175fd5e
   virtual_path: plugins/skill-creator
   is_virtual: true
   package_type: marketplace_plugin
@@ -83,7 +84,7 @@ dependencies:
     .claude/skills/skill-creator/scripts/run_eval.py: sha256:43e3b8f80dbf69c343967ba77e268fae991d9fa3ed68b32a0ff02532cd48657f
     .claude/skills/skill-creator/scripts/run_loop.py: sha256:7bd6f674203168520517eec94c55f493c0d154339b061b4d7c0f0dad187d0f21
     .claude/skills/skill-creator/scripts/utils.py: sha256:3af8ae62c40c73ab712207436a0d9a981e845f25c5a7040229eb189cc8e45bb1
-  content_hash: sha256:8371889d6c69d8c8a9951f077446ea181aa856af93792622acad4b73e1509f4f
+  content_hash: sha256:09476584a3731e3c64d504241afd18e1bdcd7095583edf9fd913f19efda5640b
 local_deployed_files:
 - .agents/skills/skill-review
 - .agents/skills/skill-review/SKILL.md
