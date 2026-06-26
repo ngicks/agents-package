@@ -8,11 +8,6 @@ description: >-
   noisy, or fire-and-forget commands.
 model: haiku
 color: purple
-tools:
-  Bash: true
-  Read: true
-  Grep: true
-  Glob: true
 skills:
 - ng-command-invoker
 ---

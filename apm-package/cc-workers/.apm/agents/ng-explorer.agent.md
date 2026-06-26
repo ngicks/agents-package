@@ -9,10 +9,6 @@ description: >-
   Never edits files.
 model: sonnet
 color: green
-tools:
-  Read: true
-  Grep: true
-  Glob: true
 skills:
 - ng-explorer
 ---

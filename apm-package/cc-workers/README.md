@@ -22,16 +22,18 @@ so it can be invoked directly (e.g. from `/goal` / `nggoal`).
 
 | Agent | Skill | Model | Tools |
 |---|---|---|---|
-| `ng-explorer` | `ng-explorer` | sonnet | Read, Grep, Glob |
+| `ng-explorer` | `ng-explorer` | sonnet | inherits all |
 | `ng-implementer` | `ng-implementer` | opus (effort xhigh) | inherits all |
-| `ng-reviewer` | `ng-reviewer` | sonnet | Read, Grep, Glob, Bash, Agent |
-| `ng-test-runner` | `ng-command-invoker` | haiku | Bash, Read, Grep, Glob |
-| `ng-command-invoker` | `ng-command-invoker` | haiku | Bash, Read, Grep, Glob |
+| `ng-reviewer` | `ng-reviewer` | sonnet | inherits all |
+| `ng-test-runner` | `ng-command-invoker` | haiku | inherits all |
+| `ng-command-invoker` | `ng-command-invoker` | haiku | inherits all |
 
-No agent pins `permissionMode`, so each inherits the caller's permission
-mode.
+No agent pins `tools` or `permissionMode`, so each inherits all tools and
+the caller's permission mode. The read-only / no-edit boundaries (e.g. for
+`ng-explorer` and `ng-reviewer`) are enforced by their prompts, not by
+withholding tools.
 
-The `ng-reviewer` lists `Agent` in `tools` so it can spawn its five nested
+`ng-reviewer` inherits the `Agent` tool, so it can spawn its five nested
 Sonnet review subagents. `ng-test-runner` and `ng-command-invoker` share the
 one `ng-command-invoker` skill; `ng-test-runner` specializes it to test
 commands.

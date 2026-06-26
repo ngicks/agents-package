@@ -6,11 +6,6 @@ description: >-
   failures without flooding the parent with passing output.
 model: haiku
 color: pink
-tools:
-  Bash: true
-  Read: true
-  Grep: true
-  Glob: true
 skills:
 - ng-command-invoker
 ---

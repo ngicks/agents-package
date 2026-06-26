@@ -7,12 +7,6 @@ description: >-
   citations and a verdict. Read-only.
 model: sonnet
 color: yellow
-tools:
-  Read: true
-  Grep: true
-  Glob: true
-  Bash: true
-  Agent: true
 skills:
 - ng-reviewer
 ---
