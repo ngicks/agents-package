@@ -6,6 +6,7 @@ description: >-
   confidence, and returns only the high-confidence issues with file:line
   citations and a verdict. Read-only.
 model: sonnet
+color: yellow
 tools:
   Read: true
   Grep: true

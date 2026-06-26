@@ -6,6 +6,7 @@ description: >-
   summary of edits with file:line references and notes any follow-ups.
 model: opus
 effort: xhigh
+color: cyan
 skills:
 - ng-implementer
 ---

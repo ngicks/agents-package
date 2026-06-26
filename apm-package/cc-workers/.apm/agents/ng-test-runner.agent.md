@@ -5,6 +5,7 @@ description: >-
   stripped to only the failing parts. Use to execute tests and surface
   failures without flooding the parent with passing output.
 model: haiku
+color: pink
 tools:
   Bash: true
   Read: true

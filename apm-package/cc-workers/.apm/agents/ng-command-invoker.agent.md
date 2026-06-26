@@ -7,6 +7,7 @@ description: >-
   judge. Honors a requested return such as exit code only. Use for long,
   noisy, or fire-and-forget commands.
 model: haiku
+color: purple
 tools:
   Bash: true
   Read: true

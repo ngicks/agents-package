@@ -5,6 +5,7 @@ description: >-
   symbols relevant to a task, and report findings with file:line
   citations before any change is made. Never edits files.
 model: sonnet
+color: green
 tools:
   Read: true
   Grep: true
