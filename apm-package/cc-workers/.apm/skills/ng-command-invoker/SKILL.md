@@ -1,5 +1,5 @@
 ---
-name: command-invoker
+name: ng-command-invoker
 description: >-
   Run a command on behalf of a parent agent and return its result as-is,
   stripped of the unnecessary parts -- a one-line pass on success, the

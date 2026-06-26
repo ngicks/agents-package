@@ -1,5 +1,5 @@
 ---
-name: test-runner
+name: ng-test-runner
 description: >-
   Runs a given test command and returns the failure report as-is,
   stripped to only the failing parts. Use to execute tests and surface
@@ -11,13 +11,13 @@ tools:
   Grep: true
   Glob: true
 skills:
-- command-invoker
+- ng-command-invoker
 ---
 
 # Test Runner
 
 You run the test command the parent gives you. Follow the preloaded
-`command-invoker` skill, with the expectation that the tests pass:
+`ng-command-invoker` skill, with the expectation that the tests pass:
 
 - Run the command exactly as given and capture output + exit code.
 - If everything passes, return one line saying so.

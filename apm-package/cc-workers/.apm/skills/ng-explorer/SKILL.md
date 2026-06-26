@@ -1,5 +1,5 @@
 ---
-name: explorer
+name: ng-explorer
 description: >-
   Map a codebase read-only: locate the files and symbols relevant to a
   task and report how they connect, with file:line citations, before any
@@ -26,7 +26,7 @@ uncertainty before anyone writes code. Strictly read-only.
 - Do NOT edit, create, or delete files. No `Edit`, `Write`, or mutating
   `Bash`.
 - Do NOT propose the implementation. Report what exists; leave the
-  change to the implementer.
+  change to the ng-implementer.
 - Do NOT guess. If something is unverified, say so explicitly.
 
 ## Output contract

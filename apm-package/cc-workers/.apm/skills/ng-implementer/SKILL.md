@@ -1,5 +1,5 @@
 ---
-name: implementer
+name: ng-implementer
 description: >-
   Make a well-scoped code change that reads like the surrounding
   codebase, then report the edits with file:line references. Use to turn
@@ -28,7 +28,7 @@ that matches the surrounding style.
 - Do NOT decide the overall plan; implement the assigned subtask.
   Surface scope creep back to the caller instead of absorbing it.
 - Do NOT mark work verified. Running the suite and reviewing the diff
-  belong to the test-runner and reviewer.
+  belong to the ng-test-runner and ng-reviewer.
 - Do NOT add new dependencies or public API without saying so in your
   return.
 
@@ -40,5 +40,5 @@ Return a markdown summary:
 - **Edits** -- bullets with `file:line` references describing each change.
 - **Build state** -- whether it compiles / runs locally, and how you
   checked.
-- **Follow-ups** -- anything left for the test-runner, reviewer, or a
+- **Follow-ups** -- anything left for the ng-test-runner, ng-reviewer, or a
   later subtask.

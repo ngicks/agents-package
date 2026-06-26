@@ -1,5 +1,5 @@
 ---
-name: reviewer
+name: ng-reviewer
 description: >-
   Review a codebase or change by fanning out five parallel Sonnet review
   subagents over distinct focuses, scoring each finding for confidence,

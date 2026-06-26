@@ -1,9 +1,9 @@
 ---
-name: orchestrator
+name: ng-orchestrator
 description: >-
   Drive a multi-step task by decomposing it, delegating each subtask to
-  the cc-workers fleet (explorer, implementer, reviewer, test-runner,
-  command-invoker), and synthesizing the results. Use for any task large
+  the cc-workers fleet (ng-explorer, ng-implementer, ng-reviewer, ng-test-runner,
+  ng-command-invoker), and synthesizing the results. Use for any task large
   enough to warrant planning and delegation, including autonomous runs
   such as /goal.
 ---
@@ -26,20 +26,20 @@ Run this loop until the goal is met or you must report a blocker.
 3. **Integrate.** Read each return, update the plan, and decide the next
    subtask. Re-delegate on failure instead of papering over it.
 4. **Verify.** Before declaring done on a code change, confirm with a
-   reviewer pass and a test-runner pass.
+   ng-reviewer pass and a ng-test-runner pass.
 
 ## Routing table
 
 | Subtask | Worker |
 |---|---|
-| Locate code, map structure, answer "where/how does X work" | `explorer` |
-| Make the actual code change for a scoped subtask | `implementer` |
-| Review a change or codebase for correctness and risk | `reviewer` |
-| Run a test command and surface failures | `test-runner` |
-| Run any other long / noisy / fire-and-forget command | `command-invoker` |
+| Locate code, map structure, answer "where/how does X work" | `ng-explorer` |
+| Make the actual code change for a scoped subtask | `ng-implementer` |
+| Review a change or codebase for correctness and risk | `ng-reviewer` |
+| Run a test command and surface failures | `ng-test-runner` |
+| Run any other long / noisy / fire-and-forget command | `ng-command-invoker` |
 
-Start unknown-heavy tasks with `explorer`. End change tasks with
-`reviewer` and `test-runner`.
+Start unknown-heavy tasks with `ng-explorer`. End change tasks with
+`ng-reviewer` and `ng-test-runner`.
 
 ## Boundaries
 
@@ -56,6 +56,6 @@ Return a short markdown report:
 - **Outcome** -- one line: done / blocked / partial.
 - **What changed** -- bullets with `file:line` references from worker
   returns.
-- **Verification** -- what reviewer / test-runner confirmed (or why
+- **Verification** -- what ng-reviewer / ng-test-runner confirmed (or why
   skipped).
 - **Open items** -- anything deferred, with the reason.

@@ -5,35 +5,35 @@ A fleet of cooperating Claude Code worker subagents, packaged for
 
 Each worker is split in two: a **skill** holds the reusable workflow, and
 a thin **subagent** preloads that skill (via the `skills:` frontmatter
-field) and pins the model/tools. The orchestrator ships as a skill only,
+field) and pins the model/tools. The ng-orchestrator ships as a skill only,
 so it can be invoked directly (e.g. from `/goal` / `nggoal`).
 
 ## Skills
 
 | Skill | Purpose | Used by |
 |---|---|---|
-| `orchestrator` | Decompose a task, delegate to workers, synthesize. | invoked directly (e.g. nggoal) |
-| `explorer` | Read-only codebase mapping. | `explorer` agent |
-| `implementer` | Make a scoped code change. | `implementer` agent |
-| `reviewer` | Fan out 5 Sonnet reviewers, score, synthesize. | `reviewer` agent |
-| `command-invoker` | Run a command, return only the stripped failure. | `test-runner`, `command-invoker` agents |
+| `ng-orchestrator` | Decompose a task, delegate to workers, synthesize. | invoked directly (e.g. nggoal) |
+| `ng-explorer` | Read-only codebase mapping. | `ng-explorer` agent |
+| `ng-implementer` | Make a scoped code change. | `ng-implementer` agent |
+| `ng-reviewer` | Fan out 5 Sonnet reviewers, score, synthesize. | `ng-reviewer` agent |
+| `ng-command-invoker` | Run a command, return only the stripped failure. | `ng-test-runner`, `ng-command-invoker` agents |
 
 ## Subagents
 
 | Agent | Skill | Model | Tools |
 |---|---|---|---|
-| `explorer` | `explorer` | sonnet | Read, Grep, Glob |
-| `implementer` | `implementer` | opus (effort xhigh) | inherits all |
-| `reviewer` | `reviewer` | sonnet | Read, Grep, Glob, Bash, Agent |
-| `test-runner` | `command-invoker` | haiku | Bash, Read, Grep, Glob |
-| `command-invoker` | `command-invoker` | haiku | Bash, Read, Grep, Glob |
+| `ng-explorer` | `ng-explorer` | sonnet | Read, Grep, Glob |
+| `ng-implementer` | `ng-implementer` | opus (effort xhigh) | inherits all |
+| `ng-reviewer` | `ng-reviewer` | sonnet | Read, Grep, Glob, Bash, Agent |
+| `ng-test-runner` | `ng-command-invoker` | haiku | Bash, Read, Grep, Glob |
+| `ng-command-invoker` | `ng-command-invoker` | haiku | Bash, Read, Grep, Glob |
 
 No agent pins `permissionMode`, so each inherits the caller's permission
 mode.
 
-The `reviewer` lists `Agent` in `tools` so it can spawn its five nested
-Sonnet review subagents. `test-runner` and `command-invoker` share the
-one `command-invoker` skill; `test-runner` specializes it to test
+The `ng-reviewer` lists `Agent` in `tools` so it can spawn its five nested
+Sonnet review subagents. `ng-test-runner` and `ng-command-invoker` share the
+one `ng-command-invoker` skill; `ng-test-runner` specializes it to test
 commands.
 
 Cooperation is description-driven: an orchestrating agent delegates to a
