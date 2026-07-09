@@ -52,22 +52,13 @@ import (
 func main() {
 	blockOn, ctx, cancel := cmdsignals.NotifyContext(context.Background())
 
-	// blockOn watches ExitSignals and cancels ctx when one arrives; it must run
-	// for signal propagation to work, so start it before Execute. cancel + Wait
-	// tear the goroutine down afterwards — whether Execute returned on its own or
-	// because a signal already cancelled ctx (cancel is a no-op in that case).
 	var wg sync.WaitGroup
 	wg.Go(blockOn)
 
 	err := commands.Execute(ctx)
 
-	// Recover the cancellation reason while ctx still reflects it. The guard is
-	// errors.Is(err, ctx.Err()) — not the bare context.Canceled sentinel, which
-	// any code may return without this ctx being cancelled — so it fires only
-	// when *this* context was actually cancelled. Read it before cancel(nil)
-	// below, or that cleanup call would set ctx.Err() and manufacture a false
-	// positive. Execute surfaces only context.Canceled; the signal lives in the
-	// cause as *SignalReceivedError.
+	// Check before cancel(nil) below — that call would set ctx.Err() and
+	// manufacture a false positive.
 	if err != nil && errors.Is(err, ctx.Err()) {
 		if sigErr, ok := errors.AsType[*cmdsignals.SignalReceivedError](context.Cause(ctx)); ok {
 			err = sigErr
@@ -83,6 +74,11 @@ func main() {
 	}
 }
 ```
+
+Emit `main.go` verbatim — do **not** add comments beyond the single `// Check before cancel(nil)` one.
+
+- The prose above (goroutine lifetime, guard rationale, cause recovery) is documentation for **you**, the editing agent.
+- Restating it as comments in the generated file is redundant noise; the one kept comment marks the only ordering constraint the code cannot show.
 
 The template treats a signal as an error (prints it, exits non-zero).
 
