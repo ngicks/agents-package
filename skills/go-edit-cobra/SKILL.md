@@ -15,9 +15,9 @@ Everything else — layout, templates, the configuration model, versioning, and 
 
 ## Reference files
 
-- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout, naming conventions (files / wrappers / run functions / package name), and the anti-patterns list.
+- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout, naming conventions (files / wrappers / run functions / package name / service method `<Method>Option` structs), and the anti-patterns list.
 
-  Read before deciding where a file goes or how to name it.
+  Read before deciding where a file goes or how to name it, and before adding or editing a `pkg/<name>` service method.
 - **[reference/command-templates.md](reference/command-templates.md)** — the command-tree code templates: `main.go`, `root.go`, flat-leaf / parent-group / nested-leaf subcommands, and `go.mod` + version policy.
 - **[reference/configuration.md](reference/configuration.md)** — the configuration model (layers, `PartialConfig.Apply` merge semantics, file format, path resolution, flag overlay, add-a-field) and the `config` subcommand (three-file split: `cmd` wiring + `pkg/<name>/cli` rendering + `internal/templateutil` funcs).
 - **[reference/config-source.md](reference/config-source.md)** — the `pkg/<name>/config.go` source template (JSON base) plus the YAML-only / both-format support block.

@@ -7,8 +7,8 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 ## Contents
 
 - [Project layout (canonical)](#project-layout-canonical)
-- [Naming conventions](#naming-conventions) — flat, nested, non-subcommand files, package name
-- [Anti-patterns](#anti-patterns) — grouped: layout & placement · mandatory pieces · naming · construction & wiring · run functions & the `./cmd` boundary · versioning · configuration model
+- [Naming conventions](#naming-conventions) — flat, nested, non-subcommand files, package name, service method options
+- [Anti-patterns](#anti-patterns) — grouped: layout & placement · mandatory pieces · naming · construction & wiring · run functions & the `./cmd` boundary · service method options · versioning · configuration model
 
 ## Project layout (canonical)
 
@@ -180,6 +180,56 @@ This is the **only** place the name is sanitized: the binary directory `cmd/<nam
   When the project name is already a valid identifier (the common case, e.g. `mytool`), the sanitized and verbatim forms coincide and there is nothing to strip.
 - Because the directory name, the `package` clause, and the import path now all agree, the import needs **no alias**: write `import "{{MODULE}}/pkg/mytool"`, not `import mytool "{{MODULE}}/pkg/my-tool"`.
 
+### Service method options (`pkg/<name>`)
+
+Exported service methods take their per-call options as a **single option struct named `<Method>Option`** — the method name plus the singular `Option` suffix.
+
+- **Always emit the option struct.** A method's optional/tunable inputs go in one `<Method>Option` value parameter, placed after `ctx` and the required target arguments — not as a tail of positional parameters.
+
+  `Serve` → `ServeOption`, `Fetch` → `FetchOption`, `DryRun` → `DryRunOption`.
+- **The suffix is singular `Option`**, never `Options`, `Params`, `Config`, or an `Opt` abbreviation.
+
+  (The service's layered `Config` is a different thing — process-wide configuration, not per-call options; see [configuration.md](configuration.md).)
+- **Facade methods embed, never re-define.** When a method `XX` is merely a facade that calls other exported methods, `XXOption` does **not** re-declare fields for those callees.
+
+  Instead it **embeds** each callee's option struct (`YYOption` for every exported `YY` the facade calls), plus only the fields the facade itself consumes.
+
+  The facade then passes each embedded value through verbatim: `s.YY(ctx, target, opt.YYOption)`.
+
+```go
+type FetchOption struct {
+	Depth int
+	Force bool
+}
+
+func (s *Service) Fetch(ctx context.Context, repo string, opt FetchOption) error { /* ... */ }
+
+type CheckoutOption struct {
+	Branch string
+}
+
+func (s *Service) Checkout(ctx context.Context, repo string, opt CheckoutOption) error { /* ... */ }
+
+// Sync is a facade over Fetch + Checkout: SyncOption embeds their option
+// structs instead of re-declaring Depth / Force / Branch.
+type SyncOption struct {
+	FetchOption
+	CheckoutOption
+}
+
+func (s *Service) Sync(ctx context.Context, repo string, opt SyncOption) error {
+	if err := s.Fetch(ctx, repo, opt.FetchOption); err != nil {
+		return err
+	}
+	return s.Checkout(ctx, repo, opt.CheckoutOption)
+}
+```
+
+Why:
+
+- The run functions under `./cmd` construct one literal per call; embedding keeps the facade's flag wiring in sync with the callees' options automatically.
+- Adding a field to `FetchOption` reaches every facade that embeds it — no drift, no field-by-field copying inside the facade.
+
 ## Anti-patterns
 
 Do not generate any of these — they look superficially shorter but break the layout contract.
@@ -252,6 +302,14 @@ Grouped by the part of the layout each one violates.
   The only allowed env-var consumer reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the variable names.
 
   Every other env var lives in `./pkg/<name>/config.go`.
+
+### Service method options
+
+- **Passing a service method's options as positional parameters** (a tail of `depth int, force bool, ...` after the target args). Per-call options go in a single struct named `<Method>Option` — see [Naming conventions › Service method options](#service-method-options-pkgname).
+- **Naming the option struct anything other than `<Method>Option`.** Not `ServeOptions`, `ServeParams`, `ServeConfig`, `ServeOpt` — the singular `Option` suffix on the method name is the convention.
+- **Re-declaring callee option fields in a facade's option struct.** When method `XX` merely calls other exported methods, `XXOption` must **embed** each callee's `YYOption` (passing it through as `opt.YYOption`), not copy its fields.
+
+  Copied fields drift the moment a callee's option grows.
 
 ### Versioning
 

@@ -225,6 +225,7 @@ func run{{SubPascal}}(cmd *cobra.Command, args []string) error {
 	// TODO: implement {{sub-name}}
 	// This function should only wire flags and positional arguments into the
 	// configuration of an internal service, then invoke it.
+	// Per-call inputs go through the service method's <Method>Option struct.
 	// Do not put business logic here.
 	return nil
 }
@@ -282,6 +283,7 @@ func run{{ParentPascal}}{{ChildPascal}}(cmd *cobra.Command, args []string) error
 	// TODO: implement {{parent-name}} {{child-name}}
 	// This function should only wire flags and positional arguments into the
 	// configuration of an internal service, then invoke it.
+	// Per-call inputs go through the service method's <Method>Option struct.
 	// Do not put business logic here.
 	return nil
 }
