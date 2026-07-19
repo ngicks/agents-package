@@ -294,6 +294,8 @@ Differences vs. flat:
 - Parent group has no `RunE` / `Args`.
 - Child file uses underscore between levels.
 - Child wrapper concatenates: `serverStartCmd`.
+
+A group may alternatively live as a `commands/<parent>/` subdirectory (its own package, exported `Cmd(parent)` boundary) — an allowed variant used only when the project already nests that way or the user asks. See [layout-and-naming.md › Subdirectory-nested subcommands](layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant).
 - Child is wired from the **parent group's wrapper**, not from `rootCmd()`. 3-level follows the same pattern (`server_start_foo.go` is wired from inside `serverStartCmd`).
 
 ## `go.mod`

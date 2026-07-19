@@ -71,6 +71,8 @@ Generation steps (relative to module root):
 
     Then write children and add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` calls inside the parent's wrapper function.
 
+    Flat underscore-joined files are the default. Generate a group as a `commands/<parent>/` subdirectory instead only when the user asks for directories — or when re-scaffolding a project whose previous layout used them (the structure preference must survive). Shape and naming: [layout-and-naming.md › Subdirectory-nested subcommands](layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant).
+
 11. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio).
 
     This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `internal/stdiopipe`.
@@ -95,6 +97,10 @@ Pre-flight checks first (Cobra detection, layout classification — see SKILL.md
 Then pick the operation; each entry below lists what to touch.
 
 ### Subcommand structure
+
+The table below is written for the flat layout. When the target group lives as a `commands/<parent>/` subdirectory (the [subdirectory variant](layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant)), apply the same operations inside that directory with the subpackage naming — child file `<child>.go`, unexported wrapper `{{childCamel}}Cmd`, run function `run{{ChildPascal}}`, wiring inside the group's exported `Cmd` — and mirror the project's existing export pattern.
+
+Preserve the existing shape: never flatten a directory-shaped group or split a flat one into directories unless the user explicitly asks.
 
 | Operation                           | Files / actions                                                                                                                                                                                                          | Ask the user when                                                                                                                     |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |

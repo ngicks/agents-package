@@ -15,7 +15,7 @@ Everything else — layout, templates, the configuration model, versioning, and 
 
 ## Reference files
 
-- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout, naming conventions (files / wrappers / run functions / package name / service method `<Method>Option` structs), and the anti-patterns list.
+- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout, naming conventions (files / wrappers / run functions / package name / service method `<Method>Option` structs / the subdirectory-nesting variant), and the anti-patterns list.
 
   Read before deciding where a file goes or how to name it, and before adding or editing a `pkg/<name>` service method.
 - **[reference/command-templates.md](reference/command-templates.md)** — the command-tree code templates: `main.go`, `root.go`, flat-leaf / parent-group / nested-leaf subcommands, and `go.mod` + version policy.
@@ -35,7 +35,7 @@ Run before any edit.
    - Absent → out of scope; report and stop.
 3. **Layout classification** (edit mode only). Categorize the project:
    - **Canonical** — `<root>/cmd/<name>/main.go` + `<root>/cmd/<name>/commands/` + `<root>/internal/cmdsignals/` exist. → Proceed.
-   - **Close variant** — `cmd/<name>/main.go` + `cmd/<name>/commands/` exist but the helper packages sit elsewhere (e.g. under an older `cmd/internal/` tree, or `cmdsignals` not yet present). → Proceed; do not force-migrate existing files.
+   - **Close variant** — `cmd/<name>/main.go` + `cmd/<name>/commands/` exist but the helper packages sit elsewhere (e.g. under an older `cmd/internal/` tree, or `cmdsignals` not yet present), or subcommand files nest under **subdirectories** of `commands/` (an allowed variant — see [layout-and-naming.md › Subdirectory-nested subcommands](reference/layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant)). → Proceed; mirror the existing structure; do not force-migrate existing files.
    - **Non-canonical Cobra** — e.g. `cmd/root.go` at module root, or `cobra-cli` defaults. → **Stop and ask.** Likely mid-migration or accidental drift.
 
 ## Cobra design rules
@@ -83,6 +83,8 @@ They are grouped below by what they govern: error handling, positional args, com
   The function builds the `cobra.Command` literal, declares flag variables in a local `var (...)` block, binds them via `cmd.Flags().<Type>Var(...)`, calls children's wrapper functions on the new `cmd`, and ends with `parent.AddCommand(cmd)`.
 
   There are **no package-level `*Cmd` variables** and **no `init()` functions** for wiring.
+
+  (In the [subdirectory-nested variant](reference/layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant), the one wrapper crossing the package boundary is exported — canonically the group's `Cmd(parent *cobra.Command)`; everything else stays unexported.)
 
 - **Root is the special case.** `func rootCmd() *cobra.Command` (no `parent`).
 

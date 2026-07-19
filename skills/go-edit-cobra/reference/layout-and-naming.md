@@ -7,7 +7,7 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 ## Contents
 
 - [Project layout (canonical)](#project-layout-canonical)
-- [Naming conventions](#naming-conventions) — flat, nested, non-subcommand files, package name, service method options
+- [Naming conventions](#naming-conventions) — flat, nested, the subdirectory variant, non-subcommand files, package name, service method options
 - [Anti-patterns](#anti-patterns) — grouped: layout & placement · mandatory pieces · naming · construction & wiring · run functions & the `./cmd` boundary · service method options · versioning · configuration model
 
 ## Project layout (canonical)
@@ -49,6 +49,10 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
             ├── config.go                # always present; RenderConfig (config subcommand JSON / --format)
             └── <ui>.go
 ```
+
+Subcommand files MAY alternatively nest under subdirectories of `commands/` (one directory per group, one Go package per directory).
+
+That is an **allowed variant**, not the canonical default — it exists so a project's structure preference survives edits and re-scaffolding; never flatten or introduce it unprompted. See [Subdirectory-nested subcommands](#subdirectory-nested-subcommands-allowed-variant).
 
 Why this shape:
 
@@ -123,6 +127,55 @@ Why this shape:
 - **Wiring**: parent's wrapper calls `{{parentCamel}}{{ChildPascal}}Cmd(cmd)`.
 
   3-level follows the same chain (`server_start_foo.go` is wired from inside `serverStartCmd`).
+
+### Subdirectory-nested subcommands (allowed variant)
+
+A group MAY live as a subdirectory of `commands/` instead of underscore-joined files — one directory per group, one Go package per directory.
+
+This variant is **allowed, not preferred**: it exists so a project that organizes its command tree in directories keeps that shape through skill edits and re-scaffolding.
+
+- **Preserve, never migrate.** When the project already nests, keep nesting: new children of a directory-shaped group go into its directory; new children of a flat group stay flat.
+
+  Do not flatten a nested tree into `<parent>_<child>.go` files, and do not split a flat tree into directories, unless the user explicitly asks.
+- **Scaffold default stays flat.** Generate directories only when the user asks for them — or when re-scaffolding a project whose previous layout used them.
+- **Mirror in-project precedent first.** An existing project may wire its subpackages differently (e.g. exported per-child wrappers like `server.StartCmd`); follow whatever pattern its other subdirectories use.
+
+  The canonical shape below applies when there is no precedent — the project's first directory-shaped group.
+
+Canonical shape:
+
+- **Directory**: `commands/<parent>/`, keeping the verbatim group name.
+- **Package clause**: the sanitized group name — strip `-` / `_`, same rule as [`pkg/<name>`](#package-name-pkgname) (`dry-run/` → `package dryrun`).
+- **Group file**: `commands/<parent>/<parent>.go` exports the subpackage's one boundary symbol, `func Cmd(parent *cobra.Command)`.
+
+  It builds the group's `cobra.Command`, calls the children's (unexported) wrappers, and ends with `parent.AddCommand(cmd)` — the standard group wrapper, exported because it crosses the package boundary.
+- **Child files drop the prefix the directory already expresses**: `server start` → `commands/server/start.go`, wrapper `startCmd`, run function `runStart`.
+
+  Inside the subpackage the flat rules apply verbatim — unexported wrappers, `zz_` prefix for non-subcommand files, the [build-constraint suffix rule](#build-constraint-suffix-collisions-in-leaf-file-names) on trailing `_`-segments of file names.
+- **Wiring**: the enclosing package imports `{{MODULE}}/cmd/<name>/commands/<parent>` and calls `<parent>.Cmd(cmd)` — from `rootCmd()` for a top-level group.
+
+  Persistent-flag threading is unchanged: pass `&flag` as extra parameters on `Cmd`.
+- **Deeper levels**: inside the subpackage, use underscore-joined files (`start_foo.go`) or a further subdirectory — mirror whichever the project already does.
+
+```go
+// commands/server/server.go
+package server
+
+import "github.com/spf13/cobra"
+
+// Cmd is the subpackage's one exported symbol; rootCmd() calls server.Cmd(cmd).
+func Cmd(parent *cobra.Command) {
+	cmd := &cobra.Command{
+		Use:   "server",
+		Short: "manage the server",
+	}
+
+	startCmd(cmd)
+	stopCmd(cmd)
+
+	parent.AddCommand(cmd)
+}
+```
 
 ### Build-constraint suffix collisions in leaf file names
 
@@ -239,6 +292,9 @@ Grouped by the part of the layout each one violates.
 ### Layout & file placement
 
 - **`commands/` at the module root** (i.e. `<root>/commands/...` instead of `<root>/cmd/<name>/commands/...`). A second binary forces a rename of every import path.
+- **Flattening a subdirectory-nested command tree — or splitting a flat one into directories — during any edit or re-scaffold.** Directory nesting under `commands/` is an allowed structure preference that must survive; migrate between the two shapes only on explicit user request.
+
+  See [Subdirectory-nested subcommands](#subdirectory-nested-subcommands-allowed-variant).
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
 - **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./pkg/<name>` while blocked to external modules.
 
