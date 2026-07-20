@@ -1,5 +1,5 @@
 ---
-name: kvm-in-podman
+name: kvm-in-container
 description: "Run and manage KVM-accelerated VMs with libvirt and virsh in a minimal environment (e.g. inside a container) without systemd: start the daemons by hand, define domains, drive the VM lifecycle, and persist or restore images and definitions. Use when asked to boot a VM, run tests in a VM, or manage qemu/libvirt where no init system set libvirt up."
 ---
 
@@ -51,12 +51,12 @@ from the daemon's point of view):
 
 ```sh
 qemu-img create -f qcow2 -b /abs/path/base.qcow2 -F qcow2 \
-  /var/lib/libvirt/images/<name>.qcow2
+  /var/lib/libvirt/images/NAME.qcow2
 ```
 
 ## Define and run a domain
 
-Minimal headless domain XML (`<name>.xml`):
+Minimal headless domain XML (`NAME.xml`):
 
 ```xml
 <domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
@@ -76,7 +76,9 @@ Minimal headless domain XML (`<name>.xml`):
     <interface type='user'><model type='virtio'/></interface>
     <serial type='pty'/><console type='pty'/>
   </devices>
-  <!-- user-mode (SLIRP) nics take port forwards only via raw qemu args -->
+  <!-- user-mode (SLIRP) nics take port forwards only via raw qemu args;
+       this adds a SECOND nic carrying the forward — drop the <interface>
+       element above if the guest should see only the forwarded nic -->
   <qemu:commandline>
     <qemu:arg value='-netdev'/>
     <qemu:arg value='user,id=fwd0,hostfwd=tcp:127.0.0.1:2222-:22'/>
@@ -93,7 +95,7 @@ prerequisites cover: `<interface type='network'>` needs the NAT extras,
 Lifecycle:
 
 ```sh
-virsh define <name>.xml    # register
+virsh define NAME.xml      # register
 virsh start NAME
 virsh console NAME         # serial console (exit: Ctrl+])
 ssh -p 2222 user@127.0.0.1 # via the hostfwd above
@@ -102,7 +104,7 @@ virsh destroy NAME         # hard stop
 virsh undefine NAME --nvram
 ```
 
-One-shot alternative: `virsh create <name>.xml` starts a transient domain
+One-shot alternative: `virsh create NAME.xml` starts a transient domain
 that unregisters itself on shutdown — a good default for throwaway VMs.
 
 ## Persist / restore
@@ -111,8 +113,8 @@ Treat everything under `/var/lib/libvirt` as disposable state; persist a VM
 deliberately by exporting both halves:
 
 ```sh
-qemu-img convert -O qcow2 /var/lib/libvirt/images/NAME.qcow2 <dest>.qcow2  # flattens backing chain
-virsh dumpxml NAME > <dest>.xml
+qemu-img convert -O qcow2 /var/lib/libvirt/images/NAME.qcow2 DEST.qcow2  # flattens backing chain
+virsh dumpxml NAME > DEST.xml
 ```
 
 Dumped XML embeds absolute paths (disks, nvram) and host-specific bits;
