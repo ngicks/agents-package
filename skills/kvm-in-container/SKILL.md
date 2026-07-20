@@ -1,6 +1,6 @@
 ---
 name: kvm-in-container
-description: "Run and manage KVM-accelerated VMs with libvirt and virsh in a minimal environment (e.g. inside a container) without systemd: start the daemons by hand, define domains, drive the VM lifecycle, and persist or restore images and definitions. Use when asked to boot a VM, run tests in a VM, or manage qemu/libvirt where no init system set libvirt up."
+description: "Run and manage KVM-accelerated VMs with libvirt and virsh in a minimal environment (e.g. inside a container) without systemd: start the daemons by hand, define domains, drive the VM lifecycle, and persist or restore images and definitions. Use when asked to boot a VM, run tests in a VM, debug a silent or hung guest, or manage qemu/libvirt where no init system set libvirt up."
 ---
 
 # libvirt/virsh without an init system
@@ -42,6 +42,23 @@ virsh list --all     # connectivity check
 The explicit URI sidesteps client autoprobing, which fails when the build's
 compiled-in socket path differs from where the daemon actually listens
 (symptom: bare `virsh` says no daemon is running while `libvirtd` is up).
+
+### Driver config (qemu.conf)
+
+qemu.conf lives under the build's compiled-in sysconfdir — not always
+`/etc/libvirt`. Nixpkgs builds read `/var/lib/libvirt/qemu.conf` and
+silently ignore anything written to `/etc/libvirt`. Settings commonly
+needed inside a container, each fixing a `virsh create` failure:
+
+- `security_driver = "none"` and `remember_owner = 0` — fixes
+  `Unable to set XATTR trusted.libvirt.security.dac ... Operation not
+  permitted` (trusted.* xattrs need CAP_SYS_ADMIN on the host).
+- `cgroup_controllers = []` — fixes
+  `Failed to create v2 cgroup ... Read-only file system`.
+
+Restart libvirtd to apply. Wrapper builds may run under a mangled process
+name (e.g. `.libvirtd-wrapp`); if `pgrep` is absent, find the pid via
+`/proc/*/comm`.
 
 ## Prepare a disk
 
@@ -92,6 +109,42 @@ Omit `<graphics>` entirely for headless. Only reference devices the
 prerequisites cover: `<interface type='network'>` needs the NAT extras,
 `<tpm>` needs swtpm, virtiofs `<filesystem>` needs virtiofsd.
 
+Adjust per guest:
+
+- Machine type: on `q35`, virtio devices sit behind PCIe root ports and
+  are exposed modern-only; some guest kernels fail that probe and boot
+  with no disks at all (see Gotchas). `machine='pc'` (i440fx) makes
+  virtio transitional on plain PCI and is the safe fallback. Install and
+  run a guest on the same machine type so its installer-built initramfs
+  matches the boot hardware.
+- Disk serials: give data disks `<serial>ID</serial>` inside `<disk>` —
+  it surfaces as `/dev/disk/by-id/virtio-ID`, and appliance guests
+  (e.g. TrueNAS) hide serial-less disks from pool creation. Hard cap
+  20 bytes (VIRTIO_BLK_ID_BYTES); longer values are silently truncated.
+- Guest agent: add the channel below; guests that ship qemu-ga start it
+  automatically once the device exists.
+
+  ```xml
+  <channel type='unix'>
+    <target type='virtio' name='org.qemu.guest_agent.0'/>
+  </channel>
+  ```
+
+- Port forwards without raw qemu args: with `passt` installed
+  (libvirt ≥ 9.2), replace the `<interface>` + `<qemu:commandline>` pair
+  with a natively forwarding interface. Either way NIC changes don't
+  hot-apply — destroy and re-create the domain.
+
+  ```xml
+  <interface type='user'>
+    <backend type='passt'/>
+    <model type='virtio'/>
+    <portForward proto='tcp' address='127.0.0.1'>
+      <range start='2222' to='22'/>
+    </portForward>
+  </interface>
+  ```
+
 Lifecycle:
 
 ```sh
@@ -107,6 +160,12 @@ virsh undefine NAME --nvram
 One-shot alternative: `virsh create NAME.xml` starts a transient domain
 that unregisters itself on shutdown — a good default for throwaway VMs.
 
+With the agent channel defined, verify qemu-ga with
+`virsh qemu-agent-command NAME '{"execute":"guest-ping"}'` — expect it to
+connect well after boot starts (~2 min for heavyweight guests), so retry
+before concluding it's dead. `virsh guestinfo NAME --os --hostname` gives
+a fuller readout.
+
 ## Persist / restore
 
 Treat everything under `/var/lib/libvirt` as disposable state; persist a VM
@@ -121,14 +180,38 @@ Dumped XML embeds absolute paths (disks, nvram) and host-specific bits;
 rewrite them for the destination before reuse. Restore = recreate an
 overlay backed by the saved image, fix paths, `virsh define`.
 
+## Debug a guest with no serial output
+
+Some guests write only to the VGA console. Tools that need no guest
+cooperation:
+
+- `/var/log/libvirt/qemu/NAME.log` holds the full qemu argv — use it to
+  map guest PCI addresses to devices (`bus=pci.4` → guest `0000:04:00.0`).
+- `virsh screenshot NAME shot.ppm` captures the VGA console. Requires a
+  video device in the XML (`<video><model type='virtio'/></video>` plus a
+  `<graphics>` element); convert the ppm (e.g. ImageMagick) to view it.
+- `virsh send-key NAME KEY_A ...` types into the guest — enough to drive
+  an initramfs/BusyBox shell one keystroke at a time (shifted chars:
+  `KEY_LEFTSHIFT KEY_X` in one call). Screenshot after each command to
+  read the result.
+
 ## Gotchas
 
+- A `q35` guest that seems to hang — `virsh dominfo` CPU time frozen,
+  `virsh domblkstat` showing reads but zero writes, serial silent — may
+  have failed the modern-only virtio probe. Guest dmesg shows
+  `virtio-pci ... Unable to change power state from D3cold to D0` then
+  `leaving for legacy driver`; kernels without the legacy fallback (seen:
+  TrueNAS SCALE 25.10, kernel 6.12) end up with no disks and no
+  virtio-serial, so the agent channel is dead too. Only virtio devices
+  directly on the root complex survive. Fix: `machine='pc'`.
 - "Failed to get 'write' lock": another qemu has the image open read-write
   (qemu takes inode-level OFD locks, effective even across containers/mount
   namespaces). Use an overlay or another image; never
   `file.locking=off`.
 - Guests on user-mode networking reach the hosting side's loopback services
-  via the SLIRP gateway `10.0.2.2`; inbound only via `hostfwd`.
+  via the SLIRP gateway `10.0.2.2`; inbound only via `hostfwd` (SLIRP) or
+  `<portForward>` (passt).
 - Put disk-heavy I/O on a real filesystem; overlayfs (e.g. a container's
   root) penalizes large writes.
 - Verify acceleration when in doubt: `virsh domcapabilities` or QMP
