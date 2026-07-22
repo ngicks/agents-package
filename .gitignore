@@ -12,3 +12,5 @@ CODEX*.md
 
 CLAUDE.md
 AGENTS.md
+
+*.env
