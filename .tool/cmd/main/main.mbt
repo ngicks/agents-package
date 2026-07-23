@@ -115,6 +115,11 @@ fn build_cli() -> @argparse.Command {
         about="Glob of repo-relative paths to skip (repeatable)",
         action=@argparse.Append,
       ),
+      @argparse.OptionArg(
+        "target",
+        about="Deploy target for the template (repeatable; default: claude, codex)",
+        action=@argparse.Append,
+      ),
     ],
   )
   @argparse.Command(

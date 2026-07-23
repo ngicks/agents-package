@@ -10,6 +10,13 @@ async fn gen_apm_yml(m : @argparse.Matches) -> Unit {
   let ref_ = opt(m, "ref")
   let output = opt(m, "output")
   let exclude = m.values.get("exclude").unwrap_or([])
+  // Repeatable --target replaces the default pair entirely when supplied at
+  // least once (defaulting is done here, not in argparse, so an Append action
+  // cannot pile user values on top of the defaults).
+  let targets = match m.values.get("target") {
+    Some([_, ..] as ts) => ts
+    _ => ["claude", "codex"]
+  }
 
   // --root is realpath'd before anything else touches the filesystem.
   let root = @fs.realpath(root_arg)
@@ -26,6 +33,7 @@ async fn gen_apm_yml(m : @argparse.Matches) -> Unit {
   let manifest = @apmyml.Manifest::new(
     name~,
     version~,
+    targets~,
     dependencies=@apmyml.Dependencies::new(apm=deps),
   )
   let doc = manifest.emit()

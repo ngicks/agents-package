@@ -98,6 +98,9 @@ targets, type}`).
 name: example
 version: 0.0.1
 description: example output
+targets:
+  - claude
+  - codex
 dependencies:
   apm:
     - git: github.com/ngicks/agents-package
@@ -122,9 +125,13 @@ dependencies:
   the "keep up with updates" goal. Optional `--ref <ref>` adds `ref: <ref>` to
   every entry for consumers who want pinning.
 - Per-entry deploy targets are deliberately NOT emitted — deployment follows the
-  consumer's own top-level `targets:` (and each child package's declared
-  `targets`). Note: `targets` would be a legal per-entry key, but it's the
-  consumer's call, not the template's.
+  top-level `targets:` (and each child package's declared `targets`). Note:
+  `targets` would be a legal per-entry key, but it's the consumer's call, not
+  the template's.
+  AMENDED: a top-level `targets:` IS emitted, defaulting to `claude`, `codex`
+  (apm 0.26 refuses to install without an explicit target declaration, so the
+  template must ship one to be installable as-is). Repeatable `--target <t>`
+  replaces the default pair; consumers edit the list after adoption.
 - Determinism: fixed kind order (apm-package, hooks, instructions, plugins,
   skills), then lexicographic sort inside each kind. Same tree in →
   byte-identical file out.
@@ -147,6 +154,7 @@ dependencies:
 ```
 tool gen-apm-yml [--root <repo-root>] [--name <pkg-name>] [--pkg-version <ver>]
                  [--git <url>] [--ref <ref>] [-o <path>] [--exclude <glob>]...
+                 [--target <t>]...
 ```
 
 - `--root` defaults to `.` (run from repo root; realpath'd before scanning).
@@ -158,6 +166,8 @@ tool gen-apm-yml [--root <repo-root>] [--name <pkg-name>] [--pkg-version <ver>]
   path segment, `**` crosses segments (e.g. `instructions/**`,
   `skills/go-*`). Hand-rolled matcher in `discover` — pure and unit-tested;
   core has no glob package.
+- `--target <t>` (repeatable) sets the emitted top-level `targets:` list;
+  when absent the default pair `claude`, `codex` is emitted.
 - Output is a template for other repos, not a package of this one. If a
   generated copy is committed here for reference, keep it OUTSIDE the walked
   roots (e.g. repo root) so it can never be discovered.
@@ -243,9 +253,10 @@ Adding a future subcommand = one new `Command` in the array + one dispatch arm.
      security"); its `git_file_transport` is a sparse-checkout fetcher for
      git/ssh repos, not a `file://` clone transport. The e2e therefore uses the
      real GitHub URL (network required; skipped only when a `git ls-remote`
-     probe fails). The consumer must also declare a top-level `targets:` in its
-     apm.yml (e.g. `- claude`) — apm 0.26 refuses to install without one; this
-     is the consumer-owned key the template deliberately omits.
+     probe fails). apm 0.26 also refuses to install without a top-level
+     `targets:` declaration — originally a consumer-added key, now shipped in
+     the template itself (default `claude`, `codex`), so the generated file is
+     installable as-is.
 - Housekeeping: `moon info && moon fmt && moon check --target native &&
 moon test --target native` (never bare `moon check` — the module targets
   native and `@fs` is native-only).
@@ -265,5 +276,7 @@ moon test --target native` (never bare `moon check` — the module targets
 - Leading `---` document marker kept (emitter hardcodes it; harmless to apm).
 - `version` in the template is static (`--pkg-version`); consumers own it after
   adoption — apm tracks git refs, not this version, for updates.
-- Top-level `targets:` is left out of the template — consumers set their own;
-  per-entry `targets:` was considered and dropped for the same reason.
+- Top-level `targets:` is emitted, defaulting to `claude`, `codex` (repeatable
+  `--target` replaces the pair) — apm refuses to install without one, so the
+  template must be installable as-is; per-entry `targets:` was considered and
+  dropped (consumer's call, not the template's).

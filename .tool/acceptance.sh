@@ -144,6 +144,14 @@ else
   fail "git values not all '$EXPECTED_GIT': got [$uniq_gits]"
 fi
 
+# Default targets: claude then codex, in that order.
+got_targets="$(sed -n '/^targets:$/,/^[^ ]/p' "$WORK/s2.yml" | sed -n 's/^  - //p')"
+if [ "$got_targets" = "$(printf 'claude\ncodex')" ]; then
+  pass "default targets are claude, codex (in order)"
+else
+  fail "default targets mismatch: got [$got_targets]"
+fi
+
 # ===========================================================================
 echo "== Step 3: determinism (two runs byte-identical) =="
 run_tool gen-apm-yml --root "$REPO_ROOT" >"$WORK/s3a.yml"
@@ -203,6 +211,15 @@ if [ "$override_gits" = "example.com/x/y" ]; then
   pass "--git example.com/x/y overrides all git values"
 else
   fail "--git override failed: got [$override_gits]"
+fi
+
+# Repeated --target replaces the default pair entirely (Append action).
+run_tool gen-apm-yml --root "$REPO_ROOT" --target copilot --target claude >"$WORK/s4tgt.yml"
+tgt_override="$(sed -n '/^targets:$/,/^[^ ]/p' "$WORK/s4tgt.yml" | sed -n 's/^  - //p')"
+if [ "$tgt_override" = "$(printf 'copilot\nclaude')" ]; then
+  pass "repeated --target replaces defaults (copilot, claude in order)"
+else
+  fail "--target override mismatch: got [$tgt_override]"
 fi
 
 # --name / --pkg-version land in the emitted top-level keys
@@ -272,9 +289,8 @@ else
   mkdir -p "$CONSUMER"
   # Generate with the derived git value (no --git) -> github.com/ngicks/agents-package.
   "$BIN" gen-apm-yml --root "$REPO_ROOT" >"$CONSUMER/apm.yml"
-  # Deployment target is the consumer's to choose; apm 0.26 refuses to install
-  # without one. This is the consumer-owned key the PLAN says consumers set.
-  printf 'targets:\n  - claude\n' >>"$CONSUMER/apm.yml"
+  # The template now ships `targets:` (default claude, codex) — apm 0.26
+  # refuses to install without one, so the generated file is installable as-is.
   rc=0
   ( cd "$CONSUMER" && timeout 300 apm install </dev/null ) >"$WORK/apm.log" 2>&1 || rc=$?
   LOCK="$CONSUMER/apm.lock.yaml"

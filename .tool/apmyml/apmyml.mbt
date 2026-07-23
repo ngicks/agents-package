@@ -16,6 +16,7 @@ pub(all) struct Manifest {
   name : String
   version : String
   description : String?
+  targets : Array[String]
   dependencies : Dependencies
 }
 
@@ -49,14 +50,18 @@ pub(all) struct McpDependency {
 
 ///|
 /// Build a `Manifest`. `description` defaults to `None` (the key is omitted
-/// from the emitted YAML when absent).
+/// from the emitted YAML when absent). `targets` defaults to
+/// `["claude", "codex"]` — apm refuses to install without an explicit
+/// deploy-target declaration, so the template ships a sensible default the
+/// consumer can edit; pass `[]` to omit the key entirely.
 pub fn Manifest::new(
   name~ : String,
   version~ : String,
   dependencies~ : Dependencies,
   description? : String,
+  targets? : Array[String] = ["claude", "codex"],
 ) -> Manifest {
-  { name, version, description, dependencies }
+  { name, version, description, targets, dependencies }
 }
 
 ///|
@@ -88,8 +93,8 @@ pub fn McpDependency::new(name~ : String) -> McpDependency {
 
 ///|
 /// Emit the manifest as a YAML value with a stable, insertion-ordered key
-/// layout: `name`, `version`, `description` (omitted when `None`),
-/// `dependencies`.
+/// layout: `name`, `version`, `description` (omitted when `None`), `targets`
+/// (omitted when empty), `dependencies`.
 ///
 /// This is the pure structural mapping. It does NOT validate scalars; callers
 /// that produce a document for apm to consume should use `emit` instead, which
@@ -101,6 +106,11 @@ pub fn Manifest::to_yaml(self : Self) -> @yaml.Yaml {
   match self.description {
     Some(d) => m["description"] = @yaml.Yaml::String(d)
     None => ()
+  }
+  if self.targets is [_, ..] {
+    m["targets"] = @yaml.Yaml::Array(
+      self.targets.map(t => @yaml.Yaml::String(t)),
+    )
   }
   m["dependencies"] = self.dependencies.to_yaml()
   @yaml.Yaml::Map(m)
@@ -143,6 +153,9 @@ pub fn Manifest::to_yaml(self : Self) -> @yaml.Yaml {
 ///       #|---
 ///       #|name: example
 ///       #|version: 0.0.1
+///       #|targets:
+///       #|  - claude
+///       #|  - codex
 ///       #|dependencies:
 ///       #|  apm:
 ///       #|    - git: github.com/o/r
@@ -159,6 +172,9 @@ pub fn Manifest::emit(self : Self) -> String raise {
   match self.description {
     Some(d) => check_scalar("description", d)
     None => ()
+  }
+  for target in self.targets {
+    check_scalar("target", target)
   }
   for dep in self.dependencies.apm {
     check_scalar("git", dep.git)

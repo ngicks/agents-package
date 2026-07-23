@@ -30,10 +30,11 @@ pub(all) struct Manifest {
   name : String
   version : String
   description : String?
+  targets : Array[String]
   dependencies : Dependencies
 }
 pub fn Manifest::emit(Self) -> String raise
-pub fn Manifest::new(name~ : String, version~ : String, dependencies~ : Dependencies, description? : String) -> Self
+pub fn Manifest::new(name~ : String, version~ : String, dependencies~ : Dependencies, description? : String, targets? : Array[String]) -> Self
 pub fn Manifest::to_yaml(Self) -> @yaml.Yaml
 
 pub(all) struct McpDependency {

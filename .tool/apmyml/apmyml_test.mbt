@@ -26,6 +26,9 @@ test "full manifest with description and multiple deps" {
       #|name: example
       #|version: 0.0.1
       #|description: example output
+      #|targets:
+      #|  - claude
+      #|  - codex
       #|dependencies:
       #|  apm:
       #|    - git: github.com/ngicks/agents-package
@@ -59,6 +62,9 @@ test "entry without ref omits the key" {
       #|name: example
       #|version: 0.0.1
       #|description: example output
+      #|targets:
+      #|  - claude
+      #|  - codex
       #|dependencies:
       #|  apm:
       #|    - git: github.com/ngicks/agents-package
@@ -87,6 +93,9 @@ test "description None omits the key" {
       #|---
       #|name: example
       #|version: 0.0.1
+      #|targets:
+      #|  - claude
+      #|  - codex
       #|dependencies:
       #|  apm:
       #|    - git: github.com/ngicks/agents-package
@@ -110,6 +119,9 @@ test "empty apm and empty mcp" {
       #|---
       #|name: agents-package-index
       #|version: 0.0.1
+      #|targets:
+      #|  - claude
+      #|  - codex
       #|dependencies:
       #|  apm: []
       #|  mcp: []
@@ -141,6 +153,9 @@ test "quoting of ambiguous scalars" {
       #|name: "true"
       #|version: "1.0"
       #|description: "a: b # c"
+      #|targets:
+      #|  - claude
+      #|  - codex
       #|dependencies:
       #|  apm:
       #|    - git: github.com/ngicks/agents-package
@@ -169,6 +184,9 @@ test "non-empty mcp entries are emitted" {
       #|---
       #|name: example
       #|version: 0.0.1
+      #|targets:
+      #|  - claude
+      #|  - codex
       #|dependencies:
       #|  apm: []
       #|  mcp:
@@ -258,4 +276,53 @@ test "emit passes on non-date-looking refs" {
   inspect(raised(mk("2024-1-1")), content="false")
   // exact 4-2-2: the one form apm's loader mis-reads as a date.
   inspect(raised(mk("2024-01-01")), content="true")
+}
+
+///|
+/// Custom targets replace the default pair; a single entry emits as a
+/// one-element list.
+test "custom targets" {
+  let manifest = @apmyml.Manifest::new(
+    name="example",
+    version="0.0.1",
+    targets=["codex"],
+    dependencies=@apmyml.Dependencies::new(apm=[]),
+  )
+  inspect(
+    manifest.emit(),
+    content=(
+      #|---
+      #|name: example
+      #|version: 0.0.1
+      #|targets:
+      #|  - codex
+      #|dependencies:
+      #|  apm: []
+      #|  mcp: []
+      #|
+    ),
+  )
+}
+
+///|
+/// Empty targets omit the key entirely.
+test "empty targets omit the key" {
+  let manifest = @apmyml.Manifest::new(
+    name="example",
+    version="0.0.1",
+    targets=[],
+    dependencies=@apmyml.Dependencies::new(apm=[]),
+  )
+  inspect(
+    manifest.emit(),
+    content=(
+      #|---
+      #|name: example
+      #|version: 0.0.1
+      #|dependencies:
+      #|  apm: []
+      #|  mcp: []
+      #|
+    ),
+  )
 }
