@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crabswarm hook exec --ft python 'ruff format {{quoteJoin .Files}}'",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "crabswarm hook exec --ft python 'ruff check {{quoteJoin .Files}}'",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
