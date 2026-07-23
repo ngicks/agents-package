@@ -1,0 +1,34 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "ngicks/agents-package-tool/discover"
+
+// Values
+pub async fn discover(String, exclude~ : Array[String]) -> Array[ApmUnit]
+
+pub fn glob_match(String, String) -> Bool
+
+// Errors
+pub suberror DiscoverError {
+  DiscoverError(String)
+}
+pub impl Show for DiscoverError
+
+// Types and methods
+pub struct ApmUnit {
+  repo_path : String
+  kind : Kind
+} derive(Eq)
+pub impl Show for ApmUnit
+
+pub(all) enum Kind {
+  ApmPackage
+  HookPackage
+  InstructionFile
+  MarketplacePlugin
+  Skill
+} derive(Eq)
+pub impl Show for Kind
+
+// Type aliases
+
+// Traits
+

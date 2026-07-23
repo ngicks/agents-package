@@ -114,6 +114,10 @@ dependencies:
   (via `@process`), normalized — strip `https://` / `ssh://` scheme, rewrite
   `git@host:owner/repo` to `host/owner/repo`, strip trailing `.git`.
   `--git <url>` overrides the derivation (also what acceptance tests use).
+  AMENDED: a pre-path colon is rewritten to `/` only for the scheme-less scp
+  form; when the URL carried a `<scheme>://`, that colon is a port and is kept
+  (`https://host:8443/o/r.git` → `host:8443/o/r`, which apm's shorthand parser
+  accepts).
 - Entries are unpinned by default: consumers track the default branch, which is
   the "keep up with updates" goal. Optional `--ref <ref>` adds `ref: <ref>` to
   every entry for consumers who want pinning.
@@ -205,11 +209,11 @@ marker predicates as pure helpers:
 
 ```moonbit
 pub(all) enum Kind { ApmPackage; HookPackage; InstructionFile; MarketplacePlugin; Skill }
-pub struct Unit_ {
+pub struct ApmUnit {
   repo_path : String   // e.g. "skills/go-edit-cobra", '/'-separated, repo-relative
   kind : Kind
 }
-pub async fn discover(root : String, exclude~ : Array[String]) -> Array[Unit_] raise
+pub async fn discover(root : String, exclude~ : Array[String]) -> Array[ApmUnit] raise
 pub fn glob_match(pattern : String, path : String) -> Bool
 ```
 
@@ -233,10 +237,15 @@ Adding a future subcommand = one new `Command` in the array + one dispatch arm.
      17 paths — no duplicates, no self-reference, no excluded dirs.
   2. Run twice; assert byte-identical output.
   3. `apm install` in a throwaway consumer repo using the generated file as its
-     apm.yml, and assert the lockfile contains all 17 units. Generate with
-     `--git file://<local-clone>` so the test needs no network (apm ships a
-     `git_file_transport` module, so `file://` should work; fall back to the
-     GitHub URL if not).
+     apm.yml, and assert the lockfile contains all 17 units.
+     AMENDED during implementation: the `file://` premise was wrong — apm 0.26
+     rejects `file://` git URLs by design ("file:// paths are rejected for
+     security"); its `git_file_transport` is a sparse-checkout fetcher for
+     git/ssh repos, not a `file://` clone transport. The e2e therefore uses the
+     real GitHub URL (network required; skipped only when a `git ls-remote`
+     probe fails). The consumer must also declare a top-level `targets:` in its
+     apm.yml (e.g. `- claude`) — apm 0.26 refuses to install without one; this
+     is the consumer-owned key the template deliberately omits.
 - Housekeeping: `moon info && moon fmt && moon check --target native &&
 moon test --target native` (never bare `moon check` — the module targets
   native and `@fs` is native-only).

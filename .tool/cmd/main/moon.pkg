@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/stdio",
+  "moonbitlang/async/process",
+  "moonbitlang/core/argparse",
+  "ngicks/agents-package-tool/apmyml",
+  "ngicks/agents-package-tool/discover",
+}
+
+supported_targets = "+native"
+
+pkgtype(kind: "executable")

@@ -1,0 +1,47 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "ngicks/agents-package-tool/apmyml"
+
+import {
+  "moonbit-community/yaml",
+}
+
+// Values
+
+// Errors
+pub suberror EmitError {
+  EmitError(String)
+}
+
+// Types and methods
+pub(all) struct ApmDependency {
+  git : String
+  path : String
+  ref_ : String?
+}
+pub fn ApmDependency::new(git~ : String, path~ : String, ref_? : String) -> Self
+
+pub(all) struct Dependencies {
+  apm : Array[ApmDependency]
+  mcp : Array[McpDependency]
+}
+pub fn Dependencies::new(apm~ : Array[ApmDependency], mcp? : Array[McpDependency]) -> Self
+
+pub(all) struct Manifest {
+  name : String
+  version : String
+  description : String?
+  dependencies : Dependencies
+}
+pub fn Manifest::emit(Self) -> String raise
+pub fn Manifest::new(name~ : String, version~ : String, dependencies~ : Dependencies, description? : String) -> Self
+pub fn Manifest::to_yaml(Self) -> @yaml.Yaml
+
+pub(all) struct McpDependency {
+  name : String
+}
+pub fn McpDependency::new(name~ : String) -> Self
+
+// Type aliases
+
+// Traits
+
