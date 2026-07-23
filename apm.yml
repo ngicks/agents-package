@@ -7,6 +7,7 @@ targets:
 - codex
 dependencies:
   apm:
+  - github.com/moonbitlang/skills
   - anthropics/claude-plugins-official/plugins/skill-creator
   mcp: []
 includes: auto
