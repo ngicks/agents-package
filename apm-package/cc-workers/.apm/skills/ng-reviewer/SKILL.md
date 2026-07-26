@@ -43,17 +43,27 @@ find. Require artifacts only obtainable by running tools (exact
 reads; never paraphrase or reconstruct code; if a tool didn't run, say
 so."
 
+Also instruct each worker: "Report every issue you find, including ones
+you are uncertain about or consider low-severity. Do not filter for
+importance or confidence -- scoring and filtering happen downstream.
+Your job at this stage is coverage: better to surface a finding that
+gets filtered out later than to silently drop a real one." Workers left
+to self-filter follow a conservative bar literally and drop real
+findings before you ever see them.
+
 Each worker returns findings as: `file:line`, severity
-(blocking / minor), and a one-line rationale.
+(blocking / minor), its own confidence (0-100), and a one-line
+rationale.
 
 ## Step 2 -- Score and filter
 
 First discard any reviewer that came back having run **0 tool calls** --
 with no reads it cannot have grounded its findings, so treat that whole
 return as hallucinated and drop it. For every surviving finding, assign
-a confidence score of 0-100 (is this a real, actionable issue on this
-commit, not a false positive). Keep only findings scoring **>= 80**.
-Deduplicate findings that multiple workers reported.
+your own confidence score of 0-100 (is this a real, actionable issue on
+this commit, not a false positive) -- treat the worker's self-reported
+confidence as one signal, not a verdict. Keep only findings scoring
+**>= 80**. Deduplicate findings that multiple workers reported.
 
 ## Step 3 -- Synthesize
 

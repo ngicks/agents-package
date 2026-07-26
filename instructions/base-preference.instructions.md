@@ -5,7 +5,8 @@ applyTo: "*"
 
 ### Base preference
 
-- You may ask back the user to resolve unclear corners, using `AskUserQuestion` (if available) or just a response.
+- Make routine judgment calls (naming, defaults, choice among equivalent approaches) yourself and note them.
+- Ask back the user — using `AskUserQuestion` (if available) or just a response — when different readings of the request would lead to materially different work, or before destructive / scope-changing actions.
 - Do not emit redundant code / comments when coding. Write:
   - How in code
   - What in tests

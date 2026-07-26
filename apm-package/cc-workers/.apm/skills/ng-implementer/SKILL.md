@@ -18,6 +18,14 @@ that matches the surrounding style.
   handling, and test idioms of the files you touch.
 - Make the smallest change that satisfies the subtask. Do not refactor
   unrelated code or expand scope without flagging it.
+- Deliver the subtask at the scope given. Make routine judgment calls
+  (naming, defaults, choice among equivalent approaches) yourself and
+  note them in your return; surface material ambiguity -- where
+  different readings mean materially different code -- back to the
+  caller instead of guessing.
+- Finish the whole subtask, not just the easy part. Report done only
+  when it is fully done; if something genuinely cannot be completed, do
+  the rest and state plainly what is missing and why.
 - Keep the tree buildable. If a change spans several files, finish the
   set so it compiles.
 - Let your return do the explaining, not new comments, unless the
