@@ -6,14 +6,16 @@
 //
 // Workflow:
 //  1. Validate the inputs and ensure the working tree is clean.
-//  2. Rewrite pkg/<name>/version.go to the release version, commit
+//  2. Rewrite <name-without-separator>/version.go to the release version, commit
 //     ("🔖: release <tag>"), tag.
 //  3. Rewrite the same file to the next development version (suffix
 //     "-devel"), commit ("👷: start <tag> development cycle").
 //  4. Push the branch and the new tag to origin.
 //
-// The version file is auto-detected by globbing pkg/*/version.go (must
-// match exactly one). Pass -file <path> to override.
+// The version file is auto-detected by globbing the top-level */version.go
+// (skipping cmd/, internal/, api/, and pkg/), falling back to the legacy
+// pkg/*/version.go layout; either way it must match exactly one file.
+// Pass -file <path> to override.
 //
 // Cross-platform by virtue of being a Go program: the same source
 // compiles and runs on Linux, macOS, and Windows.
@@ -35,7 +37,7 @@ var (
 	versionFile = flag.String(
 		"file",
 		"",
-		"path to version.go (auto-detected from pkg/*/version.go when unset)",
+		"path to version.go (auto-detected from */version.go, legacy pkg/*/version.go, when unset)",
 	)
 )
 
@@ -49,8 +51,9 @@ func init() {
                      For a Go submodule, prefix the tag with the submodule
                      directory: subpkg/v0.2.0, nested/dir/v0.2.0. The version
                      file is then auto-located under the same prefix
-                     (<prefix>/pkg/*/version.go) and the bare version string
-                     (without the prefix) is written into it.
+                     (<prefix>/*/version.go, legacy <prefix>/pkg/*/version.go)
+                     and the bare version string (without the prefix) is
+                     written into it.
   next-dev-version   defaults to bumping the patch and appending -devel
                      (v0.2.0 -> v0.2.1-devel; subpkg/v0.2.0 -> subpkg/v0.2.1-devel).
                      Must end in -devel.
@@ -217,22 +220,41 @@ func defaultNextDev(release string) (string, error) {
 	return prefix + "/" + next, nil
 }
 
-// findVersionFile globs <submoduleDir>/pkg/*/version.go (or pkg/*/version.go
-// for the root module when submoduleDir is "") and returns the sole match.
+// findVersionFile locates the service package's version.go under submoduleDir
+// ("" for the root module). The service package is a top-level directory
+// (<name-without-separator>/version.go); cmd/, internal/, and api/ never
+// hold it and are skipped, as is pkg/ itself. When the top level has no
+// match it falls back to the legacy pkg/*/version.go layout. Exactly one
+// match is required.
 func findVersionFile(submoduleDir string) (string, error) {
-	pattern := filepath.Join(submoduleDir, "pkg", "*", "version.go")
+	pattern := filepath.Join(submoduleDir, "*", "version.go")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return "", err
 	}
-	if len(matches) != 1 {
+	var filtered []string
+	for _, m := range matches {
+		switch filepath.Base(filepath.Dir(m)) {
+		case "cmd", "internal", "api", "pkg":
+			continue
+		}
+		filtered = append(filtered, m)
+	}
+	if len(filtered) == 0 {
+		pattern = filepath.Join(submoduleDir, "pkg", "*", "version.go")
+		filtered, err = filepath.Glob(pattern)
+		if err != nil {
+			return "", err
+		}
+	}
+	if len(filtered) != 1 {
 		return "", fmt.Errorf(
 			"expected exactly one %s; found %d (pass -file <path> to override)",
 			pattern,
-			len(matches),
+			len(filtered),
 		)
 	}
-	return matches[0], nil
+	return filtered[0], nil
 }
 
 func requireCleanWorkTree() error {

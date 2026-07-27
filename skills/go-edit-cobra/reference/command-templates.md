@@ -6,7 +6,7 @@ These are templates — **strictly follow** the order of elements; do **NOT** re
 
 The two mandatory subcommand templates live with their domains: `version` in [versioning.md](versioning.md), `config` in [configuration.md](configuration.md).
 
-The service config source (`pkg/<name>/config.go`) is in [config-source.md](config-source.md).
+The service config source (`<name-without-separator>/config.go`) is in [config-source.md](config-source.md).
 
 ## Contents
 

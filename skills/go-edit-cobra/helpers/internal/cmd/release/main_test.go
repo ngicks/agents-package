@@ -98,6 +98,84 @@ func TestVersionRE(t *testing.T) {
 	}
 }
 
+func TestFindVersionFile(t *testing.T) {
+	write := func(t *testing.T, root string, rel string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("package x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("top-level layout", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "mytool/version.go")
+		write(t, dir, "internal/versioninfo/version.go") // not top-level; ignored anyway
+		write(t, dir, "cmd/version.go")                  // skipped dir
+		t.Chdir(dir)
+		got, err := findVersionFile("")
+		if err != nil {
+			t.Fatalf("findVersionFile: %v", err)
+		}
+		if want := filepath.Join("mytool", "version.go"); got != want {
+			t.Errorf("findVersionFile = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("legacy pkg fallback", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "pkg/mytool/version.go")
+		t.Chdir(dir)
+		got, err := findVersionFile("")
+		if err != nil {
+			t.Fatalf("findVersionFile: %v", err)
+		}
+		if want := filepath.Join("pkg", "mytool", "version.go"); got != want {
+			t.Errorf("findVersionFile = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("top-level wins over legacy", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "mytool/version.go")
+		write(t, dir, "pkg/other/version.go")
+		t.Chdir(dir)
+		got, err := findVersionFile("")
+		if err != nil {
+			t.Fatalf("findVersionFile: %v", err)
+		}
+		if want := filepath.Join("mytool", "version.go"); got != want {
+			t.Errorf("findVersionFile = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("ambiguous", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "mytool/version.go")
+		write(t, dir, "othertool/version.go")
+		t.Chdir(dir)
+		if _, err := findVersionFile(""); err == nil {
+			t.Fatal("expected error on two candidate version files")
+		}
+	})
+
+	t.Run("submodule prefix", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "subpkg/mytool/version.go")
+		t.Chdir(dir)
+		got, err := findVersionFile("subpkg")
+		if err != nil {
+			t.Fatalf("findVersionFile: %v", err)
+		}
+		if want := filepath.Join("subpkg", "mytool", "version.go"); got != want {
+			t.Errorf("findVersionFile = %q, want %q", got, want)
+		}
+	})
+}
+
 func TestRewriteVersion(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "version.go")

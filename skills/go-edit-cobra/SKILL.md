@@ -15,12 +15,12 @@ Everything else — layout, templates, the configuration model, versioning, and 
 
 ## Reference files
 
-- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout, naming conventions (files / wrappers / run functions / package name / service method `<Method>Option` structs / the subdirectory-nesting variant), and the anti-patterns list.
+- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout (top-level service package `./<name-without-separator>/`, the main-vs-utility entry-point rule, the optional `api/` RPC-schema tree), naming conventions (files / wrappers / run functions / package name / service method `<Method>Option` structs / the subdirectory-nesting variant), and the anti-patterns list.
 
-  Read before deciding where a file goes or how to name it, and before adding or editing a `pkg/<name>` service method.
+  Read before deciding where a file goes or how to name it, before adding a new binary or an RPC API schema, and before adding or editing a `<name-without-separator>` service method.
 - **[reference/command-templates.md](reference/command-templates.md)** — the command-tree code templates: `main.go`, `root.go`, flat-leaf / parent-group / nested-leaf subcommands, and `go.mod` + version policy.
-- **[reference/configuration.md](reference/configuration.md)** — the configuration model (layers, `PartialConfig.Apply` merge semantics, file format, path resolution, flag overlay, add-a-field) and the `config` subcommand (three-file split: `cmd` wiring + `pkg/<name>/cli` rendering + `internal/templateutil` funcs).
-- **[reference/config-source.md](reference/config-source.md)** — the `pkg/<name>/config.go` source template (JSON base) plus the YAML-only / both-format support block.
+- **[reference/configuration.md](reference/configuration.md)** — the configuration model (layers, `PartialConfig.Apply` merge semantics, file format, path resolution, flag overlay, add-a-field) and the `config` subcommand (three-file split: `cmd` wiring + `<name-without-separator>/cli` rendering + `internal/templateutil` funcs).
+- **[reference/config-source.md](reference/config-source.md)** — the `<name-without-separator>/config.go` source template (JSON base) plus the YAML-only / both-format support block.
 - **[reference/versioning.md](reference/versioning.md)** — the four versioning pieces, the release-tool flow, submodule tags, and the `version.go` / `versioninfo` / `release` source.
 - **[reference/workflows.md](reference/workflows.md)** — step-by-step scaffold and edit procedures (subcommand / flag / metadata / completion operations) and the helper-package catalog.
 
@@ -35,7 +35,7 @@ Run before any edit.
    - Absent → out of scope; report and stop.
 3. **Layout classification** (edit mode only). Categorize the project:
    - **Canonical** — `<root>/cmd/<name>/main.go` + `<root>/cmd/<name>/commands/` + `<root>/internal/cmdsignals/` exist. → Proceed.
-   - **Close variant** — `cmd/<name>/main.go` + `cmd/<name>/commands/` exist but the helper packages sit elsewhere (e.g. under an older `cmd/internal/` tree, or `cmdsignals` not yet present), or subcommand files nest under **subdirectories** of `commands/` (an allowed variant — see [layout-and-naming.md › Subdirectory-nested subcommands](reference/layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant)). → Proceed; mirror the existing structure; do not force-migrate existing files.
+   - **Close variant** — `cmd/<name>/main.go` + `cmd/<name>/commands/` exist but the helper packages sit elsewhere (e.g. under an older `cmd/internal/` tree, or `cmdsignals` not yet present), the service package still lives at the legacy `pkg/<name-without-separator>/` instead of the top-level `./<name-without-separator>/`, or subcommand files nest under **subdirectories** of `commands/` (an allowed variant — see [layout-and-naming.md › Subdirectory-nested subcommands](reference/layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant)). → Proceed; mirror the existing structure; do not force-migrate existing files.
    - **Non-canonical Cobra** — e.g. `cmd/root.go` at module root, or `cobra-cli` defaults. → **Stop and ask.** Likely mid-migration or accidental drift.
 
 ## Cobra design rules

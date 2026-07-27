@@ -1,6 +1,6 @@
 # Service configuration (model & `config` subcommand)
 
-How configuration is layered, merged, and resolved — the design that the `pkg/<name>/config.go` source (see [config-source.md](config-source.md)) implements — plus the always-present `config` subcommand that prints the resolved result.
+How configuration is layered, merged, and resolved — the design that the `<name-without-separator>/config.go` source (see [config-source.md](config-source.md)) implements — plus the always-present `config` subcommand that prints the resolved result.
 
 ## Contents
 
@@ -11,13 +11,13 @@ How configuration is layered, merged, and resolved — the design that the `pkg/
 - [Config-file path resolution](#config-file-path-resolution)
 - [Flag overlay (the flags-win step, in `./cmd`)](#flag-overlay-the-flags-win-step-in-cmd)
 - [Lint, growth, and adding a field](#lint-growth-and-adding-a-field)
-- [The `config` subcommand: `cmd` wiring + `pkg/{{NAME}}/cli` + `templateutil`](#cmdnamecommandsconfiggo-always-present)
+- [The `config` subcommand: `cmd` wiring + `{{NAME}}/cli` + `templateutil`](#cmdnamecommandsconfiggo-always-present)
 
 ## Service package & configuration
 
-The CLI binary is wiring; the service is `./pkg/<name>`.
+The CLI binary is wiring; the service is `./<name-without-separator>`.
 
-Configuration is **always present**: every project carries `pkg/<name>/config.go`.
+Configuration is **always present**: every project carries `<name-without-separator>/config.go`.
 
 Inputs arrive from four layers, lowest to highest precedence:
 
@@ -33,7 +33,7 @@ Scalars and slices overwrite; nested structs and maps deep-merge (see [Merge sem
 
 - **Env vars MUST NOT be read anywhere under `./cmd`** — no `os.Getenv`, no `os.LookupEnv`, no scanning `os.Environ()`.
 
-  All env reads live in `pkg/<name>/config.go`, where `caarlos0/env` parses them into `PartialConfig` (plus the one hand-read `{{NAME_UPPER}}_CONF` path in `configPath`).
+  All env reads live in `<name-without-separator>/config.go`, where `caarlos0/env` parses them into `PartialConfig` (plus the one hand-read `{{NAME_UPPER}}_CONF` path in `configPath`).
 
   The single delegated exception reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the logger variable names.
 
@@ -218,7 +218,7 @@ Implementors MAY rename it (e.g. `--conf`, `--config-file`) if `--config` would 
 
 - **Growth.** Start with one `config.go`.
 
-  If configuration outgrows it (~300 LoC), promote it to a `pkg/<name>/config/` sub-package (`LoadConfig` → `config.Load`).
+  If configuration outgrows it (~300 LoC), promote it to a `<name-without-separator>/config/` sub-package (`LoadConfig` → `config.Load`).
 
 **Adding a config field** touches several sites in lockstep.
 
@@ -248,7 +248,7 @@ It loads the configuration through the canonical `{{NAME}}.LoadConfig` (defaults
 The work is split across **three files**, keeping presentation out of `./cmd` (the same rule that keeps run functions thin):
 
 - **`cmd/{{NAME}}/commands/config.go`** — thin wiring: builds the command, loads the config, hands the result to the presentation layer. Owns the hand-written `--format` field-shape doc in its `Long`.
-- **`pkg/{{NAME}}/cli/config.go`** — presentation: `RenderConfig` does the JSON / template rendering; `TemplateFuncHelp` surfaces the helper-func docs for the command's `Long`.
+- **`{{NAME}}/cli/config.go`** — presentation: `RenderConfig` does the JSON / template rendering; `TemplateFuncHelp` surfaces the helper-func docs for the command's `Long`.
 - **`internal/templateutil`** — the shared template `FuncMap` (`json`, plus any project-specific helpers) and its single-source-of-truth help (`FuncDocs` / `FuncHelp`).
 
 Why a shared `templateutil`: nearly every `--format` template wants at least `json` (to dump a sub-value as JSON), and keeping the func docs beside the func map means the command help can't drift from what the templates actually expose — `TemplateFuncHelp` reads straight from `FuncDocs`.
@@ -267,8 +267,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"{{MODULE}}/pkg/{{NAME}}"
-	"{{MODULE}}/pkg/{{NAME}}/cli"
+	"{{MODULE}}/{{NAME}}"
+	"{{MODULE}}/{{NAME}}/cli"
 )
 
 // configLongFmt documents the resolved-config shape so users can write --format
@@ -333,13 +333,13 @@ func runConfig(cmd *cobra.Command, _ []string, flagConfig, flagFormat string) er
 	if err != nil {
 		return err
 	}
-	// Presentation (JSON / template rendering) lives in pkg/{{NAME}}/cli; ./cmd
+	// Presentation (JSON / template rendering) lives in {{NAME}}/cli; ./cmd
 	// only wires it to stdout. cmd.Println would route to stderr.
 	return cli.RenderConfig(cmd.OutOrStdout(), cfg, flagFormat)
 }
 ```
 
-### `pkg/{{NAME}}/cli/config.go` (presentation)
+### `{{NAME}}/cli/config.go` (presentation)
 
 ```go
 // Package cli holds {{NAME}}'s CLI-presentation code — rendering resolved
@@ -355,7 +355,7 @@ import (
 	"text/template"
 
 	"{{MODULE}}/internal/templateutil"
-	"{{MODULE}}/pkg/{{NAME}}"
+	"{{MODULE}}/{{NAME}}"
 )
 
 // TemplateFuncHelp returns the aligned help block for the helper functions
@@ -484,7 +484,7 @@ Notes:
   Implementors MAY rename it (e.g. `--conf`, `--config-file`) when `--config` would collide with a more-local flag name on some subcommand; keep the chosen name consistent across the binary.
 
 - **What it shows**: the `defaults < file < env` layers — _not_ a specific service command's flag overrides, which are applied per-command in that command's run function.
-- **Presentation lives in `pkg/{{NAME}}/cli`, not `./cmd`.** `RenderConfig` is the render path; the run function only loads the config and writes to `cmd.OutOrStdout()`. This mirrors the thin-run-function rule — `./cmd` wires, the package renders.
+- **Presentation lives in `{{NAME}}/cli`, not `./cmd`.** `RenderConfig` is the render path; the run function only loads the config and writes to `cmd.OutOrStdout()`. This mirrors the thin-run-function rule — `./cmd` wires, the package renders.
 
   Write to **`cmd.OutOrStdout()`**, not `cmd.Println`: cobra's `Println` routes to **stderr** (`OutOrStderr`), so config output piped to a file or `jq` would vanish.
 
@@ -498,4 +498,4 @@ Notes:
 
 - **`templateutil` is `internal` and shared.** It is the one place template helpers live, so every renderer (config `--format` now, any future one) exposes the same funcs. `FuncMap` ↔ `FuncDocs` are kept in lockstep by a test (mirror crabswarm's `TestFuncDocs_MatchesFuncMap`).
 - **Secrets**: if `Config` carries credentials, give it a `MarshalJSON` that redacts them (or omit those fields) — `config` prints to stdout, and the `json` helper routes through the marshaler too.
-- If the project name is not a valid Go identifier, the `pkg/<name>` directory is already its sanitized form (see [Naming conventions › Package name](layout-and-naming.md#package-name-pkgname)), so the imports need no alias — `import "{{MODULE}}/pkg/mytool"` and `"{{MODULE}}/pkg/mytool/cli"`, matching `version.go`.
+- If the project name is not a valid Go identifier, the `<name-without-separator>` directory is already its sanitized form (see [Naming conventions › Package name](layout-and-naming.md#package-name-name-without-separator)), so the imports need no alias — `import "{{MODULE}}/mytool"` and `"{{MODULE}}/mytool/cli"`, matching `version.go`.

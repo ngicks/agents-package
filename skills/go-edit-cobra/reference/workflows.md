@@ -31,19 +31,21 @@ Generation steps (relative to module root):
 
 1. Resolve all parameters.
 
-   **Derive the `pkg/<name>` package name now**: strip hyphens/underscores from the project name so the directory follows Go convention (`my-tool` → `pkg/mytool/`, `package mytool`) — see [Naming conventions › Package name](layout-and-naming.md#package-name-pkgname).
+   **Derive the `<name-without-separator>` package name now**: strip hyphens/underscores from the project name so the top-level service directory follows Go convention, as the placeholder's spelling stresses (`my-tool` → `mytool/`, `package mytool`) — see [Naming conventions › Package name](layout-and-naming.md#package-name-name-without-separator).
 
-   `cmd/<name>/`, `Use:`, the env prefix, and the config-dir path keep the verbatim project name; only `pkg/<name>`, the `package` clause, and `{{MODULE}}/pkg/<name>` imports use the stripped form.
+   `cmd/<name>/`, `Use:`, the env prefix, and the config-dir path keep the verbatim project name; only the top-level `<name-without-separator>/` directory, the `package` clause, and `{{MODULE}}/<name-without-separator>` imports use the stripped form.
 
    When the project name is already a valid identifier they are identical.
+
+   The scaffold's binary carries the project's name and is its **main** functionality by definition, so its service package goes top-level without asking. Do **not** scaffold an `api/` directory — it is created only when the user asks for a public RPC API (see [layout-and-naming.md › Public RPC API](layout-and-naming.md#public-rpc-api-api)).
 2. Write `go.mod` (placeholder `v0.0.0` lines per the [template](command-templates.md#gomod), except the pinned `go.yaml.in/yaml/v4 v4.0.0-rc.5`).
 3. Write `cmd/<name>/main.go` ([template](command-templates.md#cmdnamemaingo)).
 4. Write `cmd/<name>/commands/root.go` ([template](command-templates.md#cmdnamecommandsrootgo) already wires `versionCmd(cmd)` and the `--version` flag — leave that in place).
-5. Write `pkg/<name>/version.go` ([template](versioning.md#pkgnameversiongo-always-present)).
+5. Write `<name-without-separator>/version.go` ([template](versioning.md#nameversiongo-always-present)).
 
    The initial `Version` value is `v0.0.0-devel`.
 
-6. Write `pkg/<name>/config.go` ([template](config-source.md)).
+6. Write `<name-without-separator>/config.go` ([template](config-source.md)).
 
    Fill in the real `Config` fields + `DefaultConfig`, the mirrored `PartialConfig` + `Apply` (one overlay line per field, by kind — scalar / nested / map / slice), and `LoadConfig` (env layer via caarlos0/env's `ParseWithOptions` + the package-level `envOptions`).
 
@@ -56,7 +58,7 @@ Generation steps (relative to module root):
 8. Write the `config` subcommand — three files ([templates](configuration.md#cmdnamecommandsconfiggo-always-present)):
 
    - `internal/templateutil/templateutil.go` — the shared `FuncMap` (`json` baseline) + `FuncDocs` / `FuncHelp`, plus its sync test.
-   - `pkg/<name>/cli/config.go` — `RenderConfig` (JSON / `--format`) + `TemplateFuncHelp`.
+   - `<name-without-separator>/cli/config.go` — `RenderConfig` (JSON / `--format`) + `TemplateFuncHelp`.
    - `cmd/<name>/commands/config.go` — thin wiring; hand-write the `configLongFmt` field tree to match the real `Config`.
 
    The root template already declares the persistent `--config` flag and wires `configCmd(cmd, &flagConfig)` beside `versionCmd(cmd)` — leave that in place.
@@ -77,7 +79,7 @@ Generation steps (relative to module root):
 
     This copies the `cmdsignals`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `internal/stdiopipe`.
 
-    No build-time edits are needed: the release helper auto-detects `pkg/*/version.go`.
+    No build-time edits are needed: the release helper auto-detects the top-level `<name-without-separator>/version.go` (falling back to the legacy `pkg/<name-without-separator>/version.go` layout).
 
 12. For each direct dep in `go.mod`: `go get <module>@latest` — using the correct `/vN` major path (e.g. `github.com/caarlos0/env/v11@latest`; confirm the current major first, see [Version policy](command-templates.md#gomod)).
 
@@ -95,6 +97,15 @@ Write creates parent directories — do not run `mkdir` separately.
 Pre-flight checks first (Cobra detection, layout classification — see SKILL.md › Pre-flight checks).
 
 Then pick the operation; each entry below lists what to touch.
+
+### New entry point (second binary)
+
+Adding `cmd/<other>/` reuses the scaffold templates for the wiring layer, but the service package's placement depends on what the binary **is** — see [layout-and-naming.md › Main vs utility entry points](layout-and-naming.md#main-vs-utility-entry-points):
+
+- **Main functionality** → top-level `./<other-without-separator>/` (a peer of `./<name-without-separator>/`, part of the module's public API).
+- **Utility** (debug console, importer, admin helper, ...) → service code under `internal/` (e.g. `internal/<other-without-separator>/`), never top-level.
+
+**Ask the user which it is** before writing the service package, unless the request already says so. In a legacy-layout project, a main-functionality package follows the existing `pkg/` placement instead of the top level.
 
 ### Subcommand structure
 
@@ -160,7 +171,7 @@ Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on package
 | Helper          | Import path                          | Purpose                                                                                                                                  | Signature(s)                                                                                                                                                                                                                                                                                                        | Use when                                                                                                              |
 | --------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `cmdsignals`    | `{{MODULE}}/internal/cmdsignals`     | signal-cancellable root context for `SIGINT` / `SIGTERM`, with pause/resume for temporarily forwarding signals to a child process        | `NotifyContext(ctx) (blockOn func(), ctx context.Context, cancel func(error))`, `Pause(ctx, installHandler func()) bool`, `Resume(ctx, removeHandler func()) bool`, `type SignalReceivedError{Sig os.Signal}` (cancellation cause; recover via `context.Cause` + `errors.AsType`), `var ExitSignals [...]os.Signal` | Always when scaffolding (`main.go` calls `NotifyContext`). For existing projects, only when adopting this template.   |
-| `loggerfactory` | `{{MODULE}}/internal/loggerfactory`  | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `pkg/<name>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal`                                                                                              | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.                |
+| `loggerfactory` | `{{MODULE}}/internal/loggerfactory`  | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `<name-without-separator>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal`                                                                                              | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.                |
 | `versioninfo`   | `{{MODULE}}/internal/versioninfo`    | combine the project's `Version` with VCS info from `runtime/debug.ReadBuildInfo`                                                         | `ReadVersionInfo(version string) Info`, `type Info`                                                                                                                                                                                                                                                                 | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `stdiopipe`     | `{{MODULE}}/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe`                                                                         | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                                                                                                                                                                                              | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics.           |
 
@@ -176,9 +187,9 @@ The default scaffold needs neither — `NotifyContext` alone gives the standard 
 
 | Helper    | Source                                 | Destination                           | Purpose                                                                                                                                      | Use when                                                                                                                      |
 | --------- | -------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `release` | `helpers/internal/cmd/release/main.go` | `<root>/internal/cmd/release/main.go` | Cross-platform release helper. Validates inputs, rewrites `pkg/<name>/version.go`'s `const Version`, commits + tags, bumps to next `-devel`. | Always when scaffolding. Invoke during a release with `go run ./internal/cmd/release <release-version> [<next-dev-version>]`. |
+| `release` | `helpers/internal/cmd/release/main.go` | `<root>/internal/cmd/release/main.go` | Cross-platform release helper. Validates inputs, rewrites `<name-without-separator>/version.go`'s `const Version`, commits + tags, bumps to next `-devel`. | Always when scaffolding. Invoke during a release with `go run ./internal/cmd/release <release-version> [<next-dev-version>]`. |
 
-The release helper auto-detects `pkg/*/version.go` and refuses on a dirty tree or duplicate tag.
+The release helper auto-detects the top-level `<name-without-separator>/version.go` (falling back to the legacy `pkg/<name-without-separator>/version.go`) and refuses on a dirty tree or duplicate tag.
 
 It pushes the branch and the new tag to `origin` on success; if either push fails it aborts and leaves the local commits + tag in place for manual re-push.
 
@@ -188,9 +199,9 @@ See [Versioning & release](versioning.md) for the contract it expects.
 
 | Template                           | Destination                             | Purpose                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`pkg/{{NAME}}/version.go`](versioning.md#pkgnameversiongo-always-present)          | `<root>/pkg/<name>/version.go`          | Declares `const Version`. Rewritten by `internal/cmd/release`. No imports.                                                                                                                                                                                                                                                                                                            |
-| [`pkg/{{NAME}}/config.go`](config-source.md)           | `<root>/pkg/<name>/config.go`           | `Config` + `DefaultConfig`, the exported `PartialConfig` + `Apply` (the single overlay primitive), isolated `unmarshalConfigFile`, and `LoadConfig` (defaults < file < env; env layer via caarlos0/env + `envOptions`). Triple `json:`+`yaml:`+`env:` tags; file format JSON-only / YAML-only / both (YAML wins, one file). Scalars/slices overwrite; nested structs/maps deep-merge. |
+| [`{{NAME}}/version.go`](versioning.md#nameversiongo-always-present)          | `<root>/<name-without-separator>/version.go`          | Declares `const Version`. Rewritten by `internal/cmd/release`. No imports.                                                                                                                                                                                                                                                                                                            |
+| [`{{NAME}}/config.go`](config-source.md)           | `<root>/<name-without-separator>/config.go`           | `Config` + `DefaultConfig`, the exported `PartialConfig` + `Apply` (the single overlay primitive), isolated `unmarshalConfigFile`, and `LoadConfig` (defaults < file < env; env layer via caarlos0/env + `envOptions`). Triple `json:`+`yaml:`+`env:` tags; file format JSON-only / YAML-only / both (YAML wins, one file). Scalars/slices overwrite; nested structs/maps deep-merge. |
 | [`cmd/{{NAME}}/commands/version.go`](versioning.md#cmdnamecommandsversiongo-always-present) | `<root>/cmd/<name>/commands/version.go` | The `version` subcommand and `runVersion`. Wired unconditionally by `rootCmd()`; alias of `--version`.                                                                                                                                                                                                                                                                                |
 | [`cmd/{{NAME}}/commands/config.go`](configuration.md#cmdnamecommandsconfiggo-always-present)  | `<root>/cmd/<name>/commands/config.go`  | The `config` subcommand and `runConfig` — thin wiring. Wired unconditionally by `rootCmd()`; loads `LoadConfig` and delegates rendering to `cli.RenderConfig`. `Long` hand-writes the `--format` field tree; appends `cli.TemplateFuncHelp()`.                                                                                                                                         |
-| [`pkg/{{NAME}}/cli/config.go`](configuration.md#cmdnamecommandsconfiggo-always-present)        | `<root>/pkg/<name>/cli/config.go`       | `RenderConfig` (resolved config → indented JSON, or a Go `text/template` with the shared funcs) + `TemplateFuncHelp`. Presentation lives here, not under `./cmd`; writes to the passed `io.Writer`.                                                                                                                                                                                  |
+| [`{{NAME}}/cli/config.go`](configuration.md#cmdnamecommandsconfiggo-always-present)        | `<root>/<name-without-separator>/cli/config.go`       | `RenderConfig` (resolved config → indented JSON, or a Go `text/template` with the shared funcs) + `TemplateFuncHelp`. Presentation lives here, not under `./cmd`; writes to the passed `io.Writer`.                                                                                                                                                                                  |
 | [`internal/templateutil/templateutil.go`](configuration.md#cmdnamecommandsconfiggo-always-present) | `<root>/internal/templateutil/templateutil.go` | Shared `text/template` `FuncMap` (`json` baseline + project helpers) and its single-source-of-truth `FuncDocs` / `FuncHelp`. `FuncMap` ↔ `FuncDocs` kept in lockstep by a test.                                                                                                                                                                            |

@@ -7,6 +7,8 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 ## Contents
 
 - [Project layout (canonical)](#project-layout-canonical)
+- [Main vs utility entry points](#main-vs-utility-entry-points) — when a binary earns a top-level service package, and when to ask
+- [Public RPC API (`api/`)](#public-rpc-api-api) — schema + generated-code layout, buf/proto3 rules, the collision-avoiding path prefix
 - [Naming conventions](#naming-conventions) — flat, nested, the subdirectory variant, non-subcommand files, package name, service method options
 - [Anti-patterns](#anti-patterns) — grouped: layout & placement · mandatory pieces · naming · construction & wiring · run functions & the `./cmd` boundary · service method options · versioning · configuration model
 
@@ -40,15 +42,20 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │   │   └── templateutil.go              # always present; shared text/template FuncMap + FuncDocs (json, + project helpers)
 │   └── versioninfo/
 │       └── versioninfo.go               # always present; ReadVersionInfo (Version + VCS info)
-└── pkg/
-    └── <name>/
-        ├── version.go                   # always present; release-controlled `const Version`
-        ├── config.go                    # always present; Config + DefaultConfig, PartialConfig + Apply, LoadConfig
-        ├── <service>.go                 # internal service implementation
-        └── cli/                         # CLI-presentation code (printing, prompts, tables, colors)
-            ├── config.go                # always present; RenderConfig (config subcommand JSON / --format)
-            └── <ui>.go
+├── api/                                 # only when the project exposes a public RPC API — see below
+│   ├── buf.yaml
+│   ├── gen/
+│   └── schema/
+└── <name-without-separator>/            # the service package — the project's MAIN functionality
+    ├── version.go                       # always present; release-controlled `const Version`
+    ├── config.go                        # always present; Config + DefaultConfig, PartialConfig + Apply, LoadConfig
+    ├── <service>.go                     # internal service implementation
+    └── cli/                             # CLI-presentation code (printing, prompts, tables, colors)
+        ├── config.go                    # always present; RenderConfig (config subcommand JSON / --format)
+        └── <ui>.go
 ```
+
+The placeholder is deliberately spelled `<name-without-separator>`: it is an importable Go package directory, so it follows Go package-name convention — the project name with every `-` / `_` stripped (see [Package name](#package-name-name-without-separator)). `cmd/<name>/` keeps the verbatim project name.
 
 Subcommand files MAY alternatively nest under subdirectories of `commands/` (one directory per group, one Go package per directory).
 
@@ -57,20 +64,28 @@ That is an **allowed variant**, not the canonical default — it exists so a pro
 Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
-- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `loggerfactory`, `templateutil`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./pkg/<name>` while blocked to external modules under Go's `internal/` rule.
+- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `loggerfactory`, `templateutil`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules under Go's `internal/` rule.
 
-  `templateutil` is the shared `text/template` `FuncMap` + `FuncDocs` (`json` baseline, plus any project helpers) that every renderer exposes; the `config` subcommand's `--format` uses it via `pkg/<name>/cli`. One copy keeps the func set — and its help text — identical across call sites.
-- `internal/loggerfactory/` is genuinely shared, not CLI-only: `pkg/<name>` code imports its level constants — notably `LevelTrace` and `LevelFatal` — and emits records at levels the CLI knows how to render.
+  `templateutil` is the shared `text/template` `FuncMap` + `FuncDocs` (`json` baseline, plus any project helpers) that every renderer exposes; the `config` subcommand's `--format` uses it via `<name-without-separator>/cli`. One copy keeps the func set — and its help text — identical across call sites.
+- `internal/loggerfactory/` is genuinely shared, not CLI-only: `<name-without-separator>` code imports its level constants — notably `LevelTrace` and `LevelFatal` — and emits records at levels the CLI knows how to render.
 
   That cross-package use is why the logger glue is a library under `internal/`, not `zz_`-prefixed code under `commands/`.
 
   The flag wiring is still CLI-only; the package is shared because the level constants are shared.
 
-- `pkg/<name>/` holds the actual service.
+- `<name-without-separator>/` holds the actual service, as a **top-level** package at the module root.
 
-  `./cmd` is wiring only — flags, positional args, and (logger-only) env vars feed into a service constructed from `pkg/<name>`.
+  `./cmd` is wiring only — flags, positional args, and (logger-only) env vars feed into a service constructed from `<name-without-separator>`.
 
-- `pkg/<name>/cli/` holds CLI-presentation code (printing, prompts, tables, colors, spinners).
+  The top level is reserved for the project's **main** functionality; a binary that is merely a utility does not earn a top-level package — see [Main vs utility entry points](#main-vs-utility-entry-points).
+
+  (An older revision of this layout placed the service at `pkg/<name-without-separator>/`. That is now a **legacy variant**: preserve it in projects that already use it — new files follow the existing `pkg/` placement — and migrate to top-level only on explicit user request.)
+
+- `api/` (optional) holds the public RPC API schema and its generated code — see [Public RPC API](#public-rpc-api-api).
+
+  Never scaffold it speculatively; create it only when the project actually exposes an RPC API.
+
+- `<name-without-separator>/cli/` holds CLI-presentation code (printing, prompts, tables, colors, spinners).
 
   `RunE` calls into it and returns its error.
 
@@ -86,11 +101,11 @@ Why this shape:
 
 - `version.go` is split across **three** packages by design.
 
-  `pkg/<name>/version.go` declares only `const Version`, kept import-free so external consumers of `pkg/<name>` don't drag in `internal/`.
+  `<name-without-separator>/version.go` declares only `const Version`, kept import-free so external consumers of `<name-without-separator>` don't drag in `internal/`.
 
   `internal/versioninfo/versioninfo.go` provides `ReadVersionInfo(version) Info` — the reusable VCS-info combiner consumed by the binary.
 
-  `cmd/<name>/commands/version.go` is the thin CLI presentation layer that calls `versioninfo.ReadVersionInfo(<name>.Version)`.
+  `cmd/<name>/commands/version.go` is the thin CLI presentation layer that calls `versioninfo.ReadVersionInfo(<name-without-separator>.Version)`.
 
   `version.go` is the one canonical-mapping leaf that does **not** need the `zz_` prefix because `version` is itself a real subcommand.
 
@@ -101,6 +116,59 @@ Why this shape:
   One Go source base replaces what would otherwise be parallel bash + PowerShell scripts.
 
 - Never put `commands/` directly at the module root. See [Anti-patterns](#anti-patterns).
+
+## Main vs utility entry points
+
+`cmd/<name>/` maps to the top-level service package `./<name-without-separator>/` only when that binary is a **main functionality** of the project.
+
+A project may grow additional binaries (`cmd/<other>/`) that are merely utilities — a debug console, a data importer, an admin helper. Those do **not** earn a top-level package.
+
+- **Main functionality** → service code lives at the top level: `./<other-without-separator>/` (sanitized name, same rules as `./<name-without-separator>/`).
+
+  The project then has two peer service packages at the module root — both part of its public Go API surface.
+- **Utility** → service code lives under `internal/` (e.g. `internal/<other-without-separator>/`), keeping the module's importable surface to the main package(s).
+
+  The `cmd/<other>/` wiring layer is identical either way; only the service package's placement changes.
+- **When adding a new entry point, ask the user which it is** — main or utility — unless the request already says so.
+
+  Do not silently default to a top-level package: the top level is a public-API statement, not a dumping ground.
+- The scaffold's first binary needs no ask: it carries the project's name and **is** the main functionality by definition.
+- If a would-be top-level package name collides with a reserved directory (`cmd`, `internal`, `api`, or a legacy `pkg`), stop and ask the user for an alternative name.
+
+## Public RPC API (`api/`)
+
+Optional top-level directory holding the project's **public RPC API**: the schema sources and the code generated from them.
+
+Create it only when the project actually exposes an RPC API — never speculatively.
+
+```
+<module-root>/api/
+├── buf.yaml                     # buf module config — lives here, not at the module root
+├── gen/                         # generated code, committed
+│   ├── proto/
+│   │   ├── go/                  # Go stubs — imported by <name-without-separator>/, never called directly from ./cmd
+│   │   └── <lang>/              # one directory per additional target language
+│   └── <schema format>/         # generated code for a non-proto schema format
+└── schema/
+    └── proto/                   # or another schema format's directory (openapi/, jsonschema/, ...)
+        └── <prefix>/<name-without-separator>/v1/<name-without-separator>.proto
+```
+
+Rules:
+
+- **Prefer `buf`.** Consequently write **`proto3` only** — never `proto2` — for protocol buffers.
+
+  `buf.yaml` lives under `./api` (alongside `buf.gen.yaml` when code is generated), with `api/schema/proto` as the module's proto root.
+- **Always prefix the proto package/service path** with `<username>` or `<organizationname>` (or both) so it cannot collide with other projects' schemas.
+
+  `<prefix>` in the tree above is that segment — e.g. `watage/mytool/v1/mytool.proto` with `package watage.mytool.v1;`.
+- **Resolving the prefix convention**, in order:
+  1. An explicit user instruction for the name — use it verbatim.
+  2. A convention already present in the repo (existing `api/schema` paths, proto `package` lines) — follow it.
+  3. Neither — **ask the user** which prefix (username, organization, or both) to use before writing any schema.
+- Generated code lands under `api/gen/<format>/<lang>/` and is committed; regenerate rather than hand-edit.
+
+  The service package `<name-without-separator>/` implements the generated interfaces; `./cmd` stays wiring-only, as always.
 
 ## Naming conventions
 
@@ -145,7 +213,7 @@ This variant is **allowed, not preferred**: it exists so a project that organize
 Canonical shape:
 
 - **Directory**: `commands/<parent>/`, keeping the verbatim group name.
-- **Package clause**: the sanitized group name — strip `-` / `_`, same rule as [`pkg/<name>`](#package-name-pkgname) (`dry-run/` → `package dryrun`).
+- **Package clause**: the sanitized group name — strip `-` / `_`, same rule as [`<name-without-separator>`](#package-name-name-without-separator) (`dry-run/` → `package dryrun`).
 - **Group file**: `commands/<parent>/<parent>.go` exports the subpackage's one boundary symbol, `func Cmd(parent *cobra.Command)`.
 
   It builds the group's `cobra.Command`, calls the children's (unexported) wrappers, and ends with `parent.AddCommand(cmd)` — the standard group wrapper, exported because it crosses the package boundary.
@@ -220,20 +288,21 @@ This is the same Go rule that constrains a `zz_<helper>` file's `<helper>` part 
 - The file name has no other constraint beyond the `zz_` prefix.
 - Do **not** use a leading `_`: `cmd/go` silently ignores files (and directories) whose names begin with `_` or `.`, so an `_logger.go` would never be compiled.
 
-### Package name (`pkg/<name>`)
+### Package name (`<name-without-separator>/`)
 
-`pkg/<name>` is an importable Go package, so the **name part must follow Go convention: no hyphens (`-`), no underscores (`_`)**.
+The top-level `<name-without-separator>/` is an importable Go package, so the **name part must follow Go convention: no hyphens (`-`), no underscores (`_`)** — the placeholder is spelled `-without-separator` to keep that rule in view.
 
-Derive it from the project name by stripping those characters — `my-tool` → `pkg/mytool/` with `package mytool`.
+Derive it from the project name by stripping those characters — `my-tool` → `mytool/` with `package mytool`.
 
 This is the **only** place the name is sanitized: the binary directory `cmd/<name>/` (e.g. `cmd/my-tool/`), the `Use:` string, the env prefix, and the `os.UserConfigDir()/<name>/` path all keep the verbatim project name.
 
-- In the templates, `{{NAME}}` resolves to this sanitized form wherever it appears as a **Go package identifier or inside a `pkg/…` import path** — `package {{NAME}}`, `pkg/{{NAME}}/version.go`, `import "{{MODULE}}/pkg/{{NAME}}"`, `{{NAME}}.Version`, `{{NAME}}.LoadConfig`.
+- In the templates, `{{NAME}}` resolves to this sanitized form wherever it appears as a **Go package identifier or inside the service import path** — `package {{NAME}}`, `{{NAME}}/version.go`, `import "{{MODULE}}/{{NAME}}"`, `{{NAME}}.Version`, `{{NAME}}.LoadConfig`.
 
   When the project name is already a valid identifier (the common case, e.g. `mytool`), the sanitized and verbatim forms coincide and there is nothing to strip.
-- Because the directory name, the `package` clause, and the import path now all agree, the import needs **no alias**: write `import "{{MODULE}}/pkg/mytool"`, not `import mytool "{{MODULE}}/pkg/my-tool"`.
+- Because the directory name, the `package` clause, and the import path now all agree, the import needs **no alias**: write `import "{{MODULE}}/mytool"`, not `import mytool "{{MODULE}}/my-tool"`.
+- In a legacy-layout project the same rules apply at `pkg/<name-without-separator>/` — keep the `pkg/` placement there (see [Anti-patterns › Layout & file placement](#anti-patterns)).
 
-### Service method options (`pkg/<name>`)
+### Service method options (`<name-without-separator>`)
 
 Exported service methods take their per-call options as a **single option struct named `<Method>Option`** — the method name plus the singular `Option` suffix.
 
@@ -296,15 +365,22 @@ Grouped by the part of the layout each one violates.
 
   See [Subdirectory-nested subcommands](#subdirectory-nested-subcommands-allowed-variant).
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
-- **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./pkg/<name>` while blocked to external modules.
+- **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules.
 
   The module-root `internal/` also holds build-time `main` packages such as `internal/cmd/release` that should not be `go install`-able by external modules. Do not reintroduce a `cmd/internal/` layer or scatter helpers beside the subcommand files.
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
 - **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/internal/loggerfactory`.
 
-  Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package anywhere under `cmd/` — `pkg/<name>` needs to import its `Level` constants, so it must stay at the module-root `internal/loggerfactory`.
+  Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package anywhere under `cmd/` — `<name-without-separator>` needs to import its `Level` constants, so it must stay at the module-root `internal/loggerfactory`.
 - **Putting the release helper anywhere other than `internal/cmd/release/`.** Specifically: not `cmd/release/` (that would make it `go install`-able by external consumers) and not `scripts/` (no shell-script parity to maintain).
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
+- **Placing a new service package under `pkg/` in a top-level-layout project — or migrating a legacy `pkg/<name-without-separator>/` to the top level unprompted.** The service package lives at the module root (`./<name-without-separator>/`); `pkg/` is the legacy placement.
+
+  Whichever shape a project already has must survive edits and re-scaffolding: new files follow the existing placement, and migration between the two happens only on explicit user request (same preserve rule as the subdirectory command variant).
+- **Giving a utility binary a top-level service package.** Only a **main** functionality earns `./<other-without-separator>/`; a utility's service code goes under `internal/`.
+
+  When it is not clear which kind a new entry point is, ask — see [Main vs utility entry points](#main-vs-utility-entry-points).
+- **Generating `api/` speculatively, using `proto2`, or writing an unprefixed proto package path.** `api/` exists only when the project exposes a public RPC API; protobuf schemas are `proto3` managed with `buf` (`buf.yaml` under `./api`); proto package/service paths always carry the `<username>`/`<organizationname>` prefix — repo convention first, ask when there is none. See [Public RPC API](#public-rpc-api-api).
 
 ### Mandatory pieces — never skip these
 
@@ -314,11 +390,11 @@ Grouped by the part of the layout each one violates.
 - **Skipping `internal/cmd/release`.** Always generated for scaffold; the release flow assumes it.
 
   The Go program intentionally replaces parallel bash + PowerShell scripts; do not re-introduce them.
-- **Skipping `version.go` (either copy).** Both `pkg/<name>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
-- **Skipping the `config` subcommand.** `cmd/<name>/commands/config.go` is mandatory alongside `pkg/<name>/config.go`; `rootCmd()` wires `configCmd(cmd, &flagConfig)` unconditionally.
+- **Skipping `version.go` (either copy).** Both `<name-without-separator>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
+- **Skipping the `config` subcommand.** `cmd/<name>/commands/config.go` is mandatory alongside `<name-without-separator>/config.go`; `rootCmd()` wires `configCmd(cmd, &flagConfig)` unconditionally.
 
-  It prints `LoadConfig` as JSON, or renders `--format` against it — via `cli.RenderConfig` in `pkg/<name>/cli`, using the `internal/templateutil` func map. All three files (`cmd` wiring, `cli/config.go`, `internal/templateutil`) are part of the mandatory set; see [configuration.md](configuration.md#cmdnamecommandsconfiggo-always-present).
-- **Skipping `pkg/<name>/config.go`.** Configuration is always present; every project carries it (even when `Config` starts with a single field).
+  It prints `LoadConfig` as JSON, or renders `--format` against it — via `cli.RenderConfig` in `<name-without-separator>/cli`, using the `internal/templateutil` func map. All three files (`cmd` wiring, `cli/config.go`, `internal/templateutil`) are part of the mandatory set; see [configuration.md](configuration.md#cmdnamecommandsconfiggo-always-present).
+- **Skipping `<name-without-separator>/config.go`.** Configuration is always present; every project carries it (even when `Config` starts with a single field).
 
 ### Naming
 
@@ -326,11 +402,11 @@ Grouped by the part of the layout each one violates.
 
   **Never use a leading `_`** — `cmd/go` ignores files starting with `_` or `.`, so they would silently never compile.
 
-- **Hyphens or underscores in the `pkg/<name>` directory.** It is an importable package, so the name part must follow Go convention — `pkg/mytool/`, never `pkg/my-tool/` or `pkg/my_tool/`.
+- **Hyphens or underscores in the `<name-without-separator>` directory.** It is an importable package, so the name part must follow Go convention (which is what the placeholder's spelling stresses) — `mytool/`, never `my-tool/` or `my_tool/`.
 
-  Strip those characters from the project name for the directory, the `package` clause, and the `{{MODULE}}/pkg/<name>` import (they then agree, so no import alias is needed).
+  Strip those characters from the project name for the directory, the `package` clause, and the `{{MODULE}}/<name-without-separator>` import (they then agree, so no import alias is needed).
 
-  The binary directory `cmd/<name>/` keeps the verbatim name. See [Naming conventions › Package name](#package-name-pkgname).
+  The binary directory `cmd/<name>/` keeps the verbatim name. See [Naming conventions › Package name](#package-name-name-without-separator).
 
 - **A leaf file name whose trailing `_`-segment is a GOOS / GOARCH / `test` token** (e.g. `foo_windows.go`, `db_linux_amd64.go`, `db_test.go`). Go gives it an implicit build constraint, so the subcommand silently drops out of builds on other platforms — green on your host, missing elsewhere.
 
@@ -349,7 +425,7 @@ Grouped by the part of the layout each one violates.
 ### Run functions & the `./cmd` boundary
 
 - **Putting business logic inside `RunE`.** Business logic lives outside `./cmd`; `RunE` is wiring only — either a direct `run{{Name}}` reference or a thin closure adapter that forwards captured flag values.
-- **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/pkg/<name>/cli/`.
+- **Putting CLI-presentation code inside `RunE` or anywhere under `./cmd`.** Printing, prompts, table rendering, color, terminal capability detection, spinners — these live in `<root>/<name-without-separator>/cli/`.
 
   `RunE` calls into that package and returns its error.
 
@@ -357,11 +433,11 @@ Grouped by the part of the layout each one violates.
 
   The only allowed env-var consumer reachable from `./cmd` is `loggerfactory.ReadEnv`, called from `root.go`'s `PersistentPreRun`; it owns the variable names.
 
-  Every other env var lives in `./pkg/<name>/config.go`.
+  Every other env var lives in `./<name-without-separator>/config.go`.
 
 ### Service method options
 
-- **Passing a service method's options as positional parameters** (a tail of `depth int, force bool, ...` after the target args). Per-call options go in a single struct named `<Method>Option` — see [Naming conventions › Service method options](#service-method-options-pkgname).
+- **Passing a service method's options as positional parameters** (a tail of `depth int, force bool, ...` after the target args). Per-call options go in a single struct named `<Method>Option` — see [Naming conventions › Service method options](#service-method-options-name-without-separator).
 - **Naming the option struct anything other than `<Method>Option`.** Not `ServeOptions`, `ServeParams`, `ServeConfig`, `ServeOpt` — the singular `Option` suffix on the method name is the convention.
 - **Re-declaring callee option fields in a facade's option struct.** When method `XX` merely calls other exported methods, `XXOption` must **embed** each callee's `YYOption` (passing it through as `opt.YYOption`), not copy its fields.
 
@@ -376,7 +452,7 @@ Grouped by the part of the layout each one violates.
 
   There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
 
-- **Adding imports to `pkg/<name>/version.go`.** It must stay import-free so external consumers of `pkg/<name>` are not forced to pull `internal/`.
+- **Adding imports to `<name-without-separator>/version.go`.** It must stay import-free so external consumers of `<name-without-separator>` are not forced to pull `internal/`.
 
   Anything richer (VCS info, runtime/debug glue) lives in `internal/versioninfo`.
 

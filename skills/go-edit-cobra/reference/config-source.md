@@ -1,4 +1,4 @@
-# `pkg/{{NAME}}/config.go` source template
+# `{{NAME}}/config.go` source template
 
 The service-side configuration source: `Config` + `DefaultConfig`, the exported `PartialConfig` + `Apply`, the isolated `unmarshalConfigFile`, and `LoadConfig`.
 
@@ -8,10 +8,10 @@ These are templates — **strictly follow** the order of elements; do **NOT** re
 
 ## Contents
 
-- [`pkg/{{NAME}}/config.go` (JSON-only default)](#pkgnameconfiggo-always-present)
+- [`{{NAME}}/config.go` (JSON-only default)](#nameconfiggo-always-present)
 - [YAML support (YAML-only or both formats)](#yaml-support-yaml-only-or-both-formats)
 
-## `pkg/{{NAME}}/config.go` (always present)
+## `{{NAME}}/config.go` (always present)
 
 The service configuration.
 

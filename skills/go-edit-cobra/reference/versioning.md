@@ -9,7 +9,7 @@ Read this when cutting a release, wiring the `version` subcommand, or touching `
 - [Versioning (the four collaborating pieces)](#versioning)
 - [Release flow](#release-flow)
 - [Submodule tags](#submodule-tags)
-- [`pkg/{{NAME}}/version.go` template](#pkgnameversiongo-always-present)
+- [`{{NAME}}/version.go` template](#nameversiongo-always-present)
 - [`cmd/{{NAME}}/commands/version.go` template](#cmdnamecommandsversiongo-always-present)
 - [`internal/versioninfo/versioninfo.go`](#internalversioninfoversioninfogo-always-present)
 - [`internal/cmd/release/main.go`](#internalcmdreleasemaingo-always-present)
@@ -22,11 +22,11 @@ Four pieces collaborate:
 
 | Piece                            | Responsibility                                                                                                                                                                                       |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pkg/<name>/version.go`          | Source of truth for the version string. Declares `const Version = "v0.0.0-devel"` and **nothing else** — kept import-free so external consumers of `pkg/<name>` don't pull `internal/`.              |
+| `<name-without-separator>/version.go`          | Source of truth for the version string. Declares `const Version = "v0.0.0-devel"` and **nothing else** — kept import-free so external consumers of `<name-without-separator>` don't pull `internal/`.              |
 | `internal/versioninfo`           | Reusable helper exporting `type Info` and `ReadVersionInfo(version string) Info`. Combines the supplied `Version` with VCS info from `runtime/debug.ReadBuildInfo`.                                  |
-| `cmd/<name>/commands/version.go` | The `version` subcommand. Imports both `pkg/<name>` (for `Version`) and `internal/versioninfo` (for `ReadVersionInfo`); prints to `cmd.OutOrStdout()`. Wired by `rootCmd()` unconditionally.         |
+| `cmd/<name>/commands/version.go` | The `version` subcommand. Imports both `<name-without-separator>` (for `Version`) and `internal/versioninfo` (for `ReadVersionInfo`); prints to `cmd.OutOrStdout()`. Wired by `rootCmd()` unconditionally.         |
 | `cmd/<name>/commands/root.go`    | Declares `--version` as a local (not persistent) flag on the root command. The root's `RunE` closure dispatches to `runVersion` when the flag is set.                                                |
-| `internal/cmd/release`           | Cross-platform Go `main` package. Rewrites `pkg/<name>/version.go`'s `Version` line, commits, tags, then bumps to the next `-devel` and commits again. Run with `go run ./internal/cmd/release ...`. |
+| `internal/cmd/release`           | Cross-platform Go `main` package. Rewrites `<name-without-separator>/version.go`'s `Version` line, commits, tags, then bumps to the next `-devel` and commits again. Run with `go run ./internal/cmd/release ...`. |
 
 Design notes:
 
@@ -34,12 +34,12 @@ Design notes:
 
   Tests do not swap the value.
 
-- **`pkg/<name>/version.go` has no imports.** Anything richer (VCS info, etc.) lives in `internal/versioninfo`.
+- **`<name-without-separator>/version.go` has no imports.** Anything richer (VCS info, etc.) lives in `internal/versioninfo`.
 
-  Keep `pkg/<name>` cleanly publishable.
+  Keep `<name-without-separator>` cleanly publishable.
 - **`--version` is local, not persistent.** `mytool serve --version` is intentionally an unknown-flag error; only the root command exposes the alias.
 - **`mytool --version` and `mytool version` produce identical output.** They share `runVersion`; the alias is implemented as a closure dispatch, not a duplicated command.
-- **The `version` and `config` subcommands are the `commands/` files that import `pkg/<name>` directly** (`version` for `Version`, `config` for `Config` + `LoadConfig`).
+- **The `version` and `config` subcommands are the `commands/` files that import `<name-without-separator>` directly** (`version` for `Version`, `config` for `Config` + `LoadConfig`).
 
   Other commands go through the service constructed in their wrappers / `runRoot`.
 - **One Go source base, every host OS.** The release helper is a Go `main` package precisely so Linux, macOS, and Windows users do not have to maintain parallel bash + PowerShell scripts.
@@ -58,7 +58,9 @@ Steps the tool performs:
 
    Both may carry an optional submodule path prefix — see [Submodule tags](#submodule-tags) below.
 
-2. Auto-detect `<prefix>/pkg/*/version.go` (must match exactly one; override with `-file <path>`).
+2. Auto-detect `<prefix>/<name-without-separator>/version.go` (must match exactly one; override with `-file <path>`).
+
+   Detection globs the top-level `*/version.go`, skipping the directories that never hold the service package (`cmd/`, `internal/`, `api/`, `pkg/`); when that finds nothing it falls back to the legacy `pkg/*/version.go` layout.
 
    The prefix is empty for root-module releases.
 3. Refuse if the working tree is dirty or the release tag already exists.
@@ -73,7 +75,7 @@ Usage:
 ```sh
 go run ./internal/cmd/release v0.2.0                # next dev defaults to v0.2.1-devel
 go run ./internal/cmd/release v0.2.0 v0.3.0-devel   # explicit next dev (must end in -devel; the tool does NOT append it)
-go run ./internal/cmd/release -file pkg/other/version.go v0.2.0
+go run ./internal/cmd/release -file other/version.go v0.2.0
 go run ./internal/cmd/release subpkg/v0.2.0         # Go submodule at ./subpkg/; tags as subpkg/v0.2.0
 go run ./internal/cmd/release nested/dir/v0.2.0     # deeper submodule at ./nested/dir/
 ```
@@ -97,9 +99,9 @@ The release tool accepts these tags and applies a two-rule split:
 
   The submodule's package doesn't know about the path prefix; only git tooling does.
 
-Auto-detection of the version file follows the prefix: `subpkg/v0.2.0` ⇒ `subpkg/pkg/*/version.go`.
+Auto-detection of the version file follows the prefix: `subpkg/v0.2.0` ⇒ `subpkg/<name-without-separator>/version.go`.
 
-The same `pkg/<name>/version.go` convention applies inside each submodule.
+The same `<name-without-separator>/version.go` convention applies inside each submodule (including the legacy `pkg/<name-without-separator>/version.go` fallback).
 
 If the submodule deviates from this layout, pass `-file <path>` explicitly.
 
@@ -107,11 +109,11 @@ If the submodule deviates from this layout, pass `-file <path>` explicitly.
 
 The patch-bump rule and `-devel` suffix policy are otherwise unchanged.
 
-## `pkg/{{NAME}}/version.go` (always present)
+## `{{NAME}}/version.go` (always present)
 
 Source of truth for the version string.
 
-Deliberately tiny: only the `const Version` declaration, no imports, so external consumers of `pkg/{{NAME}}` are not forced to pull `internal/`.
+Deliberately tiny: only the `const Version` declaration, no imports, so external consumers of `{{NAME}}` are not forced to pull `internal/`.
 
 ```go
 // Package {{NAME}} implements the {{NAME}} service backing the binary of the
@@ -131,13 +133,13 @@ The contract with the release helper is a single top-level `const Version = "...
 
 Anything that changes this shape (renaming the identifier, switching to `var`, multiple declarations, struct-wrapping) breaks the helper's rewrite; update the helper in lockstep if you must change the shape.
 
-`pkg/{{NAME}}/version.go` should remain import-free.
+`{{NAME}}/version.go` should remain import-free.
 
 Combine the `Version` value with VCS info via `internal/versioninfo.ReadVersionInfo(Version)` from the call site (typically `cmd/{{NAME}}/commands/version.go`).
 
-If the project name contains characters invalid in a Go identifier (e.g. `my-tool`), the `pkg/<name>` directory itself is the stripped, Go-convention form — `pkg/mytool/` with `package mytool` (see [Naming conventions › Package name](layout-and-naming.md#package-name-pkgname)).
+If the project name contains characters invalid in a Go identifier (e.g. `my-tool`), the `<name-without-separator>` directory itself is the stripped, Go-convention form — `mytool/` with `package mytool` (see [Naming conventions › Package name](layout-and-naming.md#package-name-name-without-separator)).
 
-Since the directory, the `package` clause, and the import path all agree, no alias is needed: `import "{{MODULE}}/pkg/mytool"` in `cmd/<name>/commands/version.go`.
+Since the directory, the `package` clause, and the import path all agree, no alias is needed: `import "{{MODULE}}/mytool"` in `cmd/<name>/commands/version.go`.
 
 ## `cmd/{{NAME}}/commands/version.go` (always present)
 
@@ -154,7 +156,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"{{MODULE}}/internal/versioninfo"
-	"{{MODULE}}/pkg/{{NAME}}"
+	"{{MODULE}}/{{NAME}}"
 )
 
 func versionCmd(parent *cobra.Command) {
@@ -192,9 +194,9 @@ Differences from a regular flat-leaf:
 
 - File name (`version.go`) collides with the canonical `<sub>.go` mapping intentionally — `version` IS the canonical subcommand for that file.
 - Wired by `rootCmd()` unconditionally; do **not** add a TODO around the `versionCmd(cmd)` call.
-- Imports two packages: `pkg/{{NAME}}` for the `Version` var, and `internal/versioninfo` for the `ReadVersionInfo` helper.
+- Imports two packages: `{{NAME}}` for the `Version` var, and `internal/versioninfo` for the `ReadVersionInfo` helper.
 
-  Together with [`config.go`](configuration.md#cmdnamecommandsconfiggo-always-present) it is one of the two `commands/` files that import `pkg/{{NAME}}` directly.
+  Together with [`config.go`](configuration.md#cmdnamecommandsconfiggo-always-present) it is one of the two `commands/` files that import `{{NAME}}` directly.
 
 ## `internal/versioninfo/versioninfo.go` (always present)
 
