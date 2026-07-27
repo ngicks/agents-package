@@ -1,3 +1,17 @@
+# built artifact
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+
+*.test
+
+# Go specific transient artifact
+go.work
+go.work.sum
+
 # LLM stuff
 apm_modules/
 
