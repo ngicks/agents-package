@@ -36,6 +36,8 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │   ├── cmd/
 │   │   └── release/
 │   │       └── main.go                  # always present; cross-platform release helper
+│   ├── libver/
+│   │   └── libver.go                    # always present; release-controlled `const Version` (fixed path)
 │   ├── loggerfactory/
 │   │   └── loggerfactory.go             # always present; --log / --log-level wiring
 │   ├── templateutil/
@@ -47,7 +49,6 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │   ├── gen/
 │   └── schema/
 └── <name-without-separator>/            # the service package — the project's MAIN functionality
-    ├── version.go                       # always present; release-controlled `const Version`
     ├── config.go                        # always present; Config + DefaultConfig, PartialConfig + Apply, LoadConfig
     ├── <service>.go                     # internal service implementation
     └── cli/                             # CLI-presentation code (printing, prompts, tables, colors)
@@ -64,7 +65,7 @@ That is an **allowed variant**, not the canonical default — it exists so a pro
 Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
-- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `loggerfactory`, `templateutil`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules under Go's `internal/` rule.
+- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `libver`, `loggerfactory`, `templateutil`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules under Go's `internal/` rule.
 
   `templateutil` is the shared `text/template` `FuncMap` + `FuncDocs` (`json` baseline, plus any project helpers) that every renderer exposes; the `config` subcommand's `--format` uses it via `<name-without-separator>/cli`. One copy keeps the func set — and its help text — identical across call sites.
 - `internal/loggerfactory/` is genuinely shared, not CLI-only: `<name-without-separator>` code imports its level constants — notably `LevelTrace` and `LevelFatal` — and emits records at levels the CLI knows how to render.
@@ -99,15 +100,17 @@ Why this shape:
 
     The same rule constrains a subcommand whose **leaf** file segment is such a token; the fix there is to `zz`-prefix that segment in place. See [Build-constraint suffix collisions in leaf file names](#build-constraint-suffix-collisions-in-leaf-file-names).
 
-- `version.go` is split across **three** packages by design.
+- The version is split across **three** packages by design.
 
-  `<name-without-separator>/version.go` declares only `const Version`, kept import-free so external consumers of `<name-without-separator>` don't drag in `internal/`.
+  `internal/libver/libver.go` declares only `const Version` — it is the **whole module's** version, not one service's, which is why it lives under `internal/` at a **fixed path** rather than inside `<name-without-separator>/`: the release helper (and any reader) always knows where it is, and copying/updating it never depends on the project name.
 
   `internal/versioninfo/versioninfo.go` provides `ReadVersionInfo(version) Info` — the reusable VCS-info combiner consumed by the binary.
 
-  `cmd/<name>/commands/version.go` is the thin CLI presentation layer that calls `versioninfo.ReadVersionInfo(<name-without-separator>.Version)`.
+  `cmd/<name>/commands/version.go` is the thin CLI presentation layer that calls `versioninfo.ReadVersionInfo(libver.Version)`.
 
-  `version.go` is the one canonical-mapping leaf that does **not** need the `zz_` prefix because `version` is itself a real subcommand.
+  `commands/version.go` is the one canonical-mapping leaf that does **not** need the `zz_` prefix because `version` is itself a real subcommand.
+
+  (Older revisions of this layout kept `version.go` inside the service package — top-level or under `pkg/`. Preserve that in projects that already have it; the release helper auto-detects those locations as fallbacks. Migrate to `internal/libver` only on explicit user request.)
 
 - `internal/cmd/release/` is a `main` package, not a runtime helper.
 
@@ -296,7 +299,7 @@ Derive it from the project name by stripping those characters — `my-tool` → 
 
 This is the **only** place the name is sanitized: the binary directory `cmd/<name>/` (e.g. `cmd/my-tool/`), the `Use:` string, the env prefix, and the `os.UserConfigDir()/<name>/` path all keep the verbatim project name.
 
-- In the templates, `{{NAME}}` resolves to this sanitized form wherever it appears as a **Go package identifier or inside the service import path** — `package {{NAME}}`, `{{NAME}}/version.go`, `import "{{MODULE}}/{{NAME}}"`, `{{NAME}}.Version`, `{{NAME}}.LoadConfig`.
+- In the templates, `{{NAME}}` resolves to this sanitized form wherever it appears as a **Go package identifier or inside the service import path** — `package {{NAME}}`, `{{NAME}}/config.go`, `import "{{MODULE}}/{{NAME}}"`, `{{NAME}}.LoadConfig`.
 
   When the project name is already a valid identifier (the common case, e.g. `mytool`), the sanitized and verbatim forms coincide and there is nothing to strip.
 - Because the directory name, the `package` clause, and the import path now all agree, the import needs **no alias**: write `import "{{MODULE}}/mytool"`, not `import mytool "{{MODULE}}/my-tool"`.
@@ -365,7 +368,7 @@ Grouped by the part of the layout each one violates.
 
   See [Subdirectory-nested subcommands](#subdirectory-nested-subcommands-allowed-variant).
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
-- **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules.
+- **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `libver`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules.
 
   The module-root `internal/` also holds build-time `main` packages such as `internal/cmd/release` that should not be `go install`-able by external modules. Do not reintroduce a `cmd/internal/` layer or scatter helpers beside the subcommand files.
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
@@ -390,7 +393,7 @@ Grouped by the part of the layout each one violates.
 - **Skipping `internal/cmd/release`.** Always generated for scaffold; the release flow assumes it.
 
   The Go program intentionally replaces parallel bash + PowerShell scripts; do not re-introduce them.
-- **Skipping `version.go` (either copy).** Both `<name-without-separator>/version.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
+- **Skipping `libver` or `commands/version.go`.** Both `internal/libver/libver.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
 - **Skipping the `config` subcommand.** `cmd/<name>/commands/config.go` is mandatory alongside `<name-without-separator>/config.go`; `rootCmd()` wires `configCmd(cmd, &flagConfig)` unconditionally.
 
   It prints `LoadConfig` as JSON, or renders `--format` against it — via `cli.RenderConfig` in `<name-without-separator>/cli`, using the `internal/templateutil` func map. All three files (`cmd` wiring, `cli/config.go`, `internal/templateutil`) are part of the mandatory set; see [configuration.md](configuration.md#cmdnamecommandsconfiggo-always-present).
@@ -452,9 +455,10 @@ Grouped by the part of the layout each one violates.
 
   There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
 
-- **Adding imports to `<name-without-separator>/version.go`.** It must stay import-free so external consumers of `<name-without-separator>` are not forced to pull `internal/`.
+- **Adding anything beyond `const Version` to `internal/libver/libver.go`.** The package exists to pin one constant at one fixed path — no imports, no other symbols.
 
   Anything richer (VCS info, runtime/debug glue) lives in `internal/versioninfo`.
+- **Putting `Version` in the service package for new code — or moving a legacy in-service `version.go` to `internal/libver` unprompted.** New projects declare it in `internal/libver`; a project that still carries `<name-without-separator>/version.go` (or `pkg/<name-without-separator>/version.go`) keeps it there — the release helper auto-detects both — and migrates only on explicit user request.
 
 - **Putting version printing under any other subcommand or in `main.go`.** Version output lives in `runVersion` only.
 

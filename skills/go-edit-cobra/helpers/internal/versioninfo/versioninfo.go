@@ -1,7 +1,7 @@
 // Package versioninfo combines a project-supplied version string with the
 // VCS / build info embedded by `go build` (via runtime/debug.ReadBuildInfo).
 //
-// The project's version constant lives in <name-without-separator>/version.go
+// The project's version constant lives in internal/libver/libver.go
 // (rewritten by the release helper at internal/cmd/release). Callers pass
 // that constant into ReadVersionInfo to get the full picture.
 package versioninfo
@@ -13,7 +13,7 @@ import "runtime/debug"
 // VCS-derived fields are empty when build info is unavailable (e.g. tests,
 // `-buildvcs=false`, or builds outside a VCS checkout).
 type Info struct {
-	Version    string // the project-supplied version string (e.g. <name-without-separator>.Version)
+	Version    string // the project-supplied version string (e.g. libver.Version)
 	Commit     string // vcs.revision
 	CommitTime string // vcs.time
 	Modified   bool   // vcs.modified == "true"

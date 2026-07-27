@@ -6,16 +6,17 @@
 //
 // Workflow:
 //  1. Validate the inputs and ensure the working tree is clean.
-//  2. Rewrite <name-without-separator>/version.go to the release version, commit
+//  2. Rewrite internal/libver/libver.go to the release version, commit
 //     ("🔖: release <tag>"), tag.
 //  3. Rewrite the same file to the next development version (suffix
 //     "-devel"), commit ("👷: start <tag> development cycle").
 //  4. Push the branch and the new tag to origin.
 //
-// The version file is auto-detected by globbing the top-level */version.go
-// (skipping cmd/, internal/, api/, and pkg/), falling back to the legacy
-// pkg/*/version.go layout; either way it must match exactly one file.
-// Pass -file <path> to override.
+// The version file lives at the fixed path internal/libver/libver.go.
+// Legacy layouts — a top-level <name-without-separator>/version.go, or
+// pkg/<name-without-separator>/version.go before that — are auto-detected
+// as fallbacks (the glob must then match exactly one file). Pass
+// -file <path> to override.
 //
 // Cross-platform by virtue of being a Go program: the same source
 // compiles and runs on Linux, macOS, and Windows.
@@ -37,7 +38,7 @@ var (
 	versionFile = flag.String(
 		"file",
 		"",
-		"path to version.go (auto-detected from */version.go, legacy pkg/*/version.go, when unset)",
+		"path to the version file (defaults to internal/libver/libver.go; legacy */version.go layouts auto-detected)",
 	)
 )
 
@@ -50,10 +51,10 @@ func init() {
   release-version    e.g. v0.2.0; must NOT end in -devel.
                      For a Go submodule, prefix the tag with the submodule
                      directory: subpkg/v0.2.0, nested/dir/v0.2.0. The version
-                     file is then auto-located under the same prefix
-                     (<prefix>/*/version.go, legacy <prefix>/pkg/*/version.go)
-                     and the bare version string (without the prefix) is
-                     written into it.
+                     file is then located under the same prefix
+                     (<prefix>/internal/libver/libver.go; legacy layouts
+                     auto-detected) and the bare version string (without the
+                     prefix) is written into it.
   next-dev-version   defaults to bumping the patch and appending -devel
                      (v0.2.0 -> v0.2.1-devel; subpkg/v0.2.0 -> subpkg/v0.2.1-devel).
                      Must end in -devel.
@@ -220,13 +221,18 @@ func defaultNextDev(release string) (string, error) {
 	return prefix + "/" + next, nil
 }
 
-// findVersionFile locates the service package's version.go under submoduleDir
-// ("" for the root module). The service package is a top-level directory
-// (<name-without-separator>/version.go); cmd/, internal/, and api/ never
-// hold it and are skipped, as is pkg/ itself. When the top level has no
-// match it falls back to the legacy pkg/*/version.go layout. Exactly one
-// match is required.
+// findVersionFile locates the version file under submoduleDir ("" for the
+// root module). The canonical location is the fixed internal/libver/libver.go.
+// Legacy layouts kept a top-level <name-without-separator>/version.go
+// (cmd/, internal/, api/, and pkg/ never held it and are skipped), or
+// pkg/<name-without-separator>/version.go before that; those are detected
+// as fallbacks and must then match exactly one file.
 func findVersionFile(submoduleDir string) (string, error) {
+	canonical := filepath.Join(submoduleDir, "internal", "libver", "libver.go")
+	if _, err := os.Stat(canonical); err == nil {
+		return canonical, nil
+	}
+
 	pattern := filepath.Join(submoduleDir, "*", "version.go")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -249,7 +255,8 @@ func findVersionFile(submoduleDir string) (string, error) {
 	}
 	if len(filtered) != 1 {
 		return "", fmt.Errorf(
-			"expected exactly one %s; found %d (pass -file <path> to override)",
+			"expected %s, or exactly one legacy %s; found %d legacy matches (pass -file <path> to override)",
+			canonical,
 			pattern,
 			len(filtered),
 		)

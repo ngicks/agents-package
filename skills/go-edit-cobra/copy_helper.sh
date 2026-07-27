@@ -8,6 +8,7 @@ set -e
 # (source and _test.go alike) is copied.
 ALWAYS_DIRS=(
   internal/cmdsignals
+  internal/libver
   internal/loggerfactory
   internal/versioninfo
   internal/cmd/release
@@ -26,6 +27,7 @@ usage() {
   echo "into <project-root>, mirroring each package's path:"
   echo ""
   echo "  internal/cmdsignals/        always"
+  echo "  internal/libver/            always"
   echo "  internal/loggerfactory/     always"
   echo "  internal/versioninfo/       always"
   echo "  internal/cmd/release/       always"

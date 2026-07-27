@@ -110,7 +110,35 @@ func TestFindVersionFile(t *testing.T) {
 		}
 	}
 
-	t.Run("top-level layout", func(t *testing.T) {
+	t.Run("canonical libver", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "internal/libver/libver.go")
+		t.Chdir(dir)
+		got, err := findVersionFile("")
+		if err != nil {
+			t.Fatalf("findVersionFile: %v", err)
+		}
+		if want := filepath.Join("internal", "libver", "libver.go"); got != want {
+			t.Errorf("findVersionFile = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("canonical wins over legacy", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "internal/libver/libver.go")
+		write(t, dir, "mytool/version.go")
+		write(t, dir, "pkg/other/version.go")
+		t.Chdir(dir)
+		got, err := findVersionFile("")
+		if err != nil {
+			t.Fatalf("findVersionFile: %v", err)
+		}
+		if want := filepath.Join("internal", "libver", "libver.go"); got != want {
+			t.Errorf("findVersionFile = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("legacy top-level layout", func(t *testing.T) {
 		dir := t.TempDir()
 		write(t, dir, "mytool/version.go")
 		write(t, dir, "internal/versioninfo/version.go") // not top-level; ignored anyway
@@ -121,6 +149,19 @@ func TestFindVersionFile(t *testing.T) {
 			t.Fatalf("findVersionFile: %v", err)
 		}
 		if want := filepath.Join("mytool", "version.go"); got != want {
+			t.Errorf("findVersionFile = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("submodule canonical", func(t *testing.T) {
+		dir := t.TempDir()
+		write(t, dir, "subpkg/internal/libver/libver.go")
+		t.Chdir(dir)
+		got, err := findVersionFile("subpkg")
+		if err != nil {
+			t.Fatalf("findVersionFile: %v", err)
+		}
+		if want := filepath.Join("subpkg", "internal", "libver", "libver.go"); got != want {
 			t.Errorf("findVersionFile = %q, want %q", got, want)
 		}
 	})

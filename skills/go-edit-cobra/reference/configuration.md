@@ -498,4 +498,4 @@ Notes:
 
 - **`templateutil` is `internal` and shared.** It is the one place template helpers live, so every renderer (config `--format` now, any future one) exposes the same funcs. `FuncMap` ↔ `FuncDocs` are kept in lockstep by a test (mirror crabswarm's `TestFuncDocs_MatchesFuncMap`).
 - **Secrets**: if `Config` carries credentials, give it a `MarshalJSON` that redacts them (or omit those fields) — `config` prints to stdout, and the `json` helper routes through the marshaler too.
-- If the project name is not a valid Go identifier, the `<name-without-separator>` directory is already its sanitized form (see [Naming conventions › Package name](layout-and-naming.md#package-name-name-without-separator)), so the imports need no alias — `import "{{MODULE}}/mytool"` and `"{{MODULE}}/mytool/cli"`, matching `version.go`.
+- If the project name is not a valid Go identifier, the `<name-without-separator>` directory is already its sanitized form (see [Naming conventions › Package name](layout-and-naming.md#package-name-name-without-separator)), so the imports need no alias — `import "{{MODULE}}/mytool"` and `"{{MODULE}}/mytool/cli"`.

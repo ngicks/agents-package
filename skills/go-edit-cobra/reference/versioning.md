@@ -1,6 +1,6 @@
 # Versioning & release
 
-The release-controlled version: which packages collaborate, the release-tool flow, submodule tags, and the `version.go` / `versioninfo` / `release` source.
+The release-controlled version: which packages collaborate, the release-tool flow, submodule tags, and the `libver` / `versioninfo` / `release` source.
 
 Read this when cutting a release, wiring the `version` subcommand, or touching `const Version`.
 
@@ -9,7 +9,7 @@ Read this when cutting a release, wiring the `version` subcommand, or touching `
 - [Versioning (the four collaborating pieces)](#versioning)
 - [Release flow](#release-flow)
 - [Submodule tags](#submodule-tags)
-- [`{{NAME}}/version.go` template](#nameversiongo-always-present)
+- [`internal/libver/libver.go`](#internallibverlibvergo-always-present)
 - [`cmd/{{NAME}}/commands/version.go` template](#cmdnamecommandsversiongo-always-present)
 - [`internal/versioninfo/versioninfo.go`](#internalversioninfoversioninfogo-always-present)
 - [`internal/cmd/release/main.go`](#internalcmdreleasemaingo-always-present)
@@ -22,11 +22,11 @@ Four pieces collaborate:
 
 | Piece                            | Responsibility                                                                                                                                                                                       |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<name-without-separator>/version.go`          | Source of truth for the version string. Declares `const Version = "v0.0.0-devel"` and **nothing else** — kept import-free so external consumers of `<name-without-separator>` don't pull `internal/`.              |
+| `internal/libver/libver.go`      | Source of truth for the version string. `package libver` declares `const Version = "v0.0.0-devel"` and **nothing else**. The path is fixed by convention, so the release helper always knows where to rewrite.        |
 | `internal/versioninfo`           | Reusable helper exporting `type Info` and `ReadVersionInfo(version string) Info`. Combines the supplied `Version` with VCS info from `runtime/debug.ReadBuildInfo`.                                  |
-| `cmd/<name>/commands/version.go` | The `version` subcommand. Imports both `<name-without-separator>` (for `Version`) and `internal/versioninfo` (for `ReadVersionInfo`); prints to `cmd.OutOrStdout()`. Wired by `rootCmd()` unconditionally.         |
+| `cmd/<name>/commands/version.go` | The `version` subcommand. Imports both `internal/libver` (for `Version`) and `internal/versioninfo` (for `ReadVersionInfo`); prints to `cmd.OutOrStdout()`. Wired by `rootCmd()` unconditionally.         |
 | `cmd/<name>/commands/root.go`    | Declares `--version` as a local (not persistent) flag on the root command. The root's `RunE` closure dispatches to `runVersion` when the flag is set.                                                |
-| `internal/cmd/release`           | Cross-platform Go `main` package. Rewrites `<name-without-separator>/version.go`'s `Version` line, commits, tags, then bumps to the next `-devel` and commits again. Run with `go run ./internal/cmd/release ...`. |
+| `internal/cmd/release`           | Cross-platform Go `main` package. Rewrites `internal/libver/libver.go`'s `Version` line, commits, tags, then bumps to the next `-devel` and commits again. Run with `go run ./internal/cmd/release ...`. |
 
 Design notes:
 
@@ -34,12 +34,13 @@ Design notes:
 
   Tests do not swap the value.
 
-- **`<name-without-separator>/version.go` has no imports.** Anything richer (VCS info, etc.) lives in `internal/versioninfo`.
+- **`libver` is the whole module's version, so it lives under `internal/`, not in the service package.** The constant describes the module, not one service, and the fixed `internal/libver/libver.go` path means the release helper — and any reader — never has to hunt for it.
 
-  Keep `<name-without-separator>` cleanly publishable.
+  (Older revisions of this layout kept a `version.go` inside the service package — top-level `<name-without-separator>/version.go`, or `pkg/<name-without-separator>/version.go` before that. Preserve those in projects that already use them; the release helper auto-detects them as fallbacks.)
+- **`libver.go` declares only `const Version` — no imports, nothing else.** Anything richer (VCS info, etc.) lives in `internal/versioninfo`.
 - **`--version` is local, not persistent.** `mytool serve --version` is intentionally an unknown-flag error; only the root command exposes the alias.
 - **`mytool --version` and `mytool version` produce identical output.** They share `runVersion`; the alias is implemented as a closure dispatch, not a duplicated command.
-- **The `version` and `config` subcommands are the `commands/` files that import `<name-without-separator>` directly** (`version` for `Version`, `config` for `Config` + `LoadConfig`).
+- **The `config` subcommand is the one `commands/` file that imports `<name-without-separator>` directly** (for `Config` + `LoadConfig`); `version` needs only the internal `libver` / `versioninfo` pair.
 
   Other commands go through the service constructed in their wrappers / `runRoot`.
 - **One Go source base, every host OS.** The release helper is a Go `main` package precisely so Linux, macOS, and Windows users do not have to maintain parallel bash + PowerShell scripts.
@@ -58,9 +59,9 @@ Steps the tool performs:
 
    Both may carry an optional submodule path prefix — see [Submodule tags](#submodule-tags) below.
 
-2. Auto-detect `<prefix>/<name-without-separator>/version.go` (must match exactly one; override with `-file <path>`).
+2. Locate the version file at the fixed `<prefix>/internal/libver/libver.go` (override with `-file <path>`).
 
-   Detection globs the top-level `*/version.go`, skipping the directories that never hold the service package (`cmd/`, `internal/`, `api/`, `pkg/`); when that finds nothing it falls back to the legacy `pkg/*/version.go` layout.
+   When that file is absent (a legacy layout), it globs the top-level `*/version.go` — skipping the directories that never hold the service package (`cmd/`, `internal/`, `api/`, `pkg/`) — then falls back to the older `pkg/*/version.go`; a glob must match exactly one file.
 
    The prefix is empty for root-module releases.
 3. Refuse if the working tree is dirty or the release tag already exists.
@@ -75,7 +76,7 @@ Usage:
 ```sh
 go run ./internal/cmd/release v0.2.0                # next dev defaults to v0.2.1-devel
 go run ./internal/cmd/release v0.2.0 v0.3.0-devel   # explicit next dev (must end in -devel; the tool does NOT append it)
-go run ./internal/cmd/release -file other/version.go v0.2.0
+go run ./internal/cmd/release -file other/version.go v0.2.0   # non-standard location
 go run ./internal/cmd/release subpkg/v0.2.0         # Go submodule at ./subpkg/; tags as subpkg/v0.2.0
 go run ./internal/cmd/release nested/dir/v0.2.0     # deeper submodule at ./nested/dir/
 ```
@@ -95,13 +96,13 @@ Submodule versions are tagged with the directory as a prefix (`subpkg/v1.0.0`, `
 The release tool accepts these tags and applies a two-rule split:
 
 - **Tag-shaped names** (`subpkg/v0.2.0`, `subpkg/v0.2.1-devel`) — the full prefixed string is the git tag, commit message, and `go push` reference.
-- **File-shaped content** (`const Version = "v0.2.0"`) — only the bare version is written into `version.go`.
+- **File-shaped content** (`const Version = "v0.2.0"`) — only the bare version is written into `libver.go`.
 
   The submodule's package doesn't know about the path prefix; only git tooling does.
 
-Auto-detection of the version file follows the prefix: `subpkg/v0.2.0` ⇒ `subpkg/<name-without-separator>/version.go`.
+Location of the version file follows the prefix: `subpkg/v0.2.0` ⇒ `subpkg/internal/libver/libver.go`.
 
-The same `<name-without-separator>/version.go` convention applies inside each submodule (including the legacy `pkg/<name-without-separator>/version.go` fallback).
+The same `internal/libver/libver.go` convention applies inside each submodule (including the legacy `<name-without-separator>/version.go` / `pkg/<name-without-separator>/version.go` fallbacks).
 
 If the submodule deviates from this layout, pass `-file <path>` explicitly.
 
@@ -109,20 +110,23 @@ If the submodule deviates from this layout, pass `-file <path>` explicitly.
 
 The patch-bump rule and `-devel` suffix policy are otherwise unchanged.
 
-## `{{NAME}}/version.go` (always present)
+## `internal/libver/libver.go` (always present)
 
 Source of truth for the version string.
 
-Deliberately tiny: only the `const Version` declaration, no imports, so external consumers of `{{NAME}}` are not forced to pull `internal/`.
+Project-agnostic — the package name (`libver`) and the path are fixed, so the file is copied verbatim from `${SKILL-DIR}/helpers/internal/libver/libver.go` (it is **not** a template):
 
 ```go
-// Package {{NAME}} implements the {{NAME}} service backing the binary of the
-// same name.
-package {{NAME}}
+// Package libver pins the module-wide, release-controlled version string.
+//
+// The file lives at the fixed path internal/libver/libver.go so the release
+// helper (internal/cmd/release) always knows where to rewrite it; the
+// package declares Version and nothing else.
+package libver
 
-// Version is the human-readable version string. The release helper at
-// internal/cmd/release rewrites this declaration when cutting a release,
-// then bumps it to the next "-devel" version after tagging.
+// Version is the human-readable version string for the whole module. The
+// release helper rewrites this declaration when cutting a release, then
+// bumps it to the next "-devel" version after tagging.
 //
 // Edit by hand only when the release helper is unavailable (e.g. cherry-pick
 // of a release commit).
@@ -133,13 +137,9 @@ The contract with the release helper is a single top-level `const Version = "...
 
 Anything that changes this shape (renaming the identifier, switching to `var`, multiple declarations, struct-wrapping) breaks the helper's rewrite; update the helper in lockstep if you must change the shape.
 
-`{{NAME}}/version.go` should remain import-free.
+`libver.go` declares only `Version` — no imports, no other symbols.
 
-Combine the `Version` value with VCS info via `internal/versioninfo.ReadVersionInfo(Version)` from the call site (typically `cmd/{{NAME}}/commands/version.go`).
-
-If the project name contains characters invalid in a Go identifier (e.g. `my-tool`), the `<name-without-separator>` directory itself is the stripped, Go-convention form — `mytool/` with `package mytool` (see [Naming conventions › Package name](layout-and-naming.md#package-name-name-without-separator)).
-
-Since the directory, the `package` clause, and the import path all agree, no alias is needed: `import "{{MODULE}}/mytool"` in `cmd/<name>/commands/version.go`.
+Combine the `Version` value with VCS info via `internal/versioninfo.ReadVersionInfo(libver.Version)` from the call site (typically `cmd/{{NAME}}/commands/version.go`).
 
 ## `cmd/{{NAME}}/commands/version.go` (always present)
 
@@ -155,8 +155,8 @@ package commands
 import (
 	"github.com/spf13/cobra"
 
+	"{{MODULE}}/internal/libver"
 	"{{MODULE}}/internal/versioninfo"
-	"{{MODULE}}/{{NAME}}"
 )
 
 func versionCmd(parent *cobra.Command) {
@@ -171,7 +171,7 @@ func versionCmd(parent *cobra.Command) {
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
-	info := versioninfo.ReadVersionInfo({{NAME}}.Version)
+	info := versioninfo.ReadVersionInfo(libver.Version)
 	cmd.Printf("version:     %s\n", info.Version)
 	if info.Commit != "" {
 		modified := ""
@@ -194,9 +194,9 @@ Differences from a regular flat-leaf:
 
 - File name (`version.go`) collides with the canonical `<sub>.go` mapping intentionally — `version` IS the canonical subcommand for that file.
 - Wired by `rootCmd()` unconditionally; do **not** add a TODO around the `versionCmd(cmd)` call.
-- Imports two packages: `{{NAME}}` for the `Version` var, and `internal/versioninfo` for the `ReadVersionInfo` helper.
+- Imports two internal packages: `internal/libver` for the `Version` constant, and `internal/versioninfo` for the `ReadVersionInfo` helper — it does **not** import the service package.
 
-  Together with [`config.go`](configuration.md#cmdnamecommandsconfiggo-always-present) it is one of the two `commands/` files that import `{{NAME}}` directly.
+  That leaves [`config.go`](configuration.md#cmdnamecommandsconfiggo-always-present) as the one `commands/` file that imports `{{NAME}}` directly.
 
 ## `internal/versioninfo/versioninfo.go` (always present)
 
