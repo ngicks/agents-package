@@ -1,0 +1,15 @@
+FROM golang:latest
+
+ARG GITHUB_TOKEN
+ENV GOPRIVATE=*
+
+COPY id_ed25519 /root/.ssh/id_ed25519
+RUN ssh-keyscan github.com >> /root/.ssh/known_hosts && \
+    git config --global url."https://oauth2:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+WORKDIR /src
+COPY . .
+RUN go mod download && \
+    go build -o /app .
+
+ENTRYPOINT /app

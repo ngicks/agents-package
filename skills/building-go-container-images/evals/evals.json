@@ -1,0 +1,36 @@
+{
+  "skill_name": "building-go-container-images",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Containerize the Go service in this repository for linux/amd64 and linux/arm64. Keep rebuilds fast, use a minimal production image, and make the result run as an arbitrary UID with a read-only root filesystem.",
+      "expected_output": "A repository-aware multi-stage container build using heredoc-style RUN bodies, qualified and reproducibly pinned images, safe Go caches, deliberate CGO/runtime handling, multi-platform support, and runtime validation.",
+      "files": [
+        "evals/files/service/go.mod",
+        "evals/files/service/main.go"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Our Go build needs private GitHub modules through SSH and Git LFS. Review this Containerfile for credential leaks and make it work with both Docker BuildKit and Podman where their features overlap.",
+      "expected_output": "A secure private-module build using heredoc-style RUN bodies, SSH and secret mounts, verified host keys, activated Git LFS, narrow GOPRIVATE scope, no copied credentials, and explicit notes for verified runtime differences.",
+      "files": [
+        "evals/files/private/Containerfile",
+        "evals/files/private/go.mod",
+        "evals/files/private/main.go"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Our Containerfile build for this Go service is slow behind an authenticated corporate proxy with a custom CA. Fix it. Credentials must not remain in the image or cache export, and note that code generation writes files into the source directory.",
+      "expected_output": "A proxy-aware build using heredoc-style RUN bodies that uses secret transport, mounts the CA safely, chooses COPY over a writable source bind mount, caches Go and package-manager data safely, and verifies the final image contains no secrets.",
+      "files": [
+        "evals/files/proxy/Containerfile",
+        "evals/files/proxy/go.mod",
+        "evals/files/proxy/main.go",
+        "evals/files/proxy/version.tmpl",
+        "evals/files/proxy/corp-ca.pem"
+      ]
+    }
+  ]
+}
