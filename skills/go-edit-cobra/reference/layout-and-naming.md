@@ -33,9 +33,6 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │   │   └── signals.go                   # always present
 │   ├── stdiopipe/                       # only when a subcommand needs cancellable stdio
 │   │   └── stdiopipe.go
-│   ├── cmd/
-│   │   └── release/
-│   │       └── main.go                  # always present; cross-platform release helper
 │   ├── libver/
 │   │   └── libver.go                    # always present; release-controlled `const Version` (fixed path)
 │   ├── loggerfactory/
@@ -65,7 +62,7 @@ That is an **allowed variant**, not the canonical default — it exists so a pro
 Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
-- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `libver`, `loggerfactory`, `templateutil`, `versioninfo`, and the build-time `cmd/release` — in one module-root tree, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules under Go's `internal/` rule.
+- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `libver`, `loggerfactory`, `templateutil`, `versioninfo` — in one module-root tree, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules under Go's `internal/` rule.
 
   `templateutil` is the shared `text/template` `FuncMap` + `FuncDocs` (`json` baseline, plus any project helpers) that every renderer exposes; the `config` subcommand's `--format` uses it via `<name-without-separator>/cli`. One copy keeps the func set — and its help text — identical across call sites.
 - `internal/loggerfactory/` is genuinely shared, not CLI-only: `<name-without-separator>` code imports its level constants — notably `LevelTrace` and `LevelFatal` — and emits records at levels the CLI knows how to render.
@@ -102,7 +99,7 @@ Why this shape:
 
 - The version is split across **three** packages by design.
 
-  `internal/libver/libver.go` declares only `const Version` — it is the **whole module's** version, not one service's, which is why it lives under `internal/` at a **fixed path** rather than inside `<name-without-separator>/`: the release helper (and any reader) always knows where it is, and copying/updating it never depends on the project name.
+  `internal/libver/libver.go` declares only `const Version` — it is the **whole module's** version, not one service's, which is why it lives under `internal/` at a **fixed path** rather than inside `<name-without-separator>/`: the `bump-libver` release tool (and any reader) always knows where it is, and copying/updating it never depends on the project name.
 
   `internal/versioninfo/versioninfo.go` provides `ReadVersionInfo(version) Info` — the reusable VCS-info combiner consumed by the binary.
 
@@ -110,13 +107,11 @@ Why this shape:
 
   `commands/version.go` is the one canonical-mapping leaf that does **not** need the `zz_` prefix because `version` is itself a real subcommand.
 
-  (Older revisions of this layout kept `version.go` inside the service package — top-level or under `pkg/`. Preserve that in projects that already have it; the release helper auto-detects those locations as fallbacks. Migrate to `internal/libver` only on explicit user request.)
+  (Older revisions of this layout kept `version.go` inside the service package — top-level or under `pkg/`. Preserve that in projects that already have it; the `bump-libver` tool auto-detects those locations as fallbacks. Migrate to `internal/libver` only on explicit user request.)
 
-- `internal/cmd/release/` is a `main` package, not a runtime helper.
+- Releases use the **external** `bump-libver` tool — `go run github.com/ngicks/go-common/tools/bump-libver@latest` — which rewrites `internal/libver/libver.go`, commits, tags, and pushes.
 
-  It lives under `internal/` so it cannot be `go install`ed by external modules (it's a build-time tool of this module only).
-
-  One Go source base replaces what would otherwise be parallel bash + PowerShell scripts.
+  The project vendors **no** release code of its own (see [versioning.md](versioning.md)); one Go tool replaces what would otherwise be parallel bash + PowerShell scripts.
 
 - Never put `commands/` directly at the module root. See [Anti-patterns](#anti-patterns).
 
@@ -370,12 +365,14 @@ Grouped by the part of the layout each one violates.
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
 - **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `libver`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules.
 
-  The module-root `internal/` also holds build-time `main` packages such as `internal/cmd/release` that should not be `go install`-able by external modules. Do not reintroduce a `cmd/internal/` layer or scatter helpers beside the subcommand files.
+  Do not reintroduce a `cmd/internal/` layer or scatter helpers beside the subcommand files.
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
 - **Re-implementing logger glue under `commands/`.** The logger config struct, the `--log` / `--log-level` flag callbacks, and `BuildLogger` MUST live in `<module-root>/internal/loggerfactory`.
 
   Do not copy them back into a `zz_logger.go` or any file under `commands/`, and do not relocate the package anywhere under `cmd/` — `<name-without-separator>` needs to import its `Level` constants, so it must stay at the module-root `internal/loggerfactory`.
-- **Putting the release helper anywhere other than `internal/cmd/release/`.** Specifically: not `cmd/release/` (that would make it `go install`-able by external consumers) and not `scripts/` (no shell-script parity to maintain).
+- **Vendoring release code into the project.** The release flow is the external `bump-libver` tool (`go run github.com/ngicks/go-common/tools/bump-libver@latest`); do not copy its predecessor (`internal/cmd/release/`) into new projects, and do not add release shell scripts under `scripts/` or anywhere else.
+
+  (A project scaffolded by an older skill revision may still carry `internal/cmd/release/` — leave it; remove only on explicit user request.)
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
 - **Placing a new service package under `pkg/` in a top-level-layout project — or migrating a legacy `pkg/<name-without-separator>/` to the top level unprompted.** The service package lives at the module root (`./<name-without-separator>/`); `pkg/` is the legacy placement.
 
@@ -390,9 +387,6 @@ Grouped by the part of the layout each one violates.
 - **Skipping `cmdsignals`.** Always generated for scaffold; `main.go` imports it.
 - **Skipping `loggerfactory`.** Always generated for scaffold; `root.go` imports it for `--log` / `--log-level` wiring.
 - **Skipping `versioninfo`.** Always generated for scaffold; `commands/version.go` imports it.
-- **Skipping `internal/cmd/release`.** Always generated for scaffold; the release flow assumes it.
-
-  The Go program intentionally replaces parallel bash + PowerShell scripts; do not re-introduce them.
 - **Skipping `libver` or `commands/version.go`.** Both `internal/libver/libver.go` and `cmd/<name>/commands/version.go` are mandatory; `rootCmd()` wires `versionCmd(cmd)` unconditionally and the `--version` flag dispatches to `runVersion`.
 - **Skipping the `config` subcommand.** `cmd/<name>/commands/config.go` is mandatory alongside `<name-without-separator>/config.go`; `rootCmd()` wires `configCmd(cmd, &flagConfig)` unconditionally.
 
@@ -448,17 +442,15 @@ Grouped by the part of the layout each one violates.
 
 ### Versioning
 
-- **Hand-editing `const Version = "..."` outside a release.** Use `go run ./internal/cmd/release`; manual edits drift from the tag/commit pair the helper produces.
-- **Renaming `Version` or switching it to `var`.** The required source shape is a single top-level `const Version = "..."`; the release helper relies on it.
-
-  Update the helper in lockstep if you must diverge.
+- **Hand-editing `const Version = "..."` outside a release.** Use `go run github.com/ngicks/go-common/tools/bump-libver@latest`; manual edits drift from the tag/commit pair the tool produces.
+- **Renaming `Version` or switching it to `var`.** The required source shape is a single top-level `const Version = "..."`; the `bump-libver` tool relies on it — do not diverge.
 
   There is no compelling reason to switch to `var` — `-ldflags=-X` is redundant under the rewrite-and-commit flow, and tests do not need to swap the value.
 
 - **Adding anything beyond `const Version` to `internal/libver/libver.go`.** The package exists to pin one constant at one fixed path — no imports, no other symbols.
 
   Anything richer (VCS info, runtime/debug glue) lives in `internal/versioninfo`.
-- **Putting `Version` in the service package for new code — or moving a legacy in-service `version.go` to `internal/libver` unprompted.** New projects declare it in `internal/libver`; a project that still carries `<name-without-separator>/version.go` (or `pkg/<name-without-separator>/version.go`) keeps it there — the release helper auto-detects both — and migrates only on explicit user request.
+- **Putting `Version` in the service package for new code — or moving a legacy in-service `version.go` to `internal/libver` unprompted.** New projects declare it in `internal/libver`; a project that still carries `<name-without-separator>/version.go` (or `pkg/<name-without-separator>/version.go`) keeps it there — the `bump-libver` tool auto-detects both — and migrates only on explicit user request.
 
 - **Putting version printing under any other subcommand or in `main.go`.** Version output lives in `runVersion` only.
 

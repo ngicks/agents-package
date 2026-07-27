@@ -73,9 +73,9 @@ Generation steps (relative to module root):
 
 10. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio).
 
-    This copies the `cmdsignals`, `libver`, `loggerfactory`, `versioninfo`, and `internal/cmd/release` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `internal/stdiopipe`.
+    This copies the `cmdsignals`, `libver`, `loggerfactory`, and `versioninfo` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `internal/stdiopipe`.
 
-    `internal/libver/libver.go` arrives with the initial `Version` value `v0.0.0-devel` — nothing to fill in, and the release helper reads it at that fixed path (legacy in-service `version.go` locations are auto-detected as fallbacks).
+    `internal/libver/libver.go` arrives with the initial `Version` value `v0.0.0-devel` — nothing to fill in. Releases run the **external** `bump-libver` tool (`go run github.com/ngicks/go-common/tools/bump-libver@latest`), which reads that fixed path; no release code is generated into the project.
 
 11. For each direct dep in `go.mod`: `go get <module>@latest` — using the correct `/vN` major path (e.g. `github.com/caarlos0/env/v11@latest`; confirm the current major first, see [Version policy](command-templates.md#gomod)).
 
@@ -156,9 +156,9 @@ Use a closure adapter to forward captured flag values when needed, mirroring the
 
 Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/`.
 
-The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/internal/cmdsignals/` → `<project-root>/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, `helpers/internal/cmd/release/` → `<project-root>/internal/cmd/release/`, etc.
+The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/internal/cmdsignals/` → `<project-root>/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, etc.
 
-Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on packages (`cmdsignals`, `libver`, `loggerfactory`, `versioninfo`, `internal/cmd/release`) — source and tests — in one step; add `--stdiopipe` to also copy `internal/stdiopipe`.
+Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on packages (`cmdsignals`, `libver`, `loggerfactory`, `versioninfo`) — source and tests — in one step; add `--stdiopipe` to also copy `internal/stdiopipe`.
 
 `<project-root>` must already exist.
 
@@ -167,7 +167,7 @@ Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on package
 | Helper          | Import path                          | Purpose                                                                                                                                  | Signature(s)                                                                                                                                                                                                                                                                                                        | Use when                                                                                                              |
 | --------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `cmdsignals`    | `{{MODULE}}/internal/cmdsignals`     | signal-cancellable root context for `SIGINT` / `SIGTERM`, with pause/resume for temporarily forwarding signals to a child process        | `NotifyContext(ctx) (blockOn func(), ctx context.Context, cancel func(error))`, `Pause(ctx, installHandler func()) bool`, `Resume(ctx, removeHandler func()) bool`, `type SignalReceivedError{Sig os.Signal}` (cancellation cause; recover via `context.Cause` + `errors.AsType`), `var ExitSignals [...]os.Signal` | Always when scaffolding (`main.go` calls `NotifyContext`). For existing projects, only when adopting this template.   |
-| `libver`        | `{{MODULE}}/internal/libver`         | the module-wide, release-controlled `const Version` at a fixed path; rewritten by `internal/cmd/release`                                 | `Version` (a `const`; declared alone)                                                                                                                                                                                                                                                                               | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
+| `libver`        | `{{MODULE}}/internal/libver`         | the module-wide, release-controlled `const Version` at a fixed path; rewritten by the external `bump-libver` tool                        | `Version` (a `const`; declared alone)                                                                                                                                                                                                                                                                               | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `loggerfactory` | `{{MODULE}}/internal/loggerfactory`  | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `<name-without-separator>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal`                                                                                              | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.                |
 | `versioninfo`   | `{{MODULE}}/internal/versioninfo`    | combine the project's `Version` with VCS info from `runtime/debug.ReadBuildInfo`                                                         | `ReadVersionInfo(version string) Info`, `type Info`                                                                                                                                                                                                                                                                 | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `stdiopipe`     | `{{MODULE}}/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe`                                                                         | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                                                                                                                                                                                              | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics.           |
@@ -180,15 +180,15 @@ Reach for them only in a leaf's `run{{Name}}` that hands the terminal to a child
 
 The default scaffold needs neither — `NotifyContext` alone gives the standard "signal cancels `ctx`" behavior.
 
-### Build-time `main` packages (copied verbatim)
+### Release tool (external — nothing copied)
 
-| Helper    | Source                                 | Destination                           | Purpose                                                                                                                                      | Use when                                                                                                                      |
-| --------- | -------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `release` | `helpers/internal/cmd/release/main.go` | `<root>/internal/cmd/release/main.go` | Cross-platform release helper. Validates inputs, rewrites `internal/libver/libver.go`'s `const Version`, commits + tags, bumps to next `-devel`. | Always when scaffolding. Invoke during a release with `go run ./internal/cmd/release <release-version> [<next-dev-version>]`. |
+Releases use the published `bump-libver` tool; no release code lives in the project:
 
-The release helper reads the fixed `internal/libver/libver.go` (legacy in-service `version.go` locations — top-level or under `pkg/` — are auto-detected as fallbacks) and refuses on a dirty tree or duplicate tag.
+```sh
+go run github.com/ngicks/go-common/tools/bump-libver@latest <release-version> [<next-dev-version>]
+```
 
-It pushes the branch and the new tag to `origin` on success; if either push fails it aborts and leaves the local commits + tag in place for manual re-push.
+It reads the fixed `internal/libver/libver.go` (legacy in-service `version.go` locations — top-level or under `pkg/` — are auto-detected as fallbacks), refuses on a dirty tree or duplicate tag, rewrites + commits + tags, bumps to the next `-devel`, and pushes the branch and tag to `origin` — aborting if either push fails, leaving the local commits + tag in place for manual re-push.
 
 See [Versioning & release](versioning.md) for the contract it expects.
 

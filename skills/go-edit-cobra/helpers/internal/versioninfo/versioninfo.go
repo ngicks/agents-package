@@ -2,8 +2,9 @@
 // VCS / build info embedded by `go build` (via runtime/debug.ReadBuildInfo).
 //
 // The project's version constant lives in internal/libver/libver.go
-// (rewritten by the release helper at internal/cmd/release). Callers pass
-// that constant into ReadVersionInfo to get the full picture.
+// (rewritten by the bump-libver release tool,
+// github.com/ngicks/go-common/tools/bump-libver). Callers pass that
+// constant into ReadVersionInfo to get the full picture.
 package versioninfo
 
 import "runtime/debug"

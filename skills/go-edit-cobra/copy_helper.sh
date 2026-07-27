@@ -11,7 +11,6 @@ ALWAYS_DIRS=(
   internal/libver
   internal/loggerfactory
   internal/versioninfo
-  internal/cmd/release
 )
 # Copied only with --stdiopipe (a subcommand needs cancellable stdio).
 STDIOPIPE_DIR=internal/stdiopipe
@@ -30,7 +29,6 @@ usage() {
   echo "  internal/libver/            always"
   echo "  internal/loggerfactory/     always"
   echo "  internal/versioninfo/       always"
-  echo "  internal/cmd/release/       always"
   echo "  internal/stdiopipe/         only with --stdiopipe"
   echo ""
   echo "<project-root> must already exist (the module root containing go.mod)."

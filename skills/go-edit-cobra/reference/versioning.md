@@ -1,6 +1,6 @@
 # Versioning & release
 
-The release-controlled version: which packages collaborate, the release-tool flow, submodule tags, and the `libver` / `versioninfo` / `release` source.
+The release-controlled version: which packages collaborate, the release-tool (`bump-libver`) flow, submodule tags, and the `libver` / `versioninfo` source.
 
 Read this when cutting a release, wiring the `version` subcommand, or touching `const Version`.
 
@@ -12,7 +12,7 @@ Read this when cutting a release, wiring the `version` subcommand, or touching `
 - [`internal/libver/libver.go`](#internallibverlibvergo-always-present)
 - [`cmd/{{NAME}}/commands/version.go` template](#cmdnamecommandsversiongo-always-present)
 - [`internal/versioninfo/versioninfo.go`](#internalversioninfoversioninfogo-always-present)
-- [`internal/cmd/release/main.go`](#internalcmdreleasemaingo-always-present)
+- [The `bump-libver` release tool (external)](#the-bump-libver-release-tool-external)
 
 ## Versioning
 
@@ -22,11 +22,11 @@ Four pieces collaborate:
 
 | Piece                            | Responsibility                                                                                                                                                                                       |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `internal/libver/libver.go`      | Source of truth for the version string. `package libver` declares `const Version = "v0.0.0-devel"` and **nothing else**. The path is fixed by convention, so the release helper always knows where to rewrite.        |
+| `internal/libver/libver.go`      | Source of truth for the version string. `package libver` declares `const Version = "v0.0.0-devel"` and **nothing else**. The path is fixed by convention, so the release tool always knows where to rewrite.        |
 | `internal/versioninfo`           | Reusable helper exporting `type Info` and `ReadVersionInfo(version string) Info`. Combines the supplied `Version` with VCS info from `runtime/debug.ReadBuildInfo`.                                  |
 | `cmd/<name>/commands/version.go` | The `version` subcommand. Imports both `internal/libver` (for `Version`) and `internal/versioninfo` (for `ReadVersionInfo`); prints to `cmd.OutOrStdout()`. Wired by `rootCmd()` unconditionally.         |
 | `cmd/<name>/commands/root.go`    | Declares `--version` as a local (not persistent) flag on the root command. The root's `RunE` closure dispatches to `runVersion` when the flag is set.                                                |
-| `internal/cmd/release`           | Cross-platform Go `main` package. Rewrites `internal/libver/libver.go`'s `Version` line, commits, tags, then bumps to the next `-devel` and commits again. Run with `go run ./internal/cmd/release ...`. |
+| `bump-libver` (external tool)    | Cross-platform release tool, published at `github.com/ngicks/go-common/tools/bump-libver` — nothing is vendored into the project. Rewrites `internal/libver/libver.go`'s `Version` line, commits, tags, then bumps to the next `-devel` and commits again. Run with `go run github.com/ngicks/go-common/tools/bump-libver@latest ...`. |
 
 Design notes:
 
@@ -34,24 +34,24 @@ Design notes:
 
   Tests do not swap the value.
 
-- **`libver` is the whole module's version, so it lives under `internal/`, not in the service package.** The constant describes the module, not one service, and the fixed `internal/libver/libver.go` path means the release helper — and any reader — never has to hunt for it.
+- **`libver` is the whole module's version, so it lives under `internal/`, not in the service package.** The constant describes the module, not one service, and the fixed `internal/libver/libver.go` path means the release tool — and any reader — never has to hunt for it.
 
-  (Older revisions of this layout kept a `version.go` inside the service package — top-level `<name-without-separator>/version.go`, or `pkg/<name-without-separator>/version.go` before that. Preserve those in projects that already use them; the release helper auto-detects them as fallbacks.)
+  (Older revisions of this layout kept a `version.go` inside the service package — top-level `<name-without-separator>/version.go`, or `pkg/<name-without-separator>/version.go` before that. Preserve those in projects that already use them; the release tool auto-detects them as fallbacks.)
 - **`libver.go` declares only `const Version` — no imports, nothing else.** Anything richer (VCS info, etc.) lives in `internal/versioninfo`.
 - **`--version` is local, not persistent.** `mytool serve --version` is intentionally an unknown-flag error; only the root command exposes the alias.
 - **`mytool --version` and `mytool version` produce identical output.** They share `runVersion`; the alias is implemented as a closure dispatch, not a duplicated command.
 - **The `config` subcommand is the one `commands/` file that imports `<name-without-separator>` directly** (for `Config` + `LoadConfig`); `version` needs only the internal `libver` / `versioninfo` pair.
 
   Other commands go through the service constructed in their wrappers / `runRoot`.
-- **One Go source base, every host OS.** The release helper is a Go `main` package precisely so Linux, macOS, and Windows users do not have to maintain parallel bash + PowerShell scripts.
+- **One Go tool, every host OS, zero vendored release code.** `bump-libver` is a Go program precisely so Linux, macOS, and Windows users do not have to maintain parallel bash + PowerShell scripts — and being an external tool run via `go run ...@latest`, the project carries no release code of its own.
 
   Running it requires only the Go toolchain, which the project already needs.
 
 ## Release flow
 
-`go run ./internal/cmd/release` automates the version dance.
+`go run github.com/ngicks/go-common/tools/bump-libver@latest` automates the version dance.
 
-It is the canonical release entry point; do not re-introduce shell scripts in parallel.
+It is the canonical release entry point; do not re-introduce shell scripts in parallel, and do not vendor release code into the project.
 
 Steps the tool performs:
 
@@ -74,11 +74,13 @@ Steps the tool performs:
 Usage:
 
 ```sh
-go run ./internal/cmd/release v0.2.0                # next dev defaults to v0.2.1-devel
-go run ./internal/cmd/release v0.2.0 v0.3.0-devel   # explicit next dev (must end in -devel; the tool does NOT append it)
-go run ./internal/cmd/release -file other/version.go v0.2.0   # non-standard location
-go run ./internal/cmd/release subpkg/v0.2.0         # Go submodule at ./subpkg/; tags as subpkg/v0.2.0
-go run ./internal/cmd/release nested/dir/v0.2.0     # deeper submodule at ./nested/dir/
+alias bump-libver='go run github.com/ngicks/go-common/tools/bump-libver@latest'
+
+bump-libver v0.2.0                # next dev defaults to v0.2.1-devel
+bump-libver v0.2.0 v0.3.0-devel   # explicit next dev (must end in -devel; the tool does NOT append it)
+bump-libver -file other/version.go v0.2.0   # non-standard location
+bump-libver subpkg/v0.2.0         # Go submodule at ./subpkg/; tags as subpkg/v0.2.0
+bump-libver nested/dir/v0.2.0     # deeper submodule at ./nested/dir/
 ```
 
 The default next-dev calculation bumps the patch component.
@@ -120,22 +122,26 @@ Project-agnostic — the package name (`libver`) and the path are fixed, so the 
 // Package libver pins the module-wide, release-controlled version string.
 //
 // The file lives at the fixed path internal/libver/libver.go so the release
-// helper (internal/cmd/release) always knows where to rewrite it; the
-// package declares Version and nothing else.
+// tool always knows where to rewrite it; the package declares Version and
+// nothing else.
 package libver
 
-// Version is the human-readable version string for the whole module. The
-// release helper rewrites this declaration when cutting a release, then
-// bumps it to the next "-devel" version after tagging.
+// Version is the human-readable version string for the whole module. Bump it
+// with the release tool:
 //
-// Edit by hand only when the release helper is unavailable (e.g. cherry-pick
+//	go run github.com/ngicks/go-common/tools/bump-libver@latest <release-version>
+//
+// which rewrites this declaration, commits, and tags, then bumps it to the
+// next "-devel" version.
+//
+// Edit by hand only when the release tool is unavailable (e.g. cherry-pick
 // of a release commit).
 const Version = "v0.0.0-devel"
 ```
 
-The contract with the release helper is a single top-level `const Version = "..."` line, identifier spelled `Version`.
+The contract with the `bump-libver` tool is a single top-level `const Version = "..."` line, identifier spelled `Version`.
 
-Anything that changes this shape (renaming the identifier, switching to `var`, multiple declarations, struct-wrapping) breaks the helper's rewrite; update the helper in lockstep if you must change the shape.
+Anything that changes this shape (renaming the identifier, switching to `var`, multiple declarations, struct-wrapping) breaks the tool's rewrite — do not diverge from it.
 
 `libver.go` declares only `Version` — no imports, no other symbols.
 
@@ -210,14 +216,18 @@ The caller passes the project's `Version` constant; the helper layers VCS info f
 
 This file is **not** a template; copy it as-is. See [Helper catalog](workflows.md) for the full path.
 
-## `internal/cmd/release/main.go` (always present)
+## The `bump-libver` release tool (external)
 
-Cross-platform release helper.
+Cross-platform release tool, published as `github.com/ngicks/go-common/tools/bump-libver`.
 
-Copied verbatim from `${SKILL-DIR}/helpers/internal/cmd/release/main.go`.
+**Nothing is copied or generated into the project** — run it directly:
 
-A `main` package living under `internal/` so it cannot be `go install`ed externally — it's a build-time tool of this module only.
+```sh
+go run github.com/ngicks/go-common/tools/bump-libver@latest <release-version> [<next-dev-version>]
+```
 
-Runs as `go run ./internal/cmd/release`.
+It rewrites `internal/libver/libver.go` (legacy in-service `version.go` locations are auto-detected as fallbacks; `-file <path>` overrides), refuses on a dirty tree or duplicate tag, commits, tags, bumps to the next `-devel` version, and pushes the branch and tag to `origin` — aborting if either push fails, leaving the local commits + tag in place for manual re-push.
 
-This file is **not** a template; copy it as-is. The same source compiles on Linux, macOS, and Windows; that is the entire reason for picking a Go program over parallel shell + PowerShell scripts.
+The same source compiles on Linux, macOS, and Windows; that is the entire reason for picking a Go program over parallel shell + PowerShell scripts.
+
+(Projects scaffolded by an older revision of this skill may still carry the tool's predecessor at `internal/cmd/release/`. It keeps working via `go run ./internal/cmd/release`; prefer `bump-libver` going forward and remove the vendored copy only on explicit user request.)

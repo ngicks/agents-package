@@ -21,7 +21,7 @@ Everything else — layout, templates, the configuration model, versioning, and 
 - **[reference/command-templates.md](reference/command-templates.md)** — the command-tree code templates: `main.go`, `root.go`, flat-leaf / parent-group / nested-leaf subcommands, and `go.mod` + version policy.
 - **[reference/configuration.md](reference/configuration.md)** — the configuration model (layers, `PartialConfig.Apply` merge semantics, file format, path resolution, flag overlay, add-a-field) and the `config` subcommand (three-file split: `cmd` wiring + `<name-without-separator>/cli` rendering + `internal/templateutil` funcs).
 - **[reference/config-source.md](reference/config-source.md)** — the `<name-without-separator>/config.go` source template (JSON base) plus the YAML-only / both-format support block.
-- **[reference/versioning.md](reference/versioning.md)** — the four versioning pieces (the fixed `internal/libver` version constant among them), the release-tool flow, submodule tags, and the `libver` / `versioninfo` / `release` source.
+- **[reference/versioning.md](reference/versioning.md)** — the four versioning pieces (the fixed `internal/libver` version constant among them), the external `bump-libver` release-tool flow, submodule tags, and the `libver` / `versioninfo` source.
 - **[reference/workflows.md](reference/workflows.md)** — step-by-step scaffold and edit procedures (subcommand / flag / metadata / completion operations) and the helper-package catalog.
 
 ## Pre-flight checks
