@@ -10,12 +10,12 @@ them on **every** turn until the run ends — not just the first.
 
 ## Record progress in a STATUS file if `/goal` specifies plan files
 
-When `/goal` asks to implement a plan file (e.g. `/goal Implement ./doc/plan/<YYYY-MM-DD>-NN-<plan_name>/PLAN.md`)  
+When `/goal` asks to implement a plan file (e.g. `/goal Implement ./doc/plan/<YYYY-MM-DD>-NN-<plan_name>/PLAN.html`)  
 read `STATUS.md` and/or `DECISION.md` if they exist before any action.
 
 - A plan is a _directory_ under `./doc/plan/` (created by `/ngplan`), named
   `<YYYY-MM-DD>-NN-<plan_name>`.
-- There may be `STATUS.md`, `DECISION.md` or similar files in the dir `PLAN.md` sits.
+- There may be `STATUS.md`, `DECISION.md` or similar files in the dir `PLAN.html` sits.
 
 Record progress after each task is done in `STATUS.md`.
 

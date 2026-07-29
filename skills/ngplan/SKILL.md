@@ -1,6 +1,6 @@
 ---
 name: ngplan
-description: 'Create or elaborate a plan directory under ./doc/plan/ (PLAN.md, STATUS.md, DECISION.md) — draft a rough scaffold first, record open questions, then resolve them with the user. Use when starting, drafting, editing, reviewing, or continuing a plan/planning, e.g. "make a plan", "look at a plan", "continue on plan/planning".'
+description: 'Create or elaborate a plan directory under ./doc/plan/ (PLAN.html, STATUS.md, DECISION.md) — draft a rough scaffold first, record open questions, then resolve them with the user. Use when starting, drafting, editing, reviewing, or continuing a plan/planning, e.g. "make a plan", "look at a plan", "continue on plan/planning".'
 ---
 
 # ngplan
@@ -55,14 +55,14 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
 
 ## Canonical files
 
-- **PLAN.md** — the implementation plan: title and one-line summary; goal /
+- **PLAN.html** — the implementation plan: title and one-line summary; goal /
   success criteria; scope and non-goals; context (real file paths, current
   behavior); approach (chosen design plus rejected alternatives); ordered
   implementation steps, each independently verifiable and naming real files and
   symbols; testing and verification; risks; and a numbered **Open questions**
   section that drains to empty as they resolve.
 - **STATUS.md** — living progress log: current state, a checklist mirroring the
-  PLAN.md steps, what is done / in progress / blocked, and the next action. Seed
+  PLAN.html steps, what is done / in progress / blocked, and the next action. Seed
   a new one as "not started"; when elaborating, refresh it rather than reset it.
 - **DECISION.md** — decision log: one entry per material decision with the choice
   made, the rationale, and the alternatives rejected. Seed stubs from the open
@@ -79,7 +79,7 @@ Reference actual file paths and symbols, never placeholders.
 Every unresolved decision goes into the plan as an explicit open question, never
 into chat-only memory.
 
-- Keep a numbered **Open questions** section in PLAN.md, and seed DECISION.md
+- Keep a numbered **Open questions** section in PLAN.html, and seed DECISION.md
   stubs for the material ones.
 - Each question states the decision needed, the options in view, and a tentative
   default.
