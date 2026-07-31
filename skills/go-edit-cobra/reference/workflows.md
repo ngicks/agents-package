@@ -111,9 +111,9 @@ Preserve the existing shape: never flatten a directory-shaped group or split a f
 
 | Operation                           | Files / actions                                                                                                                                                                                                          | Ask the user when                                                                                                                     |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Add flat subcommand                 | new `commands/<subcmd>.go` (flat-leaf template); add `{{subCamel}}Cmd(cmd)` call inside `rootCmd()` in `commands/root.go`                                                                                                | —                                                                                                                                     |
-| Add nested subcommand               | new `commands/<parent>_<child>.go`; add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` call inside the parent's wrapper. If parent missing, also write `commands/<parent>.go` and add `{{parentCamel}}Cmd(cmd)` to `rootCmd()` | —                                                                                                                                     |
-| Rename subcommand                   | rename file; rename wrapper `{{old}}Cmd` → `{{new}}Cmd`; rename `run{{Old}}` → `run{{New}}`; update the wiring call in the parent wrapper. Search for any external reference (tests, docs, completion)                   | —                                                                                                                                     |
+| Add flat subcommand                 | new `commands/<subcmd>.go` (flat-leaf template); add `{{subCamel}}Cmd(cmd)` call inside `rootCmd()` in `commands/root.go`                                                                                                | Name starts with `co` → [Completion › built-in `completion` prefix collision](#completion)                                            |
+| Add nested subcommand               | new `commands/<parent>_<child>.go`; add `{{parentCamel}}{{ChildPascal}}Cmd(cmd)` call inside the parent's wrapper. If parent missing, also write `commands/<parent>.go` and add `{{parentCamel}}Cmd(cmd)` to `rootCmd()` | A newly created root-level parent's name starts with `co` → [Completion › built-in `completion` prefix collision](#completion)        |
+| Rename subcommand                   | rename file; rename wrapper `{{old}}Cmd` → `{{new}}Cmd`; rename `run{{Old}}` → `run{{New}}`; update the wiring call in the parent wrapper. Search for any external reference (tests, docs, completion)                   | New root-level name starts with `co` → [Completion › built-in `completion` prefix collision](#completion)                             |
 | Remove leaf                         | delete file; remove its wiring call from the parent wrapper                                                                                                                                                              | —                                                                                                                                     |
 | Remove group                        | delete file + all children; remove the group's wiring call from `rootCmd()`                                                                                                                                              | If children exist (cascade vs refuse)                                                                                                 |
 | Promote leaf → group                | drop `RunE` from leaf cmd literal; split logic into a new child file; add the new child's wiring call inside the (now-promoted) wrapper                                                                                  | Where original `RunE` body, `Args`, `Aliases`, `Example`, `PreRunE`, `PostRunE`, and flags go (parent persistent / new child / split) |
@@ -151,6 +151,19 @@ Use a closure adapter to forward captured flag values when needed, mirroring the
 
   `ValidArgs` and `ValidArgsFunction` are mutually exclusive; Cobra reports an error when both are set.
 - **Flag-value completion**: call `cmd.RegisterFlagCompletionFunc(name, fn)` inside the wrapper, after binding the flag.
+- **Built-in `completion` prefix collision**: when an operation gives the **root** command a subcommand whose name starts with `co`, shell completion of that name now competes with the auto-generated `completion` subcommand (typing `<cli> co<TAB>` no longer completes uniquely).
+
+  Ask the user whether to hide the built-in command from help and completion — use `AskUserQuestion` when the tool is available, otherwise ask as a plain question in the response.
+
+  Hiding means setting on the root literal in `commands/root.go`:
+
+  ```go
+  CompletionOptions: cobra.CompletionOptions{HiddenDefaultCmd: true},
+  ```
+
+  `<cli> completion <shell>` still works; the command is only dropped from help output and completion suggestions.
+
+  **Skip the question** when the root literal already sets `CompletionOptions.HiddenDefaultCmd` or `CompletionOptions.DisableDefaultCmd`.
 
 ## Helper catalog
 
