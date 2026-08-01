@@ -1,6 +1,6 @@
 ---
 name: ngplan
-description: 'Create or elaborate a plan directory under ./doc/plan/ (PLAN.html, STATUS.md, DECISION.md) — draft a rough scaffold first, record open questions, then resolve them with the user. Use when starting, drafting, editing, reviewing, or continuing a plan/planning, e.g. "make a plan", "look at a plan", "continue on plan/planning".'
+description: 'Create or elaborate a plan directory under ./doc/plan/ (PLAN.md, STATUS.md, DECISION.md, plus optional presentation previews) — draft a rough scaffold first, record open questions, then resolve them with the user. Use when starting, drafting, editing, reviewing, or continuing a plan/planning, e.g. "make a plan", "look at a plan", "continue on plan/planning".'
 ---
 
 # ngplan
@@ -55,14 +55,14 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
 
 ## Canonical files
 
-- **PLAN.html** — the implementation plan: title and one-line summary; goal /
+- **PLAN.md** — the implementation plan: title and one-line summary; goal /
   success criteria; scope and non-goals; context (real file paths, current
   behavior); approach (chosen design plus rejected alternatives); ordered
   implementation steps, each independently verifiable and naming real files and
   symbols; testing and verification; risks; and a numbered **Open questions**
   section that drains to empty as they resolve.
 - **STATUS.md** — living progress log: current state, a checklist mirroring the
-  PLAN.html steps, what is done / in progress / blocked, and the next action. Seed
+  PLAN.md steps, what is done / in progress / blocked, and the next action. Seed
   a new one as "not started"; when elaborating, refresh it rather than reset it.
 - **DECISION.md** — decision log: one entry per material decision with the choice
   made, the rationale, and the alternatives rejected. Seed stubs from the open
@@ -74,20 +74,39 @@ planning or implementing. Keep the three canonical files current.
 
 Reference actual file paths and symbols, never placeholders.
 
-### PLAN.html is HTML on purpose
+### Use the right visual artifact
 
-The plan is HTML, not markdown, so it can be expressive — use that, don't just
-emit markdown-shaped prose with an `.html` extension.
+Keep the plan itself in markdown so it stays readable, diffable, and easy to
+update.
 
-- Draw a diagram wherever structure beats prose: architecture / component
-  relationships, data flow, state machines, sequence interactions.
-- Use tables for comparisons — e.g. the options weighed in the approach
-  section, side by side with their trade-offs.
-- Prefer inline SVG for diagrams so the file renders in a plain browser with no
-  external renderer; keep the file self-contained (no CDN scripts, no external
-  assets).
-- Expressiveness is for carrying information, not decoration — a diagram that
-  restates a one-line fact is noise; leave simple sections as prose.
+- Use markdown tables for comparisons, such as options and their trade-offs.
+- Mermaid code fences are allowed when structure beats prose: architecture /
+  component relationships, data flow, state machines, sequence interactions,
+  and navigation between GUI screens.
+- A diagram that restates a one-line fact is noise; leave simple sections as
+  prose.
+
+Mermaid describes relationships well, but it is not a presentation layout
+language. When material GUI, web, mobile, or terminal-interface decisions need
+spatial or interactive evidence, also create a runnable presentation preview.
+
+- Prefer the repository's existing presentation stack, dependencies, components,
+  and design tokens. For example, use an isolated React / Preact entrypoint or
+  story in a web project, or a small Bubble Tea program in a Go TUI project.
+- Follow an established preview, story, example, or development-entrypoint
+  convention when one exists. Otherwise keep the preview under the plan
+  directory so its temporary ownership is obvious.
+- Keep the preview isolated from normal application behavior. Do not add a
+  production route or dependency merely to host planning UI.
+- Link the preview from the relevant PLAN.md section. Record the decision it
+  demonstrates, how to run it, and whether it is disposable or expected to
+  graduate into production code.
+- Use one or more self-contained `display-<NN>-<screen_name>.html` files only as
+  a fallback when the repository has no suitable presentation stack or starting
+  that stack would be disproportionate. Start numbering at `01`; use semantic
+  HTML, embedded CSS, native controls, and no external assets.
+- Create a preview only when layout or interaction matters to the plan; do not
+  create placeholder presentation artifacts for other work.
 
 ## Focus of the plan
 
@@ -112,7 +131,7 @@ starts invalidates far more work than an internal refactor does.
 Every unresolved decision goes into the plan as an explicit open question, never
 into chat-only memory.
 
-- Keep a numbered **Open questions** section in PLAN.html, and seed DECISION.md
+- Keep a numbered **Open questions** section in PLAN.md, and seed DECISION.md
   stubs for the material ones.
 - Each question states the decision needed, the options in view, and a tentative
   default.
