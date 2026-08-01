@@ -5,14 +5,11 @@ applyTo: "**/*.go"
 
 ### Go Personal Design Preference
 
-Trigger `go-edit-cobra` skill when editing empty or `github.com/spf13/cobra`-backed `./cmd/**/*` .
-
 #### Keep entrypoints thin
 
 - **No business logic under `./cmd`.** Files under `./cmd` only parse flags / arguments and hand off to a service. Same rule for any other binary entrypoint package — it composes, it does not compute.
 - **No CLI-presentation logic under `./cmd` either.** Printing, prompts, table rendering, color, terminal capability detection, spinners, and other terminal control belong in `<root>/<name-without-separator>/cli/` (or a similarly named package outside `./cmd`). `./cmd` calls into that package; it does not implement it.
 - Run / `main` functions return errors; never `os.Exit` from inside business code.
-- When editing or creating files under `./cmd/`, use the **`go-edit-cobra` skill**. It owns Cobra-specific structure, naming, helpers, and edit operations.
 
 #### Push logic across the package boundary
 
