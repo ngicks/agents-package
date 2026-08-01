@@ -36,9 +36,9 @@ specific to this codebase, not generic.
     `./doc/plan/` for existing `<date>-NN-*` entries sharing today's date, take
     the highest + 1, zero-padded from `01`. No entry for today means start at
     `01`.
-  - `<plan_name>` is a short snake_case slug from the summary — use `_`, not
-    `-`, so it stays a single token that doesn't collide with the `-` joining
-    the date and `NN`.
+  - `<plan_name>` is a short snake*case slug from the summary — use `*`, not
+`-`, so it stays a single token that doesn't collide with the `-`joining
+the date and`NN`.
 
 ## Emit the rough scaffold
 
@@ -80,7 +80,7 @@ Keep the plan itself in markdown so it stays readable, diffable, and easy to
 update.
 
 - Use markdown tables for comparisons, such as options and their trade-offs.
-- Mermaid code fences are allowed when structure beats prose: architecture /
+- Use mermaid code fences when structure beats prose: architecture /
   component relationships, data flow, state machines, sequence interactions,
   and navigation between GUI screens.
 - A diagram that restates a one-line fact is noise; leave simple sections as
@@ -90,9 +90,11 @@ Mermaid describes relationships well, but it is not a presentation layout
 language. When material GUI, web, mobile, or terminal-interface decisions need
 spatial or interactive evidence, also create a runnable presentation preview.
 
+- Create a preview only when layout or interaction matters to the plan; do not
+  create placeholder presentation artifacts for other work.
 - Prefer the repository's existing presentation stack, dependencies, components,
   and design tokens. For example, use an isolated React / Preact entrypoint or
-  story in a web project, or a small Bubble Tea program in a Go TUI project.
+  story in a web project, or a small `charm.land/bubbletea/v2` program in a Go TUI project.
 - Follow an established preview, story, example, or development-entrypoint
   convention when one exists. Otherwise keep the preview under the plan
   directory so its temporary ownership is obvious.
@@ -105,8 +107,6 @@ spatial or interactive evidence, also create a runnable presentation preview.
   a fallback when the repository has no suitable presentation stack or starting
   that stack would be disproportionate. Start numbering at `01`; use semantic
   HTML, embedded CSS, native controls, and no external assets.
-- Create a preview only when layout or interaction matters to the plan; do not
-  create placeholder presentation artifacts for other work.
 
 ## Focus of the plan
 
