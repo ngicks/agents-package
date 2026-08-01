@@ -89,6 +89,24 @@ emit markdown-shaped prose with an `.html` extension.
 - Expressiveness is for carrying information, not decoration — a diagram that
   restates a one-line fact is noise; leave simple sections as prose.
 
+## Focus of the plan
+
+Spend the plan's precision on the contracts — the parts that are expensive to
+change later. Implementation internals can stay rough.
+
+- **Public API** — the exported surface consumers will call: packages, types,
+  functions, and their signatures.
+- **RPC schema** — the wire contracts between processes: proto / OpenAPI /
+  Connect definitions, endpoints, message shapes.
+- **Project layout** — where things live: directories, packages / modules, and
+  what depends on what.
+- **Persistent data format** — anything that outlives a process: database
+  schema, and the data format of files written to disk.
+
+Nail these down concretely (real names, real fields, real paths) before
+detailing implementation steps; a change to any of them after implementation
+starts invalidates far more work than an internal refactor does.
+
 ## Record open questions
 
 Every unresolved decision goes into the plan as an explicit open question, never
