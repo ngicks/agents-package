@@ -74,6 +74,21 @@ planning or implementing. Keep the three canonical files current.
 
 Reference actual file paths and symbols, never placeholders.
 
+### PLAN.html is HTML on purpose
+
+The plan is HTML, not markdown, so it can be expressive — use that, don't just
+emit markdown-shaped prose with an `.html` extension.
+
+- Draw a diagram wherever structure beats prose: architecture / component
+  relationships, data flow, state machines, sequence interactions.
+- Use tables for comparisons — e.g. the options weighed in the approach
+  section, side by side with their trade-offs.
+- Prefer inline SVG for diagrams so the file renders in a plain browser with no
+  external renderer; keep the file self-contained (no CDN scripts, no external
+  assets).
+- Expressiveness is for carrying information, not decoration — a diagram that
+  restates a one-line fact is noise; leave simple sections as prose.
+
 ## Record open questions
 
 Every unresolved decision goes into the plan as an explicit open question, never
