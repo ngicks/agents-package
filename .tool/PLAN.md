@@ -243,6 +243,11 @@ Adding a future subcommand = one new `Command` in the array + one dispatch arm.
   silently), and `--exclude` glob filtering. `glob_match` gets its own unit
   tests (`*` vs `/` boundary, `**`, `?`, literal match).
 - Acceptance (scripted, not eyeballed):
+  REMOVED after implementation: the acceptance script (`acceptance.sh`) was
+  deleted — it asserted the exact unit set of this repo and did a network
+  `apm install` against the live GitHub remote, both of which drift with
+  normal repo evolution. Fragile tests are not kept; the unit/integration
+  tests above remain the coverage.
   1. Run against this repo; assert the emitted dep set is exactly the expected
      17 paths — no duplicates, no self-reference, no excluded dirs.
   2. Run twice; assert byte-identical output.
