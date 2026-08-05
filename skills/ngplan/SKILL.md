@@ -1,6 +1,6 @@
 ---
 name: ngplan
-description: 'Create or elaborate a plan directory under ./doc/plan/ (PLAN.md, STATUS.md, DECISION.md, plus optional presentation previews) — draft a rough scaffold first, record open questions, then resolve them with the user. Use when starting, drafting, editing, reviewing, or continuing a plan/planning, e.g. "make a plan", "look at a plan", "continue on plan/planning".'
+description: 'Create or elaborate a plan directory under ./doc/plan/ (IDEA.md, PLAN.md, STATUS.md, DECISION.md, plus optional presentation previews) — settle how it should be (use cases, usability) first, draft a rough scaffold, record open questions, then resolve them with the user. Use when starting, drafting, editing, reviewing, or continuing a plan/planning, e.g. "make a plan", "look at a plan", "continue on plan/planning".'
 ---
 
 # ngplan
@@ -40,12 +40,32 @@ specific to this codebase, not generic.
 `-`, so it stays a single token that doesn't collide with the `-`joining
 the date and`NN`.
 
+## Idea phase — settle how it should be
+
+Before planning how to build it, settle what it should be. This thinking lands
+in IDEA.md, and PLAN.md's goal, scope, and success criteria derive from it.
+
+- Frame every statement as how the feature **should** behave — the behavior a
+  user would call right. How it _can_ be — current code structure, effort,
+  technical constraints — gets no vote here.
+- Walk each use case end to end: who is acting, in what situation, what they are
+  trying to get done, and what they experience at each step from invocation to
+  done.
+- Judge usability concretely: invocation ergonomics and naming, defaults that
+  match the common case, feedback while running, the failure experience, and
+  discoverability.
+- When the ideal later collides with feasibility, the compromise happens in
+  PLAN.md and is recorded as a DECISION.md entry — never by quietly editing
+  IDEA.md down to what was convenient to build.
+- Draft-first applies here too: write the rough IDEA.md, mark uncertain use
+  cases and usability calls as open questions rather than guessing silently.
+
 ## Emit the rough scaffold
 
 Write the plan directory now, as a rough first pass — do not wait for answers.
 
 - New plan — create the directory, including `./doc/plan/` itself if it does not
-  yet exist, then write the three canonical files defined under **Canonical
+  yet exist, then write the four canonical files defined under **Canonical
   files** below.
 - Existing plan — update them in place; keep what still holds.
 - Fill what is known. Mark everything uncertain as a rough spot rather than
@@ -55,12 +75,17 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
 
 ## Canonical files
 
+- **IDEA.md** — the "how it should be" statement, written in the idea phase:
+  use cases (actor, situation, intent, end-to-end walkthrough) and usability
+  requirements (ergonomics, defaults, feedback, failure experience).
+  Deliberately blind to implementation cost; PLAN.md compromises against it only
+  through a DECISION.md entry.
 - **PLAN.md** — the implementation plan: title and one-line summary; goal /
-  success criteria; scope and non-goals; context (real file paths, current
-  behavior); approach (chosen design plus rejected alternatives); ordered
-  implementation steps, each independently verifiable and naming real files and
-  symbols; testing and verification; risks; and a numbered **Open questions**
-  section that drains to empty as they resolve.
+  success criteria and scope (both grounded in IDEA.md); non-goals; context
+  (real file paths, current behavior); approach (chosen design plus rejected
+  alternatives); ordered implementation steps, each independently verifiable
+  and naming real files and symbols; testing and verification; risks; and a
+  numbered **Open questions** section that drains to empty as they resolve.
 - **STATUS.md** — living progress log: current state, a checklist mirroring the
   PLAN.md steps, what is done / in progress / blocked, and the next action. Seed
   a new one as "not started"; when elaborating, refresh it rather than reset it.
@@ -70,7 +95,7 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
   history.
 
 Other files are welcome — later agents may add notes, diagrams, or scratch while
-planning or implementing. Keep the three canonical files current.
+planning or implementing. Keep the four canonical files current.
 
 Reference actual file paths and symbols, never placeholders.
 
