@@ -45,6 +45,8 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │   ├── buf.yaml
 │   ├── gen/
 │   └── schema/
+├── pkg/                                 # every Go package NOT specific to <name-without-separator> — generic, reusable code
+│   └── <pkgname>/                       # one directory per package (a legacy-layout project also keeps its service package here — preserve it)
 └── <name-without-separator>/            # the service package — the project's MAIN functionality
     ├── config.go                        # always present; Config + DefaultConfig, PartialConfig + Apply, LoadConfig
     ├── <service>.go                     # internal service implementation
@@ -78,6 +80,14 @@ Why this shape:
   The top level is reserved for the project's **main** functionality; a binary that is merely a utility does not earn a top-level package — see [Main vs utility entry points](#main-vs-utility-entry-points).
 
   (An older revision of this layout placed the service at `pkg/<name-without-separator>/`. That is now a **legacy variant**: preserve it in projects that already use it — new files follow the existing `pkg/` placement — and migrate to top-level only on explicit user request.)
+
+- `pkg/` holds **every other Go package** — code not specific to `<name-without-separator>` (a generic parser, a reusable client, shared domain types another module could import on its own).
+
+  The placement rule, in full: main functionality → top level (`./<name-without-separator>/`); not specific to the service → `pkg/<pkgname>/`; must stay unimportable from other modules (the helper set above) → `internal/`.
+
+  Do not put a non-service package at the module root — the top level is reserved for main functionality — and do not bury an importable general-purpose package under `internal/`.
+
+  `<pkgname>` is an importable package directory, so it follows the same no-separator rule as [`<name-without-separator>`](#package-name-name-without-separator).
 
 - `api/` (optional) holds the public RPC API schema and its generated code — see [Public RPC API](#public-rpc-api-api).
 
@@ -131,7 +141,7 @@ A project may grow additional binaries (`cmd/<other>/`) that are merely utilitie
 
   Do not silently default to a top-level package: the top level is a public-API statement, not a dumping ground.
 - The scaffold's first binary needs no ask: it carries the project's name and **is** the main functionality by definition.
-- If a would-be top-level package name collides with a reserved directory (`cmd`, `internal`, `api`, or a legacy `pkg`), stop and ask the user for an alternative name.
+- If a would-be top-level package name collides with a reserved directory (`cmd`, `internal`, `api`, or `pkg`), stop and ask the user for an alternative name.
 
 ## Public RPC API (`api/`)
 
@@ -374,9 +384,10 @@ Grouped by the part of the layout each one violates.
 
   (A project scaffolded by an older skill revision may still carry `internal/cmd/release/` — leave it; remove only on explicit user request.)
 - **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
-- **Placing a new service package under `pkg/` in a top-level-layout project — or migrating a legacy `pkg/<name-without-separator>/` to the top level unprompted.** The service package lives at the module root (`./<name-without-separator>/`); `pkg/` is the legacy placement.
+- **Placing a new service package under `pkg/` in a top-level-layout project — or migrating a legacy `pkg/<name-without-separator>/` to the top level unprompted.** The service package lives at the module root (`./<name-without-separator>/`); for the **service** package, `pkg/` is only the legacy placement — its current role is housing non-service packages.
 
   Whichever shape a project already has must survive edits and re-scaffolding: new files follow the existing placement, and migration between the two happens only on explicit user request (same preserve rule as the subdirectory command variant).
+- **Putting a general-purpose package anywhere but `pkg/`.** A Go package not specific to `<name-without-separator>` goes under `pkg/<pkgname>/` — not at the module root (a public-API statement reserved for main functionality), not inside the service package, and not under `internal/` unless it genuinely must be unimportable from other modules.
 - **Giving a utility binary a top-level service package.** Only a **main** functionality earns `./<other-without-separator>/`; a utility's service code goes under `internal/`.
 
   When it is not clear which kind a new entry point is, ask — see [Main vs utility entry points](#main-vs-utility-entry-points).

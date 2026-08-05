@@ -15,7 +15,7 @@ Everything else — layout, templates, the configuration model, versioning, and 
 
 ## Reference files
 
-- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout (top-level service package `./<name-without-separator>/`, the main-vs-utility entry-point rule, the optional `api/` RPC-schema tree), naming conventions (files / wrappers / run functions / package name / service method `<Method>Option` structs / the subdirectory-nesting variant), and the anti-patterns list.
+- **[reference/layout-and-naming.md](reference/layout-and-naming.md)** — canonical project layout (top-level service package `./<name-without-separator>/`, `./pkg/` for packages not specific to the service, the main-vs-utility entry-point rule, the optional `api/` RPC-schema tree), naming conventions (files / wrappers / run functions / package name / service method `<Method>Option` structs / the subdirectory-nesting variant), and the anti-patterns list.
 
   Read before deciding where a file goes or how to name it, before adding a new binary or an RPC API schema, and before adding or editing a `<name-without-separator>` service method.
 - **[reference/command-templates.md](reference/command-templates.md)** — the command-tree code templates: `main.go`, `root.go`, flat-leaf / parent-group / nested-leaf subcommands, and `go.mod` + version policy.
