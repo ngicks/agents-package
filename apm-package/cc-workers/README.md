@@ -15,7 +15,8 @@ so it can be invoked directly (e.g. from `/goal` / `nggoal`).
 | `ng-orchestrator` | Decompose a task, delegate to workers, synthesize. | invoked directly (e.g. nggoal) |
 | `ng-explorer` | Read-only codebase mapping. | `ng-explorer` agent |
 | `ng-implementer` | Make a scoped code change. | `ng-implementer` agent |
-| `ng-reviewer` | Fan out 5 Sonnet reviewers, score, synthesize. | `ng-reviewer` agent |
+| `ng-reviewer` | Fan out the 5 dedicated focus reviewers, score, synthesize. | `ng-reviewer` agent |
+| `ng-focused-reviewer` | Worker-side single-focus review pass: ground, report all, never edit. | `ng-reviewer-*` focus agents |
 | `ng-command-invoker` | Run a command, return only the stripped failure. | `ng-test-runner`, `ng-command-invoker` agents |
 
 ## Subagents
@@ -24,18 +25,35 @@ so it can be invoked directly (e.g. from `/goal` / `nggoal`).
 |---|---|---|---|
 | `ng-explorer` | `ng-explorer` | sonnet | inherits all |
 | `ng-implementer` | `ng-implementer` | opus (effort xhigh) | inherits all |
-| `ng-reviewer` | `ng-reviewer` | sonnet | inherits all |
+| `ng-reviewer` | `ng-reviewer` | opus (effort high) | Agent, Read, Grep, Glob, Bash |
+| `ng-reviewer-conventions` | `ng-focused-reviewer` | sonnet | Read, Grep, Glob |
+| `ng-reviewer-bugs` | `ng-focused-reviewer` | sonnet | Read, Grep, Glob |
+| `ng-reviewer-history` | `ng-focused-reviewer` | sonnet | Read, Grep, Glob, Bash |
+| `ng-reviewer-docs` | `ng-focused-reviewer` | sonnet | Read, Grep, Glob |
+| `ng-reviewer-tests` | `ng-focused-reviewer` | sonnet | Read, Grep, Glob |
 | `ng-test-runner` | `ng-command-invoker` | haiku | inherits all |
 | `ng-command-invoker` | `ng-command-invoker` | haiku | inherits all |
 
-No agent pins `tools` or `permissionMode`, so each inherits all tools and
-the caller's permission mode. The read-only / no-edit boundaries (e.g. for
-`ng-explorer` and `ng-reviewer`) are enforced by their prompts, not by
-withholding tools.
+The non-review agents pin no `tools` or `permissionMode`, so they inherit
+all tools and the caller's permission mode; `ng-explorer`'s read-only
+boundary is enforced by its prompt. The review agents DO pin `tools` --
+prompt-only enforcement proved insufficient there. Four of the five
+focus workers get only `Read, Grep, Glob`: no `Edit` / `Write` /
+`NotebookEdit`, and no `Bash` either, since an arbitrary shell can
+mutate files just as well. `ng-reviewer-history` is the one exception:
+its focus needs iterative digging (`git log` / `blame` / `show`), so it
+keeps `Bash` -- restricted by prompt to read-only git commands -- while
+still pinning no edit tools. Any other shell work happens in the parent
+`ng-reviewer`, which runs commands itself and pastes the output into
+worker prompts, keeping shell execution vetted and out of the parallel
+fan-out. Running tests remains `ng-test-runner`'s job.
 
-`ng-reviewer` inherits the `Agent` tool, so it can spawn its five nested
-Sonnet review subagents. `ng-test-runner` and `ng-command-invoker` share the
-one `ng-command-invoker` skill; `ng-test-runner` specializes it to test
+`ng-reviewer` pins the `Agent` tool so it can spawn its five dedicated
+focus reviewers (`ng-reviewer-conventions`, `ng-reviewer-bugs`,
+`ng-reviewer-history`, `ng-reviewer-docs`, `ng-reviewer-tests`), which
+share the one `ng-focused-reviewer` skill and each pin their focus in
+the agent body. `ng-test-runner` and `ng-command-invoker` share the one
+`ng-command-invoker` skill; `ng-test-runner` specializes it to test
 commands.
 
 Cooperation is description-driven: an orchestrating agent delegates to a

@@ -1,11 +1,11 @@
 ---
 name: ng-reviewer
 description: >-
-  Review a codebase or change by fanning out five parallel Sonnet review
-  subagents over distinct focuses, scoring each finding for confidence,
-  keeping only the high-confidence issues, and synthesizing them into one
-  report. Use when a review should be broad and parallel rather than a
-  single read-through.
+  Review a codebase or change by fanning out the five dedicated
+  ng-reviewer-* focus subagents in parallel, scoring each finding for
+  confidence, keeping only the high-confidence issues, and synthesizing
+  them into one report. Use when a review should be broad and parallel
+  rather than a single read-through.
 ---
 
 # Reviewer
@@ -16,40 +16,42 @@ fan-out for discovery; strict filtering before anything is reported.
 
 ## Scope
 
-Review the working diff by default (`git diff` against the base). If the
-caller asks to review the whole code base or a path, scope to that
-instead. Establish the scope first and pass it to every worker.
+Review the working diff by default (run `git diff` against the base
+yourself). If the caller asks to review the whole code base or a path,
+scope to that instead. Establish the scope first and pass the material
+itself -- the diff text or file list -- to every worker: the workers
+have no Bash and cannot derive it on their own.
 
-## Step 1 -- Fan out five Sonnet reviewers
+## Step 1 -- Fan out the five dedicated reviewers
 
-Use the Agent tool to launch **five** review subagents in parallel, each
-set to the **sonnet** model, each given the scope and exactly one focus:
+Use the Agent tool to launch the five dedicated focus reviewers in
+parallel, one subagent each:
 
-1. **Conventions** -- compliance with project rules (CLAUDE.md / AGENTS.md,
-   linters, naming, layout).
-2. **Bugs** -- obvious correctness defects in the changed code: nil/null,
-   bounds, error handling, concurrency, resource leaks.
-3. **History** -- git blame/log context: does the change fit how this
-   code evolved; does it reintroduce a reverted fix.
-4. **Comments and docs** -- do comments/docstrings match the new
+1. `ng-reviewer-conventions` -- compliance with project rules
+   (CLAUDE.md / AGENTS.md, linters, naming, layout).
+2. `ng-reviewer-bugs` -- obvious correctness defects in the changed
+   code: nil/null, bounds, error handling, concurrency, resource leaks.
+3. `ng-reviewer-history` -- git blame/log context: does the change fit
+   how this code evolved; does it reintroduce a reverted fix.
+4. `ng-reviewer-docs` -- do comments/docstrings match the new
    behavior; stale or misleading docs.
-5. **Tests and edges** -- missing tests, untested error paths, edge
+5. `ng-reviewer-tests` -- missing tests, untested error paths, edge
    cases the change introduces.
 
-Keep each worker's prompt lean: hand it the scope and its one focus,
-not the answer -- do not pre-list the defects or describe what it will
-find. Require artifacts only obtainable by running tools (exact
-`file:line`, verbatim quotes) and instruct it: "cite file:line from real
-reads; never paraphrase or reconstruct code; if a tool didn't run, say
-so."
+Each agent already carries its focus, its worker workflow (the
+`ng-focused-reviewer` skill: ground findings in real tool runs, report
+everything without self-filtering), and a read-only tool set:
+Read / Grep / Glob, with Bash granted only to `ng-reviewer-history`
+for read-only git digging. Keep each worker's prompt lean: hand it the
+scope material, not the answer -- do not pre-list the defects or
+describe what it will find.
 
-Also instruct each worker: "Report every issue you find, including ones
-you are uncertain about or consider low-severity. Do not filter for
-importance or confidence -- scoring and filtering happen downstream.
-Your job at this stage is coverage: better to surface a finding that
-gets filtered out later than to silently drop a real one." Workers left
-to self-filter follow a conservative bar literally and drop real
-findings before you ever see them.
+Because the other four workers have no Bash, you run any command they
+need up front and paste the output into their prompts. This keeps
+shell execution vetted and out of the parallel fan-out -- only
+`ng-reviewer-history` runs git alongside you, and it runs read-only
+commands. Running tests stays with ng-test-runner;
+`ng-reviewer-tests` only reads for gaps.
 
 Each worker returns findings as: `file:line`, severity
 (blocking / minor), its own confidence (0-100), and a one-line
@@ -83,4 +85,4 @@ Return a markdown review:
 - **Verdict** -- approve / approve-with-nits / request-changes.
 - **Blocking** -- bullets with `file:line` and the concrete problem.
 - **Minor** -- non-blocking suggestions, clearly marked optional.
-- **Checked** -- scope reviewed and the five focuses that ran.
+- **Checked** -- scope reviewed and the five focus agents that ran.
