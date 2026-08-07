@@ -1,0 +1,36 @@
+<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  <name>ubuntu-console</name>
+  <memory unit='MiB'>4096</memory>
+  <vcpu>4</vcpu>
+  <!-- machine='pc' on purpose: on q35 the virtio disk sits behind a pcie-root-port,
+       fails the modern-only probe (dmesg: "Unable to change power state from D3cold
+       to D0") and the guest drops to initramfs with no disk. See SKILL.md Gotchas. -->
+  <os><type arch='x86_64' machine='pc'>hvm</type></os>
+  <cpu mode='host-passthrough'/>
+  <devices>
+    <emulator>/root/.nix-profile/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/ubuntu-console.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <serial type='pty'/><console type='pty'/>
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+  </devices>
+  <!-- Single SLIRP nic added via raw args (no <interface> element) so the same nic
+       carries both the ssh hostfwd and the route to the seed server on 10.0.2.2.
+       Explicit bus/addr keeps qemu's auto-placement off slots libvirt already
+       allocated (otherwise: "PCI: slot 1 function 0 not available").
+       The SMBIOS serial points cloud-init's NoCloud datasource at the seed
+       served on the hosting side's loopback (10.0.2.2 = SLIRP host alias). -->
+  <qemu:commandline>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='user,id=fwd0,hostfwd=tcp:127.0.0.1:2222-:22'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net,netdev=fwd0,bus=pci.0,addr=0x10'/>
+    <qemu:arg value='-smbios'/>
+    <qemu:arg value='type=1,serial=ds=nocloud;s=http://10.0.2.2:8000/'/>
+  </qemu:commandline>
+</domain>

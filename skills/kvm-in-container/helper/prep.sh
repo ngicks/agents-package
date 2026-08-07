@@ -4,7 +4,9 @@
 # Safe to re-run: already-running daemons just print
 # "Unable to obtain pidfile" and are left as-is.
 
-mkdir -p /run/libvirt /var/lib/libvirt /var/log/libvirt /var/lib/libvirt/images
+# /run/lock: images often ship /var/lock -> ../run/lock; a tmpfs mounted on
+# /run at container start leaves that symlink dangling until recreated.
+mkdir -p /run/libvirt /run/lock /var/lib/libvirt /var/log/libvirt /var/lib/libvirt/images
 
 virtlogd -d          # console/log muxer; libvirtd needs it to start guests
 libvirtd -d

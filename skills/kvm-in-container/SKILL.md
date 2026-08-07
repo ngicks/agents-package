@@ -21,9 +21,12 @@ Minimum, each implied by a step below:
   bits (`rw` for your uid) matter.
 - Binaries: `libvirtd` (monolithic daemon), `virtlogd`, `virsh`,
   `qemu-system-<arch>`, `qemu-img`.
-- Writable `/run/libvirt`, `/var/lib/libvirt`, `/var/log/libvirt`
-  (create them if absent), and permission to run the daemons — simplest as
-  root; as a non-root user use `qemu:///session` semantics instead.
+- Writable `/run/libvirt`, `/run/lock`, `/var/lib/libvirt`,
+  `/var/log/libvirt` (create them if absent), and permission to run the
+  daemons — simplest as root; as a non-root user use `qemu:///session`
+  semantics instead. `/run/lock` matters when the runner mounts a tmpfs
+  on `/run`: images commonly ship `/var/lock -> ../run/lock`, and the
+  mount leaves that symlink dangling until the directory is recreated.
 - Nothing else for user-mode networking. Optional features pull in extras:
   tap/bridge networking needs `/dev/net/tun` + CAP_NET_ADMIN, the libvirt
   NAT `default` network additionally needs `dnsmasq`, TPM needs `swtpm`,
@@ -260,3 +263,4 @@ cooperation:
 ## Exmaples
 
 - TrueNAS on podman container / nix managed environment: see [./example/truenas-in-container-nix/def.xml](./example/truenas-in-container-nix/def.xml)
+- Ubuntu cloud image driven entirely over the serial console, NoCloud seed served over HTTP (no ISO tools needed): see [./example/ubuntu-cloudimg-in-container-nix/](./example/ubuntu-cloudimg-in-container-nix/)
