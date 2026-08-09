@@ -133,6 +133,22 @@ spatial or interactive evidence, also create a runnable presentation preview.
   that stack would be disproportionate. Start numbering at `01`; use semantic
   HTML, embedded CSS, native controls, and no external assets.
 
+#### Offload mock generation to a subagent
+
+Writing a GUI / TUI mock is bulk output that crowds the planning context.
+When a preview is warranted, delegate its generation instead of writing it
+inline.
+
+- Use available subagent definition that best suits the task
+- If the tool supports a per-call model override, choose the subagent's model
+  relative to your own: step down one class when you are running as the
+  highest-capability model, otherwise stay at your own class — e.g. Fable
+  delegates to Opus, and Opus delegates to Opus.
+- On return, review the generated files yourself, then link them from PLAN.md
+  as described above — the linking and decision record stay your job.
+- Fall back to writing the mock directly in the current context only when
+  no delegation tool is available.
+
 ## Focus of the plan
 
 Spend the plan's precision on the contracts — the parts that are expensive to
