@@ -1,12 +1,12 @@
 lockfile_version: '1'
-generated_at: '2026-07-22T16:37:19.940276+00:00'
-apm_version: 0.26.0
+generated_at: '2026-08-09T19:39:08.755289+00:00'
+apm_version: 0.27.0
 dependencies:
 - repo_url: anthropics/claude-plugins-official
   name: skill-creator
   host: github.com
-  resolved_commit: a8237e1537e987a92c9f33e5cd650acbe175fd5e
-  version: 0.0.0
+  resolved_commit: 3c8854ad07f7b3d3efe842ca815ba71b3028174f
+  version: 3c8854a
   virtual_path: plugins/skill-creator
   is_virtual: true
   package_type: marketplace_plugin
@@ -86,7 +86,7 @@ dependencies:
     .claude/skills/skill-creator/scripts/run_eval.py: sha256:43e3b8f80dbf69c343967ba77e268fae991d9fa3ed68b32a0ff02532cd48657f
     .claude/skills/skill-creator/scripts/run_loop.py: sha256:7bd6f674203168520517eec94c55f493c0d154339b061b4d7c0f0dad187d0f21
     .claude/skills/skill-creator/scripts/utils.py: sha256:3af8ae62c40c73ab712207436a0d9a981e845f25c5a7040229eb189cc8e45bb1
-  content_hash: sha256:09476584a3731e3c64d504241afd18e1bdcd7095583edf9fd913f19efda5640b
+  content_hash: sha256:6182fd7d5f5934089f5786ca9aed66ec8babb6c6262610b8935a51099243fc89
 - repo_url: moonbitlang/skills
   name: moonbit-skills
   host: github.com
@@ -323,7 +323,7 @@ deployments:
   content_hash: sha256:5a864b4cd4f7d29ea598d31c30e8d8c533b2bbd4449968b920affd2657c3f938
 - kind: project-relative
   target: claude
-  value: .claude/rules/base.local.md
+  value: .claude/rules/local.base.md
   runtime: null
   scope: project
   owners:
@@ -1701,10 +1701,10 @@ deployments:
 local_deployed_files:
 - .agents/skills/skill-review
 - .agents/skills/skill-review/SKILL.md
-- .claude/rules/base.local.md
+- .claude/rules/local.base.md
 - .claude/skills/skill-review
 - .claude/skills/skill-review/SKILL.md
 local_deployed_file_hashes:
   .agents/skills/skill-review/SKILL.md: sha256:5a864b4cd4f7d29ea598d31c30e8d8c533b2bbd4449968b920affd2657c3f938
-  .claude/rules/base.local.md: sha256:7739c9fd281de3c9eb06df3b582908cd714589482da8bf28bafa2b91c29e4f9b
+  .claude/rules/local.base.md: sha256:7739c9fd281de3c9eb06df3b582908cd714589482da8bf28bafa2b91c29e4f9b
   .claude/skills/skill-review/SKILL.md: sha256:5a864b4cd4f7d29ea598d31c30e8d8c533b2bbd4449968b920affd2657c3f938
