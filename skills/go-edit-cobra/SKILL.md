@@ -86,6 +86,12 @@ They are grouped below by what they govern: error handling, positional args, com
 
   (In the [subdirectory-nested variant](reference/layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant), the one wrapper crossing the package boundary is exported — canonically the group's `Cmd(parent *cobra.Command)`; everything else stays unexported.)
 
+- **Every `cobra.Command` field is set inline in the composite literal.** The literal the wrapper builds is the only place command fields are set.
+
+  - No post-construction field assignment — `cmd.Short = ...`, `cmd.Args = ...` are forbidden.
+  - No hoisting a non-function field's value into a variable or constant just to name it — write it in place (`Use: "serve"`, `Args: cobra.NoArgs`, `SilenceUsage: true`).
+  - **Exception: function-typed fields** (`RunE`, the `*Run`/`*RunE` hooks, `ValidArgsFunction`). They are still *set* inside the literal, but their values follow their own rules — `RunE` per the rule below, hooks and completion per [workflows.md](reference/workflows.md) — so they may reference named package-level functions instead of spelling the body in place.
+
 - **Root is the special case.** `func rootCmd() *cobra.Command` (no `parent`).
 
   It returns the configured root and is invoked from `Execute(ctx)`.
@@ -135,9 +141,6 @@ func serveCmd(parent *cobra.Command) {
 		flagPort int
 	)
 
-	cmd.Flags().StringVar(&flagHost, "host", "0.0.0.0", "listen host")
-	cmd.Flags().IntVar(&flagPort, "port", 8080, "listen port")
-
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "run the HTTP server",
@@ -147,6 +150,8 @@ func serveCmd(parent *cobra.Command) {
 		},
 	}
 
+	cmd.Flags().StringVar(&flagHost, "host", "0.0.0.0", "listen host")
+	cmd.Flags().IntVar(&flagPort, "port", 8080, "listen port")
 
 	parent.AddCommand(cmd)
 }
