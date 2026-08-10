@@ -71,9 +71,11 @@ Generation steps (relative to module root):
 
     Flat underscore-joined files are the default. Generate a group as a `commands/<parent>/` subdirectory instead only when the user asks for directories — or when re-scaffolding a project whose previous layout used them (the structure preference must survive). Shape and naming: [layout-and-naming.md › Subdirectory-nested subcommands](layout-and-naming.md#subdirectory-nested-subcommands-allowed-variant).
 
-10. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root>` (add `--stdiopipe` when a subcommand needs cancellable stdio).
+10. Copy the verbatim helper packages into `<root>` by running `"${SKILL-DIR}/copy_helper.sh" <root> --cmdsignals-full` (scaffolding always passes `--cmdsignals-full` — `main.go` calls `cmdsignals.NotifyContext`).
 
-    This copies the `cmdsignals`, `libver`, `loggerfactory`, and `versioninfo` packages — each package's source **and** tests — to their mirrored paths under `<root>`; `--stdiopipe` additionally copies `internal/stdiopipe`.
+    This copies the `libver`, `loggerfactory`, and `versioninfo` packages — each package's source **and** tests — plus the full `cmdsignals` package to their mirrored paths under `<root>`.
+
+    Without `--cmdsignals-full`, `cmdsignals` contributes only `signals.go` (the project-owned `ExitSignals` set); the `NotifyContext` wiring in `notify.go` + tests stays out. Use the default form when a project only wants the preconfigured signal set.
 
     `internal/libver/libver.go` arrives with the initial `Version` value `v0.0.0-devel` — nothing to fill in. Releases run the **external** `bump-libver` tool (`go run github.com/ngicks/go-common/tools/bump-libver@latest`), which reads that fixed path; no release code is generated into the project.
 
@@ -171,7 +173,7 @@ Brief catalog only — full source lives at `${SKILL-DIR}/helpers/<source-path>/
 
 The source path under `helpers/` mirrors the destination path under `<project-root>/`, so `helpers/internal/cmdsignals/` → `<project-root>/internal/cmdsignals/`, `helpers/internal/loggerfactory/` → `<project-root>/internal/loggerfactory/`, etc.
 
-Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on packages (`cmdsignals`, `libver`, `loggerfactory`, `versioninfo`) — source and tests — in one step; add `--stdiopipe` to also copy `internal/stdiopipe`.
+Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on packages (`libver`, `loggerfactory`, `versioninfo` — source and tests — plus `cmdsignals/signals.go`) in one step; add `--cmdsignals-full` to also copy the rest of `cmdsignals` (`notify.go` + tests). Scaffolding always passes `--cmdsignals-full`.
 
 `<project-root>` must already exist.
 
@@ -179,19 +181,37 @@ Run `"${SKILL-DIR}/copy_helper.sh" <project-root>` to copy the always-on package
 
 | Helper          | Import path                          | Purpose                                                                                                                                  | Signature(s)                                                                                                                                                                                                                                                                                                        | Use when                                                                                                              |
 | --------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `cmdsignals`    | `{{MODULE}}/internal/cmdsignals`     | signal-cancellable root context for `SIGINT` / `SIGTERM`, with pause/resume for temporarily forwarding signals to a child process        | `NotifyContext(ctx) (blockOn func(), ctx context.Context, cancel func(error))`, `Pause(ctx, installHandler func()) bool`, `Resume(ctx, removeHandler func()) bool`, `type SignalReceivedError{Sig os.Signal}` (cancellation cause; recover via `context.Cause` + `errors.AsType`), `var ExitSignals [...]os.Signal` | Always when scaffolding (`main.go` calls `NotifyContext`). For existing projects, only when adopting this template.   |
+| `cmdsignals`    | `{{MODULE}}/internal/cmdsignals`     | signal-cancellable root context for `SIGINT` / `SIGTERM`. Split in two: `signals.go` holds only the project-owned `ExitSignals` set (may evolve per project); `notify.go` is `atomicsignal.NotifyContext` (from `github.com/ngicks/go-common/atomicsignal`, external dep) with `ExitSignals` baked in as the canceling set; callers defer `n.Stop()` (and cancel) to release resources | `NotifyContext(ctx, signals ...os.Signal) (n *atomicsignal.Notifier, ctx context.Context, cancel context.CancelCauseFunc)`, `type SignalReceivedError = atomicsignal.SignalReceivedError` (stable re-export of the cancellation cause; recover via `context.Cause` + `errors.AsType`), `var ExitSignals [...]os.Signal` (project-owned) — everything else comes from `atomicsignal` directly: `Notifier.Run()` / `Stop()` / `Swap(*Handler)` / `Restore()`, `CtxValueNotifier(ctx) (*Notifier, bool)` | Always when scaffolding (`main.go` calls `NotifyContext`; copy with `--cmdsignals-full`). For existing projects, only when adopting this template.   |
 | `libver`        | `{{MODULE}}/internal/libver`         | the module-wide, release-controlled `const Version` at a fixed path; rewritten by the external `bump-libver` tool                        | `Version` (a `const`; declared alone)                                                                                                                                                                                                                                                                               | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
 | `loggerfactory` | `{{MODULE}}/internal/loggerfactory`  | `--log` / `--log-level` flag wiring, env-var overrides, opt-in `*slog.Logger`; `Level{Trace,Fatal}` constants reusable from `<name-without-separator>` | `RegisterFlags(cmd) *Config`, `ReadEnv(*Config, appName string, env []string) error`, `BuildLogger(*Config) *slog.Logger`, `BuildLoggerTo(*Config, io.Writer) *slog.Logger`, `type Config`, `LevelTrace`, `LevelFatal`                                                                                              | Always when scaffolding (root.go imports it). For existing projects, only when adopting this template.                |
 | `versioninfo`   | `{{MODULE}}/internal/versioninfo`    | combine the project's `Version` with VCS info from `runtime/debug.ReadBuildInfo`                                                         | `ReadVersionInfo(version string) Info`, `type Info`                                                                                                                                                                                                                                                                 | Always when scaffolding (the version subcommand imports it). For existing projects, only when adopting this template. |
-| `stdiopipe`     | `{{MODULE}}/internal/stdiopipe`      | cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` via `io.Pipe`                                                                         | `Stdin(ctx) io.ReadCloser`, `Stdout(ctx) io.WriteCloser`, `Stderr(ctx) io.WriteCloser`                                                                                                                                                                                                                              | A subcommand blocks on stdio and must unblock on `ctx.Done()`. Single-use per process — second call panics.           |
 
-`cmdsignals.Pause` / `Resume` take the same `ctx` that `NotifyContext` produced (threaded through `cmd.Context()`).
+There are no bespoke pause/resume wrappers — divert signals with `atomicsignal`'s own `Notifier.Swap` / `Restore`.
 
-Reach for them only in a leaf's `run{{Name}}` that hands the terminal to a child process — exec'ing an editor, an interactive REPL, a `less` pager — where `SIGINT` should reach the child instead of cancelling the CLI.
+Do that only in a leaf's `run{{Name}}` that hands the terminal to a child process — exec'ing an editor, an interactive REPL, a `less` pager — where `SIGINT` should reach the child instead of cancelling the CLI. `NotifyContext` stores the `Notifier` in the ctx it returns, so fetch it from `cmd.Context()`:
 
-`Pause` stops this package's handler (its `installHandler` callback is where you install the child's own forwarding handler) and `Resume` restores it (`removeHandler` uninstalls yours); both no-op safely if the context carries no manager or is already cancelled.
+```go
+n, ok := atomicsignal.CtxValueNotifier(cmd.Context())
+if ok {
+	h := atomicsignal.NewHandler(1, forwardToChild, nil) // func(os.Signal)
+	go h.Run()
+	defer h.Stop()
+	n.Swap(h)         // divert signals to h instead of cancelling ctx
+	defer n.Restore() // route back to the canceling handler
+}
+```
 
-The default scaffold needs neither — `NotifyContext` alone gives the standard "signal cancels `ctx`" behavior.
+The relay underneath keeps its one channel registered with `os/signal` across swaps, so the process never falls back to the default `SIGINT` / `SIGTERM` behavior mid-swap. The registered signal set is fixed up front — pass extra non-canceling signals to `cmdsignals.NotifyContext(ctx, extraSigs...)` at startup when a swapped-in handler will need them (e.g. `SIGWINCH` for a terminal app).
+
+The default scaffold needs none of this — `NotifyContext` + `n.Run` alone give the standard "signal cancels `ctx`" behavior.
+
+### Cancellable stdio (external — nothing copied)
+
+There is no bundled stdio helper. When a subcommand blocks on `os.Stdin` / `os.Stdout` / `os.Stderr` and must unblock on `ctx.Done()`, depend on the external `github.com/ngicks/go-common/iopipe` package (`go get github.com/ngicks/go-common/iopipe@latest` when first used):
+
+- `iopipe.NewReader(os.Stdin)` / `iopipe.NewWriter(os.Stdout)` return pipe controllers; call their `Run(ctx)` in a goroutine (e.g. `sync.WaitGroup.Go`).
+- `Pipe(ctx)` derives an `io.ReadCloser` / `io.WriteCloser` plus a channel that reports exactly once how the pipe ended: `nil` when every piped byte was consumed, else `*iopipe.CloseError` (delivered byte count + cause). Cancelling `ctx` closes the derived pipe with the context error.
+- Closing a derived pipe pauses forwarding without closing or interrupting the underlying file; `Pipe` can be called again afterwards (at most one derived pipe is active at a time).
 
 ### Release tool (external — nothing copied)
 

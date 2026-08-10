@@ -21,13 +21,13 @@ The service config source (`<name-without-separator>/config.go`) is in [config-s
 
 `main.go` only handles signal wiring and process exit.
 
-It builds the root context with `cmdsignals.NotifyContext`, which subscribes to `ExitSignals` (`SIGINT` / `SIGTERM`) and returns a `blockOn` func, the cancellable `ctx`, and a `cancel(error)`.
+It builds the root context with `cmdsignals.NotifyContext` — `atomicsignal.NotifyContext` (from `github.com/ngicks/go-common/atomicsignal`) with the project's `ExitSignals` (`SIGINT` / `SIGTERM`) baked in as the canceling set — which returns the `*atomicsignal.Notifier`, the cancellable `ctx`, and a `cancel(error)`.
 
-`blockOn` is what actually cancels `ctx` on a signal, so it runs in a goroutine via `sync.WaitGroup.Go` (Go 1.25+) for the duration of `Execute`; `cancel(nil)` + `wg.Wait()` then unwind it once `Execute` returns.
+`n.Run` is what actually cancels `ctx` on a signal, so it runs in a goroutine via `sync.WaitGroup.Go` (Go 1.25+) for the duration of `Execute`; `cancel(nil)` + `n.Stop()` + `wg.Wait()` then unwind it once `Execute` returns (`n.Stop()` is what makes `Run` return). The advised pattern is `defer cancel(nil)` / `defer n.Stop()`, but `main` calls them explicitly because its `os.Exit(1)` path would skip defers.
 
-Do **not** revert to the stdlib `signal.NotifyContext` — the helper's variant is what enables `Pause` / `Resume` (see [Helper catalog](workflows.md)).
+Do **not** revert to the stdlib `signal.NotifyContext` — the helper's variant is what lets a subcommand temporarily divert signals to a child process via `n.Swap` / `n.Restore` (see [Helper catalog](workflows.md)).
 
-When a signal triggered the shutdown, `Execute` returns the bare `context.Canceled` sentinel; `main` recovers the real reason from `context.Cause(ctx)` as a `*cmdsignals.SignalReceivedError` (via `errors.AsType`, Go 1.26+) so the printed message names the signal instead of the opaque `context canceled`.
+When a signal triggered the shutdown, `Execute` returns the bare `context.Canceled` sentinel; `main` recovers the real reason from `context.Cause(ctx)` as a `*cmdsignals.SignalReceivedError` (via `errors.AsType`, Go 1.26+) so the printed message names the signal instead of the opaque `context canceled`. `SignalReceivedError` is a stable re-export (type alias) of `atomicsignal.SignalReceivedError`, so `main.go` does not import atomicsignal directly.
 
 The guard is `errors.Is(err, ctx.Err())`, **not** the bare `context.Canceled` sentinel: `context.Canceled` is a public value any code may return without this context being cancelled, whereas `ctx.Err()` is non-nil only when _this_ ctx was genuinely cancelled.
 
@@ -50,10 +50,10 @@ import (
 )
 
 func main() {
-	blockOn, ctx, cancel := cmdsignals.NotifyContext(context.Background())
+	n, ctx, cancel := cmdsignals.NotifyContext(context.Background())
 
 	var wg sync.WaitGroup
-	wg.Go(blockOn)
+	wg.Go(n.Run)
 
 	err := commands.Execute(ctx)
 
@@ -66,6 +66,7 @@ func main() {
 	}
 
 	cancel(nil)
+	n.Stop()
 	wg.Wait()
 
 	if err != nil {
@@ -306,11 +307,12 @@ module {{MODULE}}
 go {{GO_VERSION}} // latest major with .0, e.g. 1.26.0
 
 require (
-	github.com/caarlos0/env/v11 v0.0.0            // env parsing; `go get github.com/caarlos0/env/v11@latest` — confirm /v11 is still the current major
-	github.com/ngicks/go-common/contextkey v0.0.0 // resolved by `go get @latest`
-	github.com/spf13/cobra v0.0.0                 // resolved by `go get @latest`
+	github.com/caarlos0/env/v11 v0.0.0              // env parsing; `go get github.com/caarlos0/env/v11@latest` — confirm /v11 is still the current major
+	github.com/ngicks/go-common/atomicsignal v0.0.0 // used by internal/cmdsignals; resolved by `go get @latest`
+	github.com/ngicks/go-common/contextkey v0.0.0   // resolved by `go get @latest`
+	github.com/spf13/cobra v0.0.0                   // resolved by `go get @latest`
 	// YAML-only or both-format projects only — omit for JSON-only:
-	go.yaml.in/yaml/v4 v4.0.0-rc.5                // pinned: v4 is pre-release, so do NOT use @latest
+	go.yaml.in/yaml/v4 v4.0.0-rc.5                  // pinned: v4 is pre-release, so do NOT use @latest
 )
 ```
 

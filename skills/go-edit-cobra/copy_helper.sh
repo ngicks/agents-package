@@ -7,29 +7,35 @@ set -e
 # <project-root>/internal/loggerfactory/. Every *.go file in the package
 # (source and _test.go alike) is copied.
 ALWAYS_DIRS=(
-  internal/cmdsignals
   internal/libver
   internal/loggerfactory
   internal/versioninfo
 )
-# Copied only with --stdiopipe (a subcommand needs cancellable stdio).
-STDIOPIPE_DIR=internal/stdiopipe
+# cmdsignals is special-cased: signals.go (the project-owned ExitSignals set,
+# which may evolve per project) is always copied; the rest of the package (the
+# NotifyContext wiring and its tests, a thin wrapper over
+# github.com/ngicks/go-common/atomicsignal) is copied only with
+# --cmdsignals-full.
+CMDSIGNALS_DIR=internal/cmdsignals
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 HELPERS_DIR="$SCRIPT_DIR/helpers"
 
 usage() {
   echo "Usage:"
-  echo "  $0 <project-root> [--stdiopipe]"
+  echo "  $0 <project-root> [--cmdsignals-full]"
   echo ""
   echo "Copies the go-edit-cobra verbatim helper packages (source and tests)"
   echo "into <project-root>, mirroring each package's path:"
   echo ""
-  echo "  internal/cmdsignals/        always"
-  echo "  internal/libver/            always"
-  echo "  internal/loggerfactory/     always"
-  echo "  internal/versioninfo/       always"
-  echo "  internal/stdiopipe/         only with --stdiopipe"
+  echo "  internal/libver/                 always"
+  echo "  internal/loggerfactory/          always"
+  echo "  internal/versioninfo/            always"
+  echo "  internal/cmdsignals/signals.go   always (the ExitSignals set only)"
+  echo "  internal/cmdsignals/ (rest)      only with --cmdsignals-full"
+  echo ""
+  echo "The full cmdsignals package depends on"
+  echo "github.com/ngicks/go-common/atomicsignal (go get after copying)."
   echo ""
   echo "<project-root> must already exist (the module root containing go.mod)."
   exit 1
@@ -54,11 +60,26 @@ copy_dir() {
   done
 }
 
+copy_cmdsignals_signals_only() {
+  local rel="$CMDSIGNALS_DIR"
+  local src="$HELPERS_DIR/$rel/signals.go"
+  local dst_dir="$DEST/$rel"
+
+  if [[ ! -f "$src" ]]; then
+    echo "Error: helper source not found: $src" >&2
+    exit 1
+  fi
+
+  mkdir -p "$dst_dir"
+  cp "$src" "$dst_dir/"
+  echo "  $rel/signals.go"
+}
+
 DEST=""
-WITH_STDIOPIPE=0
+WITH_CMDSIGNALS_FULL=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --stdiopipe) WITH_STDIOPIPE=1; shift ;;
+    --cmdsignals-full) WITH_CMDSIGNALS_FULL=1; shift ;;
     -h|--help) usage ;;
     -*) echo "Error: unknown option: $1" >&2; usage ;;
     *)
@@ -83,6 +104,8 @@ echo "Copying helpers into $DEST"
 for d in "${ALWAYS_DIRS[@]}"; do
   copy_dir "$d"
 done
-if [[ "$WITH_STDIOPIPE" -eq 1 ]]; then
-  copy_dir "$STDIOPIPE_DIR"
+if [[ "$WITH_CMDSIGNALS_FULL" -eq 1 ]]; then
+  copy_dir "$CMDSIGNALS_DIR"
+else
+  copy_cmdsignals_signals_only
 fi

@@ -30,9 +30,8 @@ Read this when scaffolding, adding/renaming/moving subcommands, or deciding wher
 │           └── <parent>_<child>.go      # one per nested leaf (zz-prefix a trailing GOOS/GOARCH/test leaf: foo_windows.go → foo_zzwindows.go)
 ├── internal/
 │   ├── cmdsignals/
-│   │   └── signals.go                   # always present
-│   ├── stdiopipe/                       # only when a subcommand needs cancellable stdio
-│   │   └── stdiopipe.go
+│   │   ├── signals.go                   # always present; the project-owned ExitSignals set
+│   │   └── notify.go                    # NotifyContext: atomicsignal.NotifyContext (github.com/ngicks/go-common/atomicsignal) with ExitSignals baked in; callers defer n.Stop()
 │   ├── libver/
 │   │   └── libver.go                    # always present; release-controlled `const Version` (fixed path)
 │   ├── loggerfactory/
@@ -64,7 +63,7 @@ That is an **allowed variant**, not the canonical default — it exists so a pro
 Why this shape:
 
 - `cmd/<name>/` lets a future second binary be added as `cmd/<other>/` with no churn.
-- `internal/` holds every internal helper package — `cmdsignals`, `stdiopipe`, `libver`, `loggerfactory`, `templateutil`, `versioninfo` — in one module-root tree, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules under Go's `internal/` rule.
+- `internal/` holds every internal helper package — `cmdsignals`, `libver`, `loggerfactory`, `templateutil`, `versioninfo` — in one module-root tree, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules under Go's `internal/` rule.
 
   `templateutil` is the shared `text/template` `FuncMap` + `FuncDocs` (`json` baseline, plus any project helpers) that every renderer exposes; the `config` subcommand's `--format` uses it via `<name-without-separator>/cli`. One copy keeps the func set — and its help text — identical across call sites.
 - `internal/loggerfactory/` is genuinely shared, not CLI-only: `<name-without-separator>` code imports its level constants — notably `LevelTrace` and `LevelFatal` — and emits records at levels the CLI knows how to render.
@@ -373,7 +372,7 @@ Grouped by the part of the layout each one violates.
 
   See [Subdirectory-nested subcommands](#subdirectory-nested-subcommands-allowed-variant).
 - **`main.go` at the module root.** Same reason — entrypoint must live at `cmd/<name>/main.go`.
-- **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `stdiopipe`, `libver`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules.
+- **Helper packages under `cmd/<name>/commands/` or a separate `cmd/internal/` tree.** Every internal helper — `cmdsignals`, `libver`, `loggerfactory`, `versioninfo` — lives under the module-root `internal/`, reachable from both `./cmd` and `./<name-without-separator>` while blocked to external modules.
 
   Do not reintroduce a `cmd/internal/` layer or scatter helpers beside the subcommand files.
 - **Importing `{{MODULE}}/commands`** anywhere. The only correct import is `{{MODULE}}/cmd/<name>/commands`.
@@ -383,7 +382,7 @@ Grouped by the part of the layout each one violates.
 - **Vendoring release code into the project.** The release flow is the external `bump-libver` tool (`go run github.com/ngicks/go-common/tools/bump-libver@latest`); do not copy its predecessor (`internal/cmd/release/`) into new projects, and do not add release shell scripts under `scripts/` or anywhere else.
 
   (A project scaffolded by an older skill revision may still carry `internal/cmd/release/` — leave it; remove only on explicit user request.)
-- **Generating `stdiopipe` speculatively.** Only when a concrete subcommand needs it.
+- **Vendoring a stdio-pipe helper into the project (e.g. a legacy `internal/stdiopipe/`).** Cancellable `os.Stdin` / `os.Stdout` / `os.Stderr` comes from the external `github.com/ngicks/go-common/iopipe` package — see [workflows.md › Cancellable stdio](workflows.md#cancellable-stdio-external--nothing-copied). Add the dependency only when a concrete subcommand needs it. (A project scaffolded by an older skill revision may still carry `internal/stdiopipe/` — leave it; migrate only on explicit user request.)
 - **Placing a new service package under `pkg/` in a top-level-layout project — or migrating a legacy `pkg/<name-without-separator>/` to the top level unprompted.** The service package lives at the module root (`./<name-without-separator>/`); for the **service** package, `pkg/` is only the legacy placement — its current role is housing non-service packages.
 
   Whichever shape a project already has must survive edits and re-scaffolding: new files follow the existing placement, and migration between the two happens only on explicit user request (same preserve rule as the subdirectory command variant).
