@@ -10,8 +10,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/ngicks/go-common/atomicsignal"
 )
 
 // TestNotifyContext_DeliversRealSignal exercises the full wiring by sending
@@ -48,7 +46,7 @@ func TestNotifierSwap_DivertsRealSignal(t *testing.T) {
 	n, ctx, _, _ := startNotifier(t)
 
 	forward := make(chan os.Signal, 1)
-	h := atomicsignal.NewHandler(1, func(sig os.Signal) { forward <- sig }, nil)
+	h := NewHandler(1, func(sig os.Signal) { forward <- sig }, nil)
 	go h.Run()
 	defer h.Stop()
 	n.Swap(h)

@@ -12,6 +12,15 @@ import (
 // `cmdsignals.SignalReceivedError` without importing atomicsignal.
 type SignalReceivedError = atomicsignal.SignalReceivedError
 
+// Notifier aliases [atomicsignal.Notifier] so references stay stable as
+// `cmdsignals.Notifier`. Its methods — Run, Stop, Swap, Restore — are
+// documented upstream.
+type Notifier = atomicsignal.Notifier
+
+// Handler aliases [atomicsignal.Handler] so references stay stable as
+// `cmdsignals.Handler`; build one with [NewHandler].
+type Handler = atomicsignal.Handler
+
 // NotifyContext is [atomicsignal.NotifyContext] with [ExitSignals] baked in
 // as the canceling set: ctx is cancelled with [*SignalReceivedError] when one
 // of [ExitSignals] is received.
@@ -44,11 +53,29 @@ type SignalReceivedError = atomicsignal.SignalReceivedError
 // signals to additionally register non-canceling ones up front when a
 // swapped-in handler ([atomicsignal.Notifier.Swap]) may need them later.
 //
-// The Notifier is stored in ctx; retrieve it with
-// [atomicsignal.CtxValueNotifier].
+// The Notifier is stored in ctx; retrieve it with [CtxValueNotifier].
 func NotifyContext(
 	inCtx context.Context,
 	signals ...os.Signal,
-) (n *atomicsignal.Notifier, ctx context.Context, cancel context.CancelCauseFunc) {
+) (n *Notifier, ctx context.Context, cancel context.CancelCauseFunc) {
 	return atomicsignal.NotifyContext(inCtx, ExitSignals[:], signals...)
+}
+
+// CtxValueNotifier proxies [atomicsignal.CtxValueNotifier], returning the
+// [Notifier] stored in ctx by [NotifyContext], so references stay stable as
+// `cmdsignals.CtxValueNotifier`.
+func CtxValueNotifier(ctx context.Context) (*Notifier, bool) {
+	return atomicsignal.CtxValueNotifier(ctx)
+}
+
+// NewHandler proxies [atomicsignal.NewHandler] so references stay stable as
+// `cmdsignals.NewHandler`; use it to build the [Handler] swapped in with
+// [atomicsignal.Notifier.Swap]. The caller is responsible for running it
+// (`go h.Run()`) and stopping it.
+func NewHandler(
+	buffer int,
+	defaultHandler func(sig os.Signal),
+	handlers map[os.Signal]func(sig os.Signal),
+) *Handler {
+	return atomicsignal.NewHandler(buffer, defaultHandler, handlers)
 }

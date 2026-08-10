@@ -21,7 +21,7 @@ The service config source (`<name-without-separator>/config.go`) is in [config-s
 
 `main.go` only handles signal wiring and process exit.
 
-It builds the root context with `cmdsignals.NotifyContext` — `atomicsignal.NotifyContext` (from `github.com/ngicks/go-common/atomicsignal`) with the project's `ExitSignals` (`SIGINT` / `SIGTERM`) baked in as the canceling set — which returns the `*atomicsignal.Notifier`, the cancellable `ctx`, and a `cancel(error)`.
+It builds the root context with `cmdsignals.NotifyContext` — `atomicsignal.NotifyContext` (from `github.com/ngicks/go-common/atomicsignal`) with the project's `ExitSignals` (`SIGINT` / `SIGTERM`) baked in as the canceling set — which returns the `*cmdsignals.Notifier` (a stable re-export of `atomicsignal.Notifier`), the cancellable `ctx`, and a `cancel(error)`.
 
 `n.Run` is what actually cancels `ctx` on a signal, so it runs in a goroutine via `sync.WaitGroup.Go` (Go 1.25+) for the duration of `Execute`; `cancel(nil)` + `n.Stop()` + `wg.Wait()` then unwind it once `Execute` returns (`n.Stop()` is what makes `Run` return). The advised pattern is `defer cancel(nil)` / `defer n.Stop()`, but `main` calls them explicitly because its `os.Exit(1)` path would skip defers.
 

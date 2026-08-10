@@ -5,8 +5,6 @@ import (
 	"errors"
 	"testing"
 	"time"
-
-	"github.com/ngicks/go-common/atomicsignal"
 )
 
 const testTimeout = 2 * time.Second
@@ -16,7 +14,7 @@ const testTimeout = 2 * time.Second
 // Stop so the process-global signal registration does not leak into other
 // tests.
 func startNotifier(t *testing.T) (
-	n *atomicsignal.Notifier,
+	n *Notifier,
 	ctx context.Context,
 	cancel context.CancelCauseFunc,
 	done <-chan struct{},
@@ -73,11 +71,11 @@ func TestNotifyContext_CancelPreservesCauseAndStopEndsRun(t *testing.T) {
 func TestNotifyContext_StoresNotifierInContext(t *testing.T) {
 	n, ctx, _, _ := startNotifier(t)
 
-	got, ok := atomicsignal.CtxValueNotifier(ctx)
+	got, ok := CtxValueNotifier(ctx)
 	if !ok || got != n {
 		t.Fatalf("CtxValueNotifier = (%v, %v), want the returned Notifier", got, ok)
 	}
-	if _, ok := atomicsignal.CtxValueNotifier(context.Background()); ok {
+	if _, ok := CtxValueNotifier(context.Background()); ok {
 		t.Fatal("CtxValueNotifier returned true for a context without a Notifier")
 	}
 }
