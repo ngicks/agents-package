@@ -230,6 +230,9 @@ Canonical shape:
 - **Wiring**: the enclosing package imports `{{MODULE}}/cmd/<name>/commands/<parent>` and calls `<parent>.Cmd(cmd)` — from `rootCmd()` for a top-level group.
 
   Persistent-flag threading is unchanged: pass `&flag` as extra parameters on `Cmd`.
+
+  Across the package boundary, thread individual pointers (`*string`, `*bool`, ... — no named type crosses packages).
+  A shared set too large for that means the values belong in the service's `PartialConfig`, not flags. Do not escalate to a struct here — crossing the boundary would force exporting it, and the flag bundle must stay unexported.
 - **Deeper levels**: inside the subpackage, use underscore-joined files (`start_foo.go`) or a further subdirectory — mirror whichever the project already does.
 
 ```go
@@ -427,7 +430,12 @@ Grouped by the part of the layout each one violates.
 - **Pointer-returning flag APIs (`Flags().String(...)`, `Flags().Int(...)`)** at any scope. Always use the `*Var` family with a local declared in the wrapper's `var (...)` block.
 
   This keeps the binding shape uniform with `pflag.BoolFunc`.
-- **Reading flags via `cmd.Flags().Get*`.** Use the captured flag variable from the wrapper's `var (...)` block; pass it into `run{{Name}}` via a `RunE` closure adapter when needed.
+- **Reading flags via `cmd.Flags().Get*` or `cmd.InheritedFlags().Get*`.** Use the captured flag variable from the wrapper's `var (...)` block; pass it into `run{{Name}}` via a `RunE` closure adapter when needed.
+
+  This includes a child re-reading a parent's persistent flag by name — thread `&flag` (or the parent's unexported flag struct) into the child wrapper instead; string lookups break silently on flag renames.
+- **Exporting the parent→child flag bundle** — an exported `ServeFlags` type, or package-level shared flag state.
+
+  Threading is an internal detail of the `commands` package: flag `var`s, child wrappers, and any bundling struct stay unexported so the shape (pointer arguments ↔ one struct) can change freely with the flag count. See SKILL.md › Wrappers, run functions & wiring.
 
 ### Run functions & the `./cmd` boundary
 

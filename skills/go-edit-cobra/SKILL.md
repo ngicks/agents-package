@@ -104,6 +104,15 @@ They are grouped below by what they govern: error handling, positional args, com
 
   When a persistent flag must reach a child's run function, declare the flag's `var` in the parent wrapper and pass its address as an extra parameter to the child wrapper (`{{child}}Cmd(cmd, &flagShared)`).
 
+- **Parent→child flag threading is an unexported internal detail.** The flag `var`s, the child wrappers, and any bundling struct all stay unexported inside the `commands` package, so the threading shape is free to change as the shared-flag count changes — switching forms is a local refactor, never an API change. Pick by size:
+
+  - **Default (up to ~3 shared flags): individual pointer arguments** — `{{child}}Cmd(cmd, &flagConfig)`.
+    Each child receives only the flags it actually consumes; the wrapper signature documents the dependency.
+  - **Escalation (more than ~3, or two same-typed pointers traveling together): one unexported struct** declared in the parent's file (e.g. `type serveFlags struct { host string; port int }`), passed as `{{child}}Cmd(cmd, &shared)`.
+    Named fields remove the swapped-same-type-argument hazard.
+  - Reaching the threshold is a smell: before bundling, check whether those values belong in the service's `PartialConfig` (file/env layers) rather than flags at all.
+  - **Never** have a child re-read a parent's flag via `cmd.InheritedFlags().Get*` / `cmd.Flags().Get*` — stringly-typed lookups compile fine and break silently on flag renames.
+
 - **Run functions are named** (`run{{Name}}`) and live at package level.
 
   **Run functions are thin wiring**: read positional args, call a service, return its error.

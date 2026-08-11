@@ -249,6 +249,9 @@ func {{parentCamel}}Cmd(parent *cobra.Command) {
 
 	// TODO: wire children here, e.g.:
 	//   {{parentCamel}}{{ChildPascal}}Cmd(cmd)
+	// Persistent flags a child consumes are threaded as extra parameters:
+	// `&flagShared` per flag by default; one unexported struct declared in this
+	// file once the shared set outgrows ~3 flags (SKILL.md › Wrappers).
 
 	parent.AddCommand(cmd)
 }
