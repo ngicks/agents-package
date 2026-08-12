@@ -83,9 +83,11 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
 - **PLAN.md** — the implementation plan: title and one-line summary; goal /
   success criteria and scope (both grounded in IDEA.md); non-goals; context
   (real file paths, current behavior); approach (chosen design plus rejected
-  alternatives); ordered implementation steps, each independently verifiable
-  and naming real files and symbols; testing and verification; risks; and a
-  numbered **Open questions** section that drains to empty as they resolve.
+  alternatives); a **Public surface delta** section (see Focus of the plan)
+  whenever exported or user-visible surface changes; ordered implementation
+  steps, each independently verifiable and naming real files and symbols;
+  testing and verification; risks; and a numbered **Open questions** section
+  that drains to empty as they resolve.
 - **STATUS.md** — living progress log: current state, a checklist mirroring the
   PLAN.md steps, what is done / in progress / blocked, and the next action. Seed
   a new one as "not started"; when elaborating, refresh it rather than reset it.
@@ -155,7 +157,8 @@ Spend the plan's precision on the contracts — the parts that are expensive to
 change later. Implementation internals can stay rough.
 
 - **Public API** — the exported surface consumers will call: packages, types,
-  functions, and their signatures.
+  functions, and their signatures — plus the surface end users actually touch:
+  config file keys, CLI flags and subcommands, and environment variables.
 - **RPC schema** — the wire contracts between processes: proto / OpenAPI /
   Connect definitions, endpoints, message shapes.
 - **Project layout** — where things live: directories, packages / modules, and
@@ -166,6 +169,41 @@ change later. Implementation internals can stay rough.
 Nail these down concretely (real names, real fields, real paths) before
 detailing implementation steps; a change to any of them after implementation
 starts invalidates far more work than an internal refactor does.
+
+### Public surface delta — fenced code, not prose
+
+Every plan touching exported or user-visible surface gets a **Public surface
+delta** section in PLAN.md whose authority is fenced code in the source
+language. Prose may explain, but the code block defines: anything user-visible
+that is not in the block is out of scope by definition.
+
+Enumerate in the block:
+
+- added / changed / removed exported symbols, with full signatures;
+- struct fields, with tags;
+- config keys, as a literal example-config snippet;
+- CLI flags and subcommands, as example invocations;
+- durable state vocabulary — option / setting names, DB columns, file formats.
+
+Prose is where omissions hide — a reader cannot notice a missing line in a
+paragraph. An enumerated code block makes absence visible and askable: if it
+is user-visible and not in the block, ask why.
+
+## Sub-plans and inherited decisions
+
+A large plan may split into sub-plans, each its own plan directory. The split
+boundary is where deliverables fall through the cracks, so make it explicit in
+both directions.
+
+- **Boundary ledger, both directions** — when a plan is split, the parent and
+  every sub-plan each carry the same table listing every deliverable the
+  feature needs end-to-end, with the plan and step that owns it. An inbound
+  list alone ("what the parent consumes from us") is not enough; a deliverable
+  owned by nobody must appear as a visible empty cell, never as silence.
+- **Quote inherited decisions verbatim** — when a sub-plan restates an upstream
+  DECISION.md entry, quote its operative sentence or link to it directly;
+  never re-summarize. A compressed paraphrase can invert meaning and
+  camouflage a requirement through implementation and review.
 
 ## Record open questions
 
@@ -198,3 +236,19 @@ After each answer, fold it back into the plan files immediately.
 - Append a DECISION.md entry with the choice, the rationale, and the rejected
   alternatives.
 - Refresh STATUS.md to reflect the now-current plan.
+
+### Traceability gate
+
+Before declaring the plan finalized, verify every decided clause is owned by a
+step — review catches what is listed, not what is implied.
+
+- Walk every DECISION.md entry, inherited ones included, clause by clause, and
+  record for each operative clause the step that delivers it:
+
+      D15 "via config" -> step 4 | parent plan step 15 | open question
+
+- An unmapped clause means the plan is not finalized: give it an owning step,
+  hand it to another plan in the family via the boundary ledger, or reopen it
+  as an open question.
+- Then replay each IDEA.md use case against the union of planned steps across
+  the plan family; a use case no step delivers is flagged the same way.
