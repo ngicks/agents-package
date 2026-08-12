@@ -56,7 +56,7 @@ Scalars and slices overwrite; nested structs and maps deep-merge (see [Merge sem
 
    `unmarshalConfigFile` decodes the file into a fresh **zero** `PartialConfig` (absent file → zero value; ENOENT is not an error; any other read or parse error aborts) and never merges — decoding into a zero value sidesteps the v1 `encoding/json` merge edge cases (the ones `encoding/json/v2` is designed to remove) that decoding into an already-populated struct hits.
 
-3. **The env layer (via `github.com/caarlos0/env`).** `LoadConfig` fills the **same** `PartialConfig` from the environment by calling `env.ParseWithOptions` directly — no wrapper type: the variable names live in `PartialConfig`'s `env:` / `envPrefix:` tags, and the package-level `envOptions` (`env.Options{Prefix: "{{NAME_UPPER}}_"}`) applies the prefix.
+3. **The env layer (via `github.com/caarlos0/env`).** `LoadConfig` fills the **same** `PartialConfig` from the environment by calling `env.ParseWithOptions` directly — no wrapper type: the variable names live in `PartialConfig`'s `env:` / `envPrefix:` tags, and the package-level `envOptions` (`env.Options{Prefix: EnvPrefix}`, where the exported `EnvPrefix` const is `"{{NAME_UPPER}}_"`) applies the prefix.
 
    A field is set (non-nil) when its variable is present; absent ones stay nil.
 
@@ -204,9 +204,9 @@ Implementors MAY rename it (e.g. `--conf`, `--config-file`) if `--config` would 
 
 ### Lint, growth, and adding a field
 
-- **Env var names** live in `PartialConfig`'s `env:` / `envPrefix:` tags (bare names; the `{{NAME_UPPER}}_` prefix is applied via the package-level `envOptions`).
+- **Env var names** live in `PartialConfig`'s `env:` / `envPrefix:` tags (bare names; the `{{NAME_UPPER}}_` prefix comes from the exported `EnvPrefix` const, applied via the package-level `envOptions`).
 
-  There are no `SCREAMING_SNAKE` Go constants to trip naming lint — the only env-name identifier is the MixedCaps `envConfVar`, which needs no directive.
+  One deliberate exception: the exported `ENV_{{NAME_UPPER}}_CONF` const's identifier mirrors its variable name (`ENV_` + variable), so it carries a `//nolint:revive,stylecheck` directive; `EnvPrefix` is MixedCaps and needs none.
 
 - **Long lines.** The triple-tagged `PartialConfig` fields (`json:` + `yaml:` + `env:` on one line) routinely exceed line-length linters (`lll`, `revive`'s `line-length-limit`).
 

@@ -1,6 +1,6 @@
 # `{{NAME}}/config.go` source template
 
-The service-side configuration source: `Config` + `DefaultConfig`, the exported `PartialConfig` + `Apply`, the isolated `unmarshalConfigFile`, and `LoadConfig`.
+The service-side configuration source: the top `const` block (the exported `ENV_{{NAME_UPPER}}_CONF` + `EnvPrefix`, the unexported `defaultConfigDir`), `Config` + `DefaultConfig`, the exported `PartialConfig` + `Apply`, the isolated `unmarshalConfigFile`, and `LoadConfig`.
 
 The model these implement (layers, merge rules, precedence, path resolution, flag overlay) is documented in [configuration.md](configuration.md) — read it first.
 
@@ -35,6 +35,27 @@ import (
 	"path/filepath"
 
 	"github.com/caarlos0/env/v11"
+)
+
+// Well-known names the config machinery uses, gathered in one block above the
+// types they govern. The env-var names are exported so consumers (help text,
+// docs generation, tests) can reference them.
+const (
+	// ENV_{{NAME_UPPER}}_CONF names the config-file-path override read by
+	// configPath. It is the ONE env var read by hand (the path is needed before
+	// parsing, and is not a Config field); every other variable lives in
+	// PartialConfig's env tags. The identifier deliberately mirrors the
+	// variable name ("ENV_" + variable), so it carries a naming-lint suppression.
+	//nolint:revive,stylecheck // identifier mirrors the env var name
+	ENV_{{NAME_UPPER}}_CONF = "{{NAME_UPPER}}_CONF"
+
+	// EnvPrefix is applied to every tag-declared variable via envOptions,
+	// yielding {{NAME_UPPER}}_ADDR, {{NAME_UPPER}}_SERVER_TLS, etc.
+	EnvPrefix = "{{NAME_UPPER}}_"
+
+	// defaultConfigDir is the directory under os.UserConfigDir() holding the
+	// default config file (see configPath).
+	defaultConfigDir = "{{NAME}}"
 )
 
 // Config is the materialized configuration the service consumes, after every
@@ -160,9 +181,9 @@ func (p PartialServerConfig) Apply(base ServerConfig) ServerConfig {
 
 // envOptions configures caarlos0/env for the env layer in LoadConfig. The
 // variable names live in the env: / envPrefix: tags on PartialConfig; the
-// {{NAME_UPPER}}_ prefix is applied here, yielding {{NAME_UPPER}}_ADDR,
+// EnvPrefix const is applied here, yielding {{NAME_UPPER}}_ADDR,
 // {{NAME_UPPER}}_SERVER_TLS, {{NAME_UPPER}}_LABELS, etc.
-var envOptions = env.Options{Prefix: "{{NAME_UPPER}}_"}
+var envOptions = env.Options{Prefix: EnvPrefix}
 
 // LoadConfig assembles defaults < config file < environment through Apply. The
 // ./cmd layer applies explicitly-set flags on top (flags win). flagPath is the
@@ -219,26 +240,21 @@ func unmarshalConfigFile(path string) (PartialConfig, error) {
 	return p, nil
 }
 
-// envConfVar names the config-file-path override. It is the one env var read by
-// hand (the file path is needed before parsing, and is not a Config field); every
-// other variable lives in PartialConfig's env tags. MixedCaps, so no naming-lint
-// directive is needed.
-const envConfVar = "{{NAME_UPPER}}_CONF"
-
-// configPath resolves the file path: --config (flagPath), else $envConfVar, else
-// os.UserConfigDir()/{{NAME}}/config.json.
+// configPath resolves the file path: --config (flagPath), else the
+// $ENV_{{NAME_UPPER}}_CONF override, else os.UserConfigDir()/defaultConfigDir/
+// config.json. (The const is declared in the block at the top of the file.)
 func configPath(flagPath string) (string, error) {
 	if flagPath != "" {
 		return flagPath, nil
 	}
-	if p, ok := os.LookupEnv(envConfVar); ok {
+	if p, ok := os.LookupEnv(ENV_{{NAME_UPPER}}_CONF); ok {
 		return p, nil
 	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "{{NAME}}", "config.json"), nil
+	return filepath.Join(dir, defaultConfigDir, "config.json"), nil
 }
 ```
 
@@ -334,21 +350,21 @@ func unmarshalConfigFile(path string) (PartialConfig, error) {
 	return p, nil
 }
 
-// configPath (both mode): --config / $envConfVar win as explicit paths (format by
+// configPath (both mode): --config / $ENV_{{NAME_UPPER}}_CONF win as explicit paths (format by
 // extension); otherwise probe the default dir YAML-first and return the first that
 // exists. YAML takes precedence over JSON; only that one file is loaded.
 func configPath(flagPath string) (string, error) {
 	if flagPath != "" {
 		return flagPath, nil
 	}
-	if p, ok := os.LookupEnv(envConfVar); ok {
+	if p, ok := os.LookupEnv(ENV_{{NAME_UPPER}}_CONF); ok {
 		return p, nil
 	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	base := filepath.Join(dir, "{{NAME}}")
+	base := filepath.Join(dir, defaultConfigDir)
 	for _, name := range []string{"config.yaml", "config.yml", "config.json"} {
 		p := filepath.Join(base, name)
 		if _, err := os.Stat(p); err == nil {
