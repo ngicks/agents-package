@@ -53,6 +53,9 @@ in IDEA.md, and PLAN.md's goal, scope, and success criteria derive from it.
 - Walk each use case end to end: who is acting, in what situation, what they are
   trying to get done, and what they experience at each step from invocation to
   done.
+- Diagram the workflow where it earns it: when a use case branches, involves
+  several actors, or spans more than a few steps, put a mermaid flowchart or
+  sequence diagram beside the prose walkthrough in IDEA.md.
 - Judge usability concretely: invocation ergonomics and naming, defaults that
   match the common case, feedback while running, the failure experience, and
   discoverability.
@@ -122,11 +125,65 @@ Keep the plan itself in markdown so it stays readable, diffable, and easy to
 update.
 
 - Use markdown tables for comparisons, such as options and their trade-offs.
-- Use mermaid code fences when structure beats prose: architecture /
-  component relationships, data flow, state machines, sequence interactions,
-  and navigation between GUI screens.
-- A diagram that restates a one-line fact is noise; leave simple sections as
-  prose.
+- Diagrams are for the human reader. Whenever a section's material has shape —
+  a flow, a hierarchy, relations, states, a layout — default to adding the
+  matching mermaid diagram alongside the prose, in IDEA.md and PLAN.md alike.
+  Diagram and prose co-exist: the diagram shows the shape, the prose explains
+  it.
+- Skip a diagram only when there is no shape to show: adding a library
+  function or a simple refactor / clean-up contains no workflow or structure.
+- Pick the diagram type from the catalogue below rather than defaulting to
+  flowchart for everything.
+- A workflow diagrammed in IDEA.md often deserves a PLAN.md counterpart
+  showing which components and steps deliver each leg of the flow.
+
+#### Mermaid type catalogue
+
+Match the diagram type to the shape of the material.
+
+Flow and behavior — things that happen over time:
+
+| Type              | Shows                                     | Typical plan use                                          |
+| ----------------- | ----------------------------------------- | --------------------------------------------------------- |
+| `flowchart`       | steps, branches, decisions                | use-case workflows, control flow, error paths              |
+| `sequenceDiagram` | ordered messages between actors           | RPC / protocol exchanges, multi-component use cases        |
+| `stateDiagram-v2` | states and transitions                    | lifecycles, modes, connection / session state              |
+| `journey`         | user steps scored by experience           | IDEA.md end-to-end walkthroughs, pain-point hunting        |
+| `timeline`        | events in chronological order             | rollout, migration, and deprecation phases                 |
+| `gantt`           | schedule with durations and dependencies  | ordering across steps or sub-plans                         |
+
+Structure and data — things that are:
+
+| Type                 | Shows                                  | Typical plan use                                         |
+| -------------------- | -------------------------------------- | --------------------------------------------------------- |
+| `classDiagram`       | types, members, relationships          | public API shape, domain model                             |
+| `erDiagram`          | entities, attributes, cardinality      | database schema, persistent data                           |
+| `packet`             | bit / byte field layout                | wire formats, binary file headers                          |
+| `architecture`       | services, groups, connections          | deployment / infrastructure topology                       |
+| `C4Context` (etc.)   | system context / container views       | where the feature sits among surrounding systems           |
+| `block`              | nested blocks on a grid                | component layout, memory maps                              |
+| `mindmap`            | hierarchy radiating from a root        | idea-phase decomposition, scope maps                       |
+| `gitGraph`           | commits, branches, merges              | branching / release strategy                               |
+| `requirementDiagram` | requirements linked to elements        | formal requirement traceability                            |
+
+Quantitative and tracking — occasionally useful evidence:
+
+| Type            | Shows                          | Typical plan use                                  |
+| --------------- | ------------------------------ | -------------------------------------------------- |
+| `pie`           | shares of a whole              | sizing evidence (e.g. where time / bytes go)        |
+| `xychart`       | line / bar series              | benchmarks, load or growth data behind a decision   |
+| `quadrantChart` | items placed on two axes       | option triage — effort vs impact                    |
+| `radar`         | multi-axis comparison          | scoring rejected vs chosen alternatives             |
+| `sankey`        | volume flowing between nodes   | data volume moving between components               |
+| `kanban`        | work items in status columns   | rarely — STATUS.md's checklist usually suffices     |
+| `treemap`       | nested proportions             | relative size of packages / areas touched           |
+
+Newer niche types exist (`venn`, `wardley`, `cynefin`, `ishikawa`,
+`railroad`, …). Plan documents are read in many renderers — GitHub, editors,
+doc sites — so prefer the long-stable types above when either fits; a diagram
+that does not render is worse than prose.
+
+#### Presentation previews
 
 Mermaid describes relationships well, but it is not a presentation layout
 language. When material GUI, web, mobile, or terminal-interface decisions need
