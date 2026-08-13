@@ -115,7 +115,9 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
   history.
 
 Other files are welcome — later agents may add notes, diagrams, or scratch while
-planning or implementing. Keep the four canonical files current.
+planning or implementing. Keep the four canonical files current. One more file
+is standardized but deliberately not scaffolded: HANDOFF.md — see
+**HANDOFF.md — ledger of what leaves the plan** below.
 
 Reference actual file paths and symbols, never placeholders.
 
@@ -303,6 +305,31 @@ explicit in both directions.
   directly; never re-summarize. A compressed paraphrase can invert meaning
   and camouflage a requirement through implementation and review.
 
+## HANDOFF.md — ledger of what leaves the plan
+
+Work that leaves the plan family — deferred tasks, defects found but not
+fixed, required follow-ups — is recorded in a `HANDOFF.md` in the plan
+directory. It is a ledger, not a license: writing an item there does not
+authorize deferring it.
+
+- Do not scaffold it. Create the file only when the first real item appears.
+  No HANDOFF.md means nothing was left behind; the file's very existence is a
+  signal the user should see.
+- Only two kinds of entries are legitimate:
+  - **Out-of-scope discovery** — a defect or improvement found while working
+    that the agreed scope does not cover. Recording it is mandatory; fixing
+    it silently and staying silent about it are both wrong.
+  - **User-approved deferral** — in-scope work moved out by an explicit user
+    decision, linking its DECISION.md entry. A deferral without a decision
+    entry is scope silently dropped, which the traceability gate rejects.
+- In-scope work is never handed off by default: it is done, or the plan is
+  not done. A step turning out hard or large is a reason to raise an open
+  question with the user, not to write a HANDOFF entry.
+- Each entry records what the item is (real paths and symbols), why it is not
+  done here (discovery, or the linked decision), and the concrete follow-up
+  required — who or which future plan should pick it up.
+- Tell the user whenever you add an entry; the file never grows quietly.
+
 ## Record open questions
 
 Every unresolved decision goes into the plan as an explicit open question, never
@@ -353,3 +380,6 @@ step — review catches what is listed, not what is implied.
   as an open question.
 - Then replay each IDEA.md use case against the union of planned steps across
   the plan family; a use case no step delivers is flagged the same way.
+- HANDOFF.md is part of the gate: if it exists, every entry must be an
+  out-of-scope discovery or link a user-made DECISION.md entry — anything
+  else is scope silently dropped, and the plan is not finalized.
