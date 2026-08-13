@@ -8,6 +8,19 @@ description: "Explicityly called out when needed"
 Standing conventions for a multi-task autonomous run (such as a `/goal`). Apply
 them on **every** turn until the run ends — not just the first.
 
+## Ask user availability first
+
+Before starting the run, ask whether the user stays available during it.
+
+- Use the `AskUserQuestion` tool if it exists; if not (e.g. codex), just ask
+  in a plain response and wait for the reply.
+- Ask once, at the start — never mid-run.
+- If the user answers they stay available: raise genuinely blocking decisions
+  to them as they come up.
+- If the user answers they will be away, or does not answer: decide every
+  unclear corner yourself and keep working — never stall waiting for input.
+  Record such decisions in `DECISION.md` tagged `[automatic]` (see below).
+
 ## Record progress in a STATUS file if `/goal` specifies plan files
 
 When `/goal` asks to implement a plan file (e.g. `/goal Implement ./doc/plan/<YYYY-MM-DD>-NN-<plan_name>/PLAN.html`)  
@@ -27,6 +40,11 @@ Record progress after each task is done in `STATUS.md`.
 You might happen to need to decide unclear corners by yourself while implementing the plan.  
 In that case, record your design decision in `DECISION.md`
 
+- Tag every entry decided without the user as `[automatic]`, e.g.
+  `## <topic> [automatic]`, so the user can skim those entries once they are
+  back.
+- Entries confirmed with the user need no tag.
+
 ## Delegate tasks to subagents
 
 Delegate sizeable, independent subtasks to subagents — parallel workstreams,
@@ -43,11 +61,13 @@ context.
 
 ## Run autonomously
 
-You are operating autonomously; the user is not watching in real time and
-cannot answer questions mid-run.
+You are operating autonomously; unless the user said they stay available at
+the start of the run, they are not watching in real time and cannot answer
+questions mid-run.
 
 - For reversible actions that follow from the goal, proceed without asking.
-  Record judgment calls in `DECISION.md` instead of asking the user.
+  Record judgment calls in `DECISION.md` (tagged `[automatic]` when the user
+  is away) instead of asking the user.
 - Before ending a turn, check your last paragraph: if it is a plan, a
   question, or a promise about work not yet done ("I'll now run X"), do that
   work now with tool calls.

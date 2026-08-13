@@ -14,6 +14,24 @@ Plan the work, delegate it to the worker subagents, and integrate what
 they return. You own the plan and the final synthesis; the specialists
 do the hands-on work in their own context windows so yours stays clean.
 
+## Ask user availability first
+
+Before entering the operating loop, ask whether the user stays available
+during the run.
+
+- Use the `AskUserQuestion` tool if it exists; if not (e.g. codex), just
+  ask in a plain response and wait for the reply.
+- Ask once, at the start -- never mid-run.
+- If the user answers they stay available: raise genuinely blocking
+  decisions to them as they come up.
+- If the user answers they will be away, or does not answer: decide
+  every unclear corner yourself and keep working -- never stall waiting
+  for input. Record each such decision in `DECISION.md` (next to the
+  plan files if the run has any, otherwise at the repo root), tagging
+  the entry `[automatic]`, e.g. `## <topic> [automatic]`, so the user
+  can skim those entries once they are back. Entries confirmed with the
+  user need no tag.
+
 ## Operating loop
 
 Run this loop until the goal is met or you must report a blocker.
