@@ -62,6 +62,19 @@ in IDEA.md, and PLAN.md's goal, scope, and success criteria derive from it.
 - Draft-first applies here too: write the rough IDEA.md, mark uncertain use
   cases and usability calls as open questions rather than guessing silently.
 
+### The idea gate — finalize IDEA.md before planning
+
+IDEA.md is a gate, not a first draft that planning overtakes. Stop and
+finalize it with the user before detailing the implementation plan.
+
+- Resolve the idea-level open questions — use cases, usability calls — with
+  the user first, before any contract or implementation-step questions.
+- Then ask the user to confirm IDEA.md captures how it should be; only after
+  that confirmation, detail PLAN.md's contracts and implementation steps.
+- The rough scaffold still writes all four files up front, but PLAN.md stays
+  a skeleton — goal, scope, known context, open questions — until the gate
+  passes.
+
 ## Emit the rough scaffold
 
 Write the plan directory now, as a rough first pass — do not wait for answers.
@@ -248,6 +261,9 @@ into chat-only memory.
 
 Walk the open questions and resolve every one with the user.
 
+- Order the rounds idea-first: resolve IDEA.md questions and pass the idea
+  gate (see **The idea gate** above) before raising contract or
+  implementation-step questions.
 - Prefer the `AskUserQuestion` tool when available: offer concrete options with
   the tentative default first as the recommended choice, and let the user supply
   a custom answer.
