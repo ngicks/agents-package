@@ -107,8 +107,12 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
   testing and verification; risks; and a numbered **Open questions** section
   that drains to empty as they resolve.
 - **STATUS.md** — living progress log: current state, a checklist mirroring the
-  PLAN.md steps, what is done / in progress / blocked, and the next action. Seed
-  a new one as "not started"; when elaborating, refresh it rather than reset it.
+  PLAN.md steps, what is done / in progress / blocked, and the next action.
+  Checklist items quote or cite the DECISION.md entry or requirement they
+  discharge (e.g. `D28: tab completes *paths* ✓`), never just the feature
+  name, so completion is judged against the requirement's words rather than
+  the implementation's. Seed a new one as "not started"; when elaborating,
+  refresh it rather than reset it.
 - **DECISION.md** — decision log: one entry per material decision with the choice
   made, the rationale, and the alternatives rejected. Seed stubs from the open
   questions; append a finished entry as each one resolves, rather than rewriting
@@ -209,6 +213,22 @@ spatial or interactive evidence, also create a runnable presentation preview.
   that stack would be disproportionate. Start numbering at `01`; use semantic
   HTML, embedded CSS, native controls, and no external assets.
 
+#### Mock limitations and promotion
+
+A mock validates interaction decisions by silently substituting fake
+everything else — data sources, filesystem, timing, fixture data. State that
+substitution explicitly at the moment it is cheapest to see.
+
+- Every mock or preview states, in its header comment or a sibling
+  `MOCK_LIMITS.md`: what the mock fakes, and which requirements it therefore
+  cannot validate.
+- A DECISION.md entry justified by "validated in the mock" must name which
+  mock, and holds only for behaviors outside that mock's known-limitations
+  list.
+- When mock code is lifted into production, read its claimed semantics — its
+  own comments — side by side against the DECISION.md wording it implements.
+  A discrepancy is a deviation to raise with the user, never to copy forward.
+
 #### Offload mock generation to a subagent
 
 Writing a GUI / TUI mock is bulk output that crowds the planning context.
@@ -220,8 +240,9 @@ inline.
   relative to your own: step down one class when you are running as the
   highest-capability model, otherwise stay at your own class — e.g. Fable
   delegates to Opus, and Opus delegates to Opus.
-- On return, review the generated files yourself, then link them from PLAN.md
-  as described above — the linking and decision record stay your job.
+- On return, review the generated files yourself — including that the
+  known-limitations list is present — then link them from PLAN.md as
+  described above; the linking and decision record stay your job.
 - Fall back to writing the mock directly in the current context only when
   no delegation tool is available.
 
