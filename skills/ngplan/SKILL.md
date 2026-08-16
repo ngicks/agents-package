@@ -77,6 +77,15 @@ finalize it with the user before detailing the implementation plan.
 - The rough scaffold still writes all four files up front, but PLAN.md stays
   a skeleton — goal, scope, known context, open questions — until the gate
   passes.
+- Record the gate state in IDEA.md itself, as a status line near the top:
+  the rough scaffold seeds `Gate: not confirmed`, and it flips to
+  `Gate: confirmed by user, <YYYY-MM-DD>` when the user confirms.
+- When resuming an existing plan, trust only that recorded line — a
+  confirmation given in an earlier session's chat does not count. If the
+  line is missing or says not confirmed, run the gate again before
+  detailing PLAN.md.
+- Substantive edits to IDEA.md after confirmation reset the line to
+  `Gate: not confirmed`; confirm with the user again before planning on.
 
 ## Emit the rough scaffold
 
@@ -94,7 +103,8 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
 ## Canonical files
 
 - **IDEA.md** — the "how it should be" statement, written in the idea phase:
-  use cases (actor, situation, intent, end-to-end walkthrough) and usability
+  a `Gate:` status line near the top (see **The idea gate**), use cases
+  (actor, situation, intent, end-to-end walkthrough) and usability
   requirements (ergonomics, defaults, feedback, failure experience).
   Deliberately blind to implementation cost; PLAN.md compromises against it only
   through a DECISION.md entry.
