@@ -39,6 +39,11 @@ that matches the surrounding style.
   belong to the ng-test-runner and ng-reviewer.
 - Do NOT add new dependencies or public API without saying so in your
   return.
+- Do NOT cite plan or decision documents in anything durable. Plan
+  files (`PLAN.md`, `DECISION.md`, `STATUS.md`) are ephemeral and may
+  be removed later, so code, comments, commit messages, and docs must
+  stand on their own: write the actual reason in plain words, never
+  tokens like `D15` or "step 3 of the plan".
 
 ## Output contract
 

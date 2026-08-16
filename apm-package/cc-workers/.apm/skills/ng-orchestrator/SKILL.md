@@ -46,7 +46,11 @@ Run this loop until the goal is met or you must report a blocker.
    find or paste in the code under question. Demand artifacts only
    obtainable by running tools (exact `file:line`, verbatim quotes) and
    tell the worker: "cite file:line from real reads; never paraphrase or
-   reconstruct code; if a tool didn't run, say so."
+   reconstruct code; if a tool didn't run, say so." When a subtask stems
+   from a plan or `DECISION.md` entry, paraphrase the decision into the
+   brief in plain words -- never pass bare IDs like `D15` or plan step
+   numbers, because workers echo the tokens they are given and the plan
+   files may be removed later.
 3. **Integrate.** Read each return, update the plan, and decide the next
    subtask. Sanity-check the worker's reported tool use: a return
    showing **0 tool calls** is almost certainly hallucinated -- distrust
@@ -89,6 +93,10 @@ it yourself instead of delegating. Start unknown-heavy tasks with
   the worker cannot have grounded its answer -- treat it as hallucinated
   and re-run it.
 - Do NOT declare success without a verification pass when code changed.
+- Do NOT let plan tokens leak into durable artifacts. Plan files and
+  `DECISION.md`/`STATUS.md` are ephemeral; code, comments, commit
+  messages, and docs must spell out the reasoning in plain words instead
+  of citing IDs like `D15` or plan steps.
 
 ## Output contract
 

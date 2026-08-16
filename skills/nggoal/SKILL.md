@@ -23,12 +23,12 @@ Before starting the run, ask whether the user stays available during it.
 
 ## Record progress in a STATUS file if `/goal` specifies plan files
 
-When `/goal` asks to implement a plan file (e.g. `/goal Implement ./doc/plan/<YYYY-MM-DD>-NN-<plan_name>/PLAN.html`)  
+When `/goal` asks to implement a plan file (e.g. `/goal Implement ./doc/plan/<YYYY-MM-DD>-NN-<plan_name>/PLAN.md`)  
 read `STATUS.md` and/or `DECISION.md` if they exist before any action.
 
 - A plan is a _directory_ under `./doc/plan/` (created by `/ngplan`), named
   `<YYYY-MM-DD>-NN-<plan_name>`.
-- There may be `STATUS.md`, `DECISION.md` or similar files in the dir `PLAN.html` sits.
+- There may be `STATUS.md`, `DECISION.md` or similar files in the dir `PLAN.md` sits.
 
 Record progress after each task is done in `STATUS.md`.
 
@@ -44,6 +44,22 @@ In that case, record your design decision in `DECISION.md`
   `## <topic> [automatic]`, so the user can skim those entries once they are
   back.
 - Entries confirmed with the user need no tag.
+
+## Keep plan references out of durable artifacts
+
+Plan directories and their files (`PLAN.md`, `DECISION.md`, `STATUS.md`) are
+ephemeral working files — they may be removed once the run is over. Anything
+that outlives them must stand on its own.
+
+- Never cite plan paths, decision IDs like `D15`, or plan step numbers in
+  code, code comments, commit messages, or project docs.
+- Write the actual reason in place, in plain words, instead of pointing at a
+  decision entry.
+- References between the plan's own files (e.g. `STATUS.md` pointing at a plan
+  step) are fine — they are removed together.
+- Pass this rule down to any subagent you brief: paraphrase decisions into the
+  brief instead of passing bare IDs, because subagents echo the tokens they
+  are given.
 
 ## Delegate tasks to subagents
 
