@@ -29,16 +29,15 @@ specific to this codebase, not generic.
 - Check `./doc/plan/` for an existing plan the user refers to. If one matches (or
   the user points at a directory), open it and elaborate it — work from its
   current files.
-- Otherwise compute a new location `./doc/plan/<YYYY-MM-DD>-NN-<plan_name>`:
+- Otherwise compute a new location `./doc/plan/<YYYY-MM-DD>-<plan_name>`:
   - `<YYYY-MM-DD>` is today's date — get it from `date "+%Y-%m-%d"` rather than
     guessing.
-  - `NN` is the next free 2-digit serial among that day's entries — scan
-    `./doc/plan/` for existing `<date>-NN-*` entries sharing today's date, take
-    the highest + 1, zero-padded from `01`. No entry for today means start at
-    `01`.
-  - `<plan_name>` is a short snake*case slug from the summary — use `*`, not
-`-`, so it stays a single token that doesn't collide with the `-`joining
-the date and`NN`.
+  - `<plan_name>` is a short snake_case slug from the summary — use `_`, not
+    `-`, so it stays a single token that doesn't collide with the `-`s inside
+    the date and the one joining the date to the name.
+  - If the computed directory already exists and holds a different plan, pick
+    a more specific slug — disambiguate by name, never by a serial counter,
+    so parallel worktrees never have to coordinate a shared number.
 - A sub-plan of an existing plan does not get its own dated entry — it lives
   under its master plan's directory instead; see **Sub-plans** below.
 
