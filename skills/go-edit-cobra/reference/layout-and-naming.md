@@ -527,3 +527,7 @@ Grouped by the part of the layout each one violates.
 - **Hand-building the config path as `$HOME/.config/...`.** Use `os.UserConfigDir()` — it honors `$XDG_CONFIG_HOME` and is platform-native on macOS / Windows.
 
   Resolution order: `--config` flag, then `$<NAME>_CONF`, then `os.UserConfigDir()`.
+
+- **Writing app files into a `~/.<name>/` home-dir dotdir, or hand-building any other XDG path (`$HOME/.cache/...`, `$HOME/.local/share/...`).** The home directory takes no per-app subdirectory at all — `~/.<name>` is the legacy layout the XDG spec replaces.
+
+  Resolve cache via `os.UserCacheDir()`, and data / state / runtime via the `internal/userdir` helper, appending `/<name>` in the app-specific layer — see [user-dirs.md](user-dirs.md).

@@ -9,6 +9,7 @@ set -e
 ALWAYS_DIRS=(
   internal/libver
   internal/loggerfactory
+  internal/userdir
   internal/versioninfo
 )
 # cmdsignals is special-cased: signals.go (the project-owned ExitSignals set,
@@ -30,6 +31,7 @@ usage() {
   echo ""
   echo "  internal/libver/                 always"
   echo "  internal/loggerfactory/          always"
+  echo "  internal/userdir/                always"
   echo "  internal/versioninfo/            always"
   echo "  internal/cmdsignals/signals.go   always (the ExitSignals set only)"
   echo "  internal/cmdsignals/ (rest)      only with --cmdsignals-full"

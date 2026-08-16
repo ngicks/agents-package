@@ -171,6 +171,8 @@ Use **`os.UserConfigDir`**, not a hand-built `$HOME/.config` — it already cons
 
 Exposing `--config` is recommended but optional — pass `""` to `LoadConfig` to rely on `$<NAME>_CONF` / `os.UserConfigDir` alone.
 
+(Config-file resolution is owned by `configPath`, here. Every **other** per-user directory the app writes to — cache, data, state, runtime — is covered by [user-dirs.md](user-dirs.md).)
+
 ### Flag overlay (the flags-win step, in `./cmd`)
 
 Service-config flags are **not** bound directly into `Config` — that would let a flag's _default_ value clobber file/env.
