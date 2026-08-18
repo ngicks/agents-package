@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crabswarm hook exec --ft markdown 'mermaid-lint {{quoteJoin .Files}}'",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
