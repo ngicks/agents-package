@@ -340,7 +340,10 @@ explicit in both directions.
 Work that leaves the plan family — deferred tasks, defects found but not
 fixed, required follow-ups — is recorded in a `HANDOFF.md` in the plan
 directory. It is a ledger, not a license: writing an item there does not
-authorize deferring it.
+authorize deferring it. It is also not the final resting place: once the
+implementation is done and the user has reviewed it, the ledger drains into
+the durable issue backlog — see **Fold the ledger into the issue backlog**
+below.
 
 - Do not scaffold it. Create the file only when the first real item appears.
   No HANDOFF.md means nothing was left behind; the file's very existence is a
@@ -359,6 +362,34 @@ authorize deferring it.
   done here (discovery, or the linked decision), and the concrete follow-up
   required — who or which future plan should pick it up.
 - Tell the user whenever you add an entry; the file never grows quietly.
+
+### Fold the ledger into the issue backlog
+
+HANDOFF.md lives in the plan directory, and plan directories are ephemeral —
+they may be removed once the work is over. Entries that should survive are
+folded into the repository's durable issue backlog,
+`./doc/plan/issue/issue.md`, but only on the user's say-so.
+
+- Timing — this happens strictly after the implementation is done **and** the
+  user has followed up on it. Never bundle the fold into the same turn as the
+  completion report: report the finished work, wait for the user's review and
+  approval of the implementation, and only then offer the fold.
+- Ask which entries to fold with `AskUserQuestion` (`multiSelect: true`), one
+  option per HANDOFF.md entry (topic). At most ~4 options per round; go in
+  rounds for a longer ledger. The built-in "Other" choice is how the user
+  answers "all of them" or gives a custom instruction. A single-entry
+  ledger gets a fold-or-drop question for that entry instead, since the
+  tool needs at least two options. Fall back to plain chat when the tool
+  is unavailable.
+- Create `doc/plan/issue/` and `issue.md` on first use; append the selected
+  entries and never rewrite or reorder what is already there.
+- issue.md outlives the plan directory, so rewrite each folded entry to stand
+  alone: real paths and symbols, the reasoning in plain words, and no plan
+  paths, decision IDs like `D15`, or plan step numbers.
+- Entries the user leaves unselected stay in HANDOFF.md and disappear with
+  the plan directory — that is the user's decision to drop them; never fold
+  them silently.
+- Tell the user what was folded and where.
 
 ## Record open questions
 
@@ -412,4 +443,7 @@ step — review catches what is listed, not what is implied.
   the plan family; a use case no step delivers is flagged the same way.
 - HANDOFF.md is part of the gate: if it exists, every entry must be an
   out-of-scope discovery or link a user-made DECISION.md entry — anything
-  else is scope silently dropped, and the plan is not finalized.
+  else is scope silently dropped, and the plan is not finalized. A ledger
+  that passes the gate is what later gets offered for folding into
+  `doc/plan/issue/issue.md` — after implementation, once the user has
+  followed up on it (see **Fold the ledger into the issue backlog**).

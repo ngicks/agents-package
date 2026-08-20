@@ -107,4 +107,36 @@ Return a short markdown report:
   returns.
 - **Verification** -- what ng-reviewer / ng-test-runner confirmed (or why
   skipped).
-- **Open items** -- anything deferred, with the reason.
+- **Open items** -- anything deferred, with the reason, including
+  `HANDOFF.md` entries not yet folded into `doc/plan/issue/issue.md`
+  (see **Fold HANDOFF.md into the issue backlog**).
+
+## Fold HANDOFF.md into the issue backlog
+
+If the run's plan directory holds a `HANDOFF.md` (deferred tasks,
+out-of-scope discoveries), its surviving entries are folded into the
+durable issue backlog `<repo root>/doc/plan/issue/issue.md` -- but only
+after the user has signed off on the implementation.
+
+- Timing: never in the same turn as the final report. Deliver the
+  report, wait for the user's follow-up on the implementation, and only
+  after their review and approval offer the fold.
+- Ask which entries to fold with `AskUserQuestion`
+  (`multiSelect: true`), one option per entry; at most ~4 options per
+  round, going in rounds for a longer ledger. The built-in "Other"
+  choice is how the user answers "all of them" or gives a custom
+  instruction. A single-entry ledger gets a fold-or-drop question for
+  that entry instead, since the tool needs at least two options. Fall
+  back to plain chat when the tool is unavailable.
+- Create `doc/plan/issue/` and `issue.md` on first use; append the
+  selected entries, never rewriting or reordering what is already
+  there.
+- issue.md is a durable artifact: rewrite each folded entry to stand
+  alone, with real paths and symbols and the reasoning in plain words
+  -- no plan paths, decision IDs like `D15`, or plan step numbers.
+- If the user said at run start that they are away, do not fold
+  anything automatically: list `HANDOFF.md` under **Open items** in the
+  report as awaiting triage instead.
+- Unselected entries stay in `HANDOFF.md` and are removed with the plan
+  directory -- that is the user's decision to drop them; never fold
+  them silently.
