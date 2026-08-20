@@ -20,6 +20,48 @@ Use this checklist to find old Go writing and replace it with idioms and APIs av
 
 ## Checklist
 
+#### Go 1.27
+
+##### Language
+
+- **DO** use generic methods — a method declaration may declare its own type parameters (e.g. `func (c *Cache) Get[T any](key string) (T, bool)`).
+  - Interface methods may not declare type parameters, and interface methods cannot be implemented by generic methods.
+- **DO** set promoted (embedded) fields directly in struct literals — a key may be any valid field selector for the struct type, not just a top-level field name.
+
+##### JSON
+
+- **DO** prefer `encoding/json/v2` for new code: `Marshal`/`Unmarshal` take variadic `Options`; use `MarshalWrite`/`UnmarshalRead` for streams and `MarshalEncode`/`UnmarshalDecode` with encoders/decoders.
+  - v2 defaults are stricter than v1: invalid UTF-8 in JSON strings and duplicate object names are rejected.
+- **DO** use `encoding/json/jsontext` (`Encoder`, `Decoder`, `Token`, `Value`) for low-level syntactic JSON processing.
+- **MIND `time.Duration`:** v2 deliberately rejects marshaling/unmarshaling `time.Duration` (no agreed default representation).
+  - **DO** always provide custom marshalers/unmarshalers for types containing `time.Duration`, built with `json.MarshalToFunc` / `json.UnmarshalFromFunc` and passed via `json.WithMarshalers(...)` / `json.WithUnmarshalers(...)`.
+- The v1 `encoding/json` API still works (now backed by the v2 implementation); the Go 1.24 `omitzero` rule still applies to v1-API code.
+
+##### Standard Library
+
+- **DO** use `strings.CutLast` / `bytes.CutLast` to slice around the **last** occurrence of a separator.
+  - **DON'T** hand-roll it with `LastIndex` plus manual slicing.
+- **DO** use the new stdlib `uuid` package to generate and parse UUIDs.
+  - **DON'T** add `github.com/google/uuid` to new code.
+- **DO** use `net/url.URL.Clone()` and `url.Values.Clone()` instead of manual deep copies.
+- **DO** use `math/big.Int.Divide` for quotient and remainder with rounding modes `Trunc`, `Floor`, `Round`, `Ceil`.
+- **DO** use the generic `Rand.N` method in `math/rand/v2` (matches the top-level `N` function).
+- **DO** use `hash/maphash.Hasher` / `ComparableHasher` as the hashing contract for hash-based data structures.
+- **DO** use `go/types.Hasher` / `HasherIgnoreTags` to key hash tables by `types.Type` (respects `Identical` / `IdenticalIgnoreTags`).
+- **DO** use `net/http.Server.MaxHeaderValueCount` to bound accepted header value counts; set `Server.DisableClientPriority` to keep round-robin HTTP/2 stream scheduling instead of RFC 9218 priorities.
+- You can use the `goroutineleak` profile (`runtime/pprof`; `net/http/pprof` endpoint `/debug/pprof/goroutineleak`) to find leaked goroutines.
+
+##### Testing
+
+- **DO** use `testing/synctest.Sleep()` instead of `time.Sleep` + `synctest.Wait` inside synctest bubbles.
+- **DO** use `net/http/httptest.NewTestServer()` for an in-memory fake-network server usable with `testing/synctest`.
+
+##### Crypto / TLS
+
+- **DO** use `crypto/mldsa` for post-quantum ML-DSA signatures (FIPS 204); supported by `crypto/x509` and TLS 1.3 (`MLDSA44` / `MLDSA65` / `MLDSA87` `SignatureScheme` values).
+- **DO** add `MLKEM1024` to `tls.Config.CurvePreferences` when that key exchange is needed.
+- **DON'T** set `tls.Config.Rand` (deprecated) — use `testing/cryptotest.SetGlobalRandom()` for deterministic tests.
+
 #### Go 1.26
 
 ##### Language
