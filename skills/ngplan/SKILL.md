@@ -73,6 +73,18 @@ finalize it with the user before detailing the implementation plan.
   the user first, before any contract or implementation-step questions.
 - Then ask the user to confirm IDEA.md captures how it should be; only after
   that confirmation, detail PLAN.md's contracts and implementation steps.
+- Ask that confirmation with `AskUserQuestion`, using this fixed wording and
+  option order every time — never reorder or reword it, so the user's answer
+  by muscle memory always lands on the same choice:
+  - Question: "Does IDEA.md capture how it should be?"
+  - Option 1: "No. Need something to change" — the user points out what;
+    the gate stays `not confirmed`.
+  - Option 2: "Yes. Confirm the gate" — flip the `Gate:` line to confirmed.
+- This fixed order overrides the recommended-first convention: even when
+  "Yes" is the natural recommendation, do not move it first or append
+  "(Recommended)" to it.
+- Keep the same wording and order when falling back to plain chat because
+  the tool is unavailable.
 - The rough scaffold still writes all four files up front, but PLAN.md stays
   a skeleton — goal, scope, known context, open questions — until the gate
   passes.
@@ -411,7 +423,8 @@ Walk the open questions and resolve every one with the user.
   implementation-step questions.
 - Prefer the `AskUserQuestion` tool when available: offer concrete options with
   the tentative default first as the recommended choice, and let the user supply
-  a custom answer.
+  a custom answer. (Exception: the idea-gate confirmation uses its own fixed
+  wording and order — see **The idea gate**.)
 - Fall back to plain chat when `AskUserQuestion` is unavailable — ask in your
   reply, listing the numbered questions with their options and your default.
 - At most ~4 questions per round; go in rounds until nothing material is open.

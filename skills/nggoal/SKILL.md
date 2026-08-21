@@ -14,6 +14,17 @@ Before starting the run, ask whether the user stays available during it.
 
 - Use the `AskUserQuestion` tool if it exists; if not (e.g. codex), just ask
   in a plain response and wait for the reply.
+- Use this fixed wording and option order every time — never reorder or
+  reword it, so the user's answer by muscle memory always lands on the same
+  choice:
+  - Question: "Will you stay available during this run?"
+  - Option 1: "No. I'm away" — decide unclear corners autonomously and tag
+    those decisions `[automatic]`.
+  - Option 2: "Yes. I stay available" — raise genuinely blocking decisions
+    as they come up.
+- This fixed order overrides the recommended-first convention: even when
+  "Yes" seems the natural recommendation, do not move it first or append
+  "(Recommended)" to it.
 - Ask once, at the start — never mid-run.
 - If the user answers they stay available: raise genuinely blocking decisions
   to them as they come up.
