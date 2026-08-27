@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+FROM docker.io/library/golang:1.24-bookworm AS build
+WORKDIR /app/src
+COPY . .
+RUN CGO_ENABLED=0 go build -o /out/app ./...
+
+FROM docker.io/library/debian:bookworm-slim
+RUN <<EOF
+    set -e
+    groupadd --gid 10001 app
+    useradd --uid 10001 --gid 10001 --create-home app
+EOF
+COPY --from=build /out/app /app
+USER app
+ENTRYPOINT ["/app"]

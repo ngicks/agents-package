@@ -1,0 +1,10 @@
+# syntax=docker/dockerfile:1
+FROM docker.io/library/node:22-bookworm-slim AS build
+WORKDIR /app/src
+COPY . .
+RUN npm ci
+RUN npm run build
+
+FROM docker.io/library/node:22-bookworm-slim
+COPY --from=build /app/src/dist /app/dist
+ENTRYPOINT ["node", "/app/dist/index.js"]

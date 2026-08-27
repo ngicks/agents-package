@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+FROM docker.io/library/node:22-bookworm-slim AS build
+WORKDIR /app/src
+COPY package.json package-lock.json ./
+RUN --mount=type=secret,id=npm_token,env=NPM_TOKEN \
+    --mount=type=ssh \
+    --mount=type=cache,target=/root/.npm \
+    npm ci
+COPY . .
+RUN npm run build
+
+FROM docker.io/library/node:22-bookworm-slim
+COPY --from=build /app/src/dist /app/dist
+COPY --from=build /app/src/node_modules /app/node_modules
+ENTRYPOINT ["node", "/app/dist/index.js"]

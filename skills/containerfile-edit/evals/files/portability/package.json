@@ -1,0 +1,14 @@
+{
+  "name": "portability",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild index.js --bundle --platform=node --outdir=dist"
+  },
+  "dependencies": {
+    "@corp/internal-sdk": "git+ssh://git@github.example.com/corp/internal-sdk.git#v1.2.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}

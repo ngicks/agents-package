@@ -1,0 +1,14 @@
+{
+  "name": "cache-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild index.js --bundle --platform=node --outdir=dist"
+  },
+  "dependencies": {
+    "express": "^4.19.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}

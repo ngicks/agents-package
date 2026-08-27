@@ -1,0 +1,80 @@
+{
+  "skill_name": "containerfile-edit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write a Containerfile for the Go service in this repository. Keep rebuilds fast, use a minimal production image, and make the result run under an arbitrary UID with a read-only root filesystem.",
+      "expected_output": "A multi-stage build that bind-mounts the source read-only into the build RUN (Go builds do not write into the tree) with -o output outside the mount, concurrency-safe Go cache mounts, a fully qualified pinned builder image, a digest-pinned minimal runtime base, exec-form ENTRYPOINT/CMD, and no baked USER.",
+      "files": [
+        "evals/files/go-service/go.mod",
+        "evals/files/go-service/main.go"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write a Containerfile for this Node.js application. We also maintain similar Python and Rust services; explain how source should enter the build stage for these ecosystems and why.",
+      "expected_output": "Whole-context COPY with a deliberate ignore file for Node.js, Python, and Rust — not a source bind mount — with the correct rationale: their build workflows commonly write outputs into or below the source tree while bind mounts are read-only by default, so such builds fail; the repository standardizes on COPY for these ecosystems. Dependency manifests copied first remain the cache-ordering exception.",
+      "files": [
+        "evals/files/node-app/package.json",
+        "evals/files/node-app/package-lock.json",
+        "evals/files/node-app/index.js"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "We added internal/metrics to this monorepo and the image silently shipped without it. Review and fix the Containerfile.",
+      "expected_output": "Rejects the enumerated per-directory COPY list as the root cause (it silently breaks when files are added), replaces it with a whole-context COPY filtered by a maintained ignore file, and keeps only the dependency-manifest copy as the cache-ordering exception.",
+      "files": [
+        "evals/files/monorepo/Containerfile",
+        "evals/files/monorepo/go.mod",
+        "evals/files/monorepo/cmd/api/main.go",
+        "evals/files/monorepo/internal/auth/auth.go",
+        "evals/files/monorepo/internal/store/store.go",
+        "evals/files/monorepo/internal/metrics/metrics.go"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Review this Containerfile against our repository conventions and fix what violates them.",
+      "expected_output": "Removes the baked USER (and the now-unneeded user creation) per the deployment contract: the image must support an arbitrary UID and every consumer explicitly supplies --user under a rootless runtime; documents that runtime guidance instead of re-hardening with USER. Also keeps the image runnable as non-root with no path requiring root, and digest-pins the runtime base image.",
+      "files": [
+        "evals/files/baked-user/Containerfile",
+        "evals/files/baked-user/go.mod",
+        "evals/files/baked-user/main.go"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "This Containerfile is built by Docker BuildKit in CI and by Podman/Buildah on developer machines. Verify every feature it uses works on both builders and fix or document any gap.",
+      "expected_output": "Checks secret env= mounts (supported by current Docker and Buildah; verify on old deployed builders), and handles Buildah's 2-second SSH agent connection close by forcing a signing operation before the build (ssh-add -T <public-key> for every key the build may use — a signing test, not an identity listing); documents any builder-specific compromise instead of presenting the build as portable.",
+      "files": [
+        "evals/files/portability/Containerfile",
+        "evals/files/portability/package.json",
+        "evals/files/portability/package-lock.json",
+        "evals/files/portability/index.js"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Builds run behind a corporate TLS-intercepting proxy. Review how this Containerfile handles the corporate CA and fix it. Some dependencies are fetched from public registries with public roots.",
+      "expected_output": "Stops copying the CA into a layer and stops overwriting the package-managed system bundle; mounts the corporate CA as a secret at a neutral path (e.g. /run/secrets/corporate-ca.pem) with SSL_CERT_FILE pointing at it, and supplies a deliberately combined bundle since both public and corporate roots are needed.",
+      "files": [
+        "evals/files/corp-ca/Containerfile",
+        "evals/files/corp-ca/go.mod",
+        "evals/files/corp-ca/main.go",
+        "evals/files/corp-ca/corp-ca.pem"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Every code change re-downloads all npm dependencies in this image build. Fix the Containerfile and describe how to verify the fix.",
+      "expected_output": "Copies dependency manifests and installs dependencies before copying source, adds a package-manager cache mount, and validates by building twice to confirm warm-cache reuse, then changing an ordinary source file without touching dependency manifests and confirming dependency acquisition remains cached.",
+      "files": [
+        "evals/files/cache/Containerfile",
+        "evals/files/cache/package.json",
+        "evals/files/cache/package-lock.json",
+        "evals/files/cache/index.js"
+      ]
+    }
+  ]
+}
