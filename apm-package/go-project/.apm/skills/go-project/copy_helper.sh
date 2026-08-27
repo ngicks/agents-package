@@ -26,7 +26,7 @@ usage() {
   echo "Usage:"
   echo "  $0 <project-root> [--cmdsignals-full]"
   echo ""
-  echo "Copies the go-edit-cobra verbatim helper packages (source and tests)"
+  echo "Copies the go-project skill's verbatim helper packages (source and tests)"
   echo "into <project-root>, mirroring each package's path:"
   echo ""
   echo "  internal/libver/                 always"

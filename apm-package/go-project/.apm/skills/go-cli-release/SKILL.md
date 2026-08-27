@@ -7,7 +7,7 @@ description: "Use when cutting a release of a Go project, bumping its version, t
 
 The release-controlled version of the canonical Go CLI project: the fixed `internal/libver` version constant, the `version` subcommand's collaborators, the external `bump-libver` release-tool flow, and submodule tags.
 
-Companion to the `go-edit-cobra` skill (same package): that skill owns the command tree; this one owns the version contract and the release flow.
+Companion to the `go-project` skill (same package): that skill owns the project layout and command tree; this one owns the version contract and the release flow.
 
 ## The contract in one line
 
@@ -29,5 +29,5 @@ Core invariants (details and rationale in the reference file):
 
 ## Sibling skills
 
-- **`go-edit-cobra`** — command-tree scaffolding/editing; the `libver` / `versioninfo` helper sources ship there and are copied into projects by its `copy_helper.sh`. Entry point: [../go-edit-cobra/SKILL.md](../go-edit-cobra/SKILL.md).
+- **`go-project`** — project layout + command-tree scaffolding/editing; the `libver` / `versioninfo` helper sources ship there and are copied into projects by its `copy_helper.sh`. Entry point: [../go-project/SKILL.md](../go-project/SKILL.md).
 - **`go-cli-config`** — the layered configuration model and per-user directories. Entry point: [../go-cli-config/SKILL.md](../go-cli-config/SKILL.md).

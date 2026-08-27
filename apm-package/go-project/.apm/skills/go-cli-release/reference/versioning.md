@@ -117,7 +117,7 @@ The patch-bump rule and `-devel` suffix policy are otherwise unchanged.
 
 Source of truth for the version string.
 
-Project-agnostic — the package name (`libver`) and the path are fixed, so the file is copied verbatim from the sibling `go-edit-cobra` skill's `helpers/internal/libver/libver.go` (it is **not** a template):
+Project-agnostic — the package name (`libver`) and the path are fixed, so the file is copied verbatim from the sibling `go-project` skill's `helpers/internal/libver/libver.go` (it is **not** a template):
 
 ```go
 // Package libver pins the module-wide, release-controlled version string.
@@ -209,13 +209,13 @@ Differences from a regular flat-leaf:
 
 Reusable, project-agnostic helper.
 
-Copied verbatim from the sibling `go-edit-cobra` skill's `helpers/internal/versioninfo/versioninfo.go`.
+Copied verbatim from the sibling `go-project` skill's `helpers/internal/versioninfo/versioninfo.go`.
 
 Exposes `type Info` and `ReadVersionInfo(version string) Info`.
 
 The caller passes the project's `Version` constant; the helper layers VCS info from `runtime/debug.ReadBuildInfo` on top.
 
-This file is **not** a template; copy it as-is. See the `go-edit-cobra` skill's [Helper catalog](../../go-edit-cobra/reference/workflows.md#helper-catalog) for the full path.
+This file is **not** a template; copy it as-is. See the `go-project` skill's [Helper catalog](../../go-project/reference/workflows.md#helper-catalog) for the full path.
 
 ## The `bump-libver` release tool (external)
 
@@ -237,7 +237,7 @@ The same source compiles on Linux, macOS, and Windows; that is the entire reason
 
 Do not generate any of these — they look superficially shorter but break the versioning contract.
 
-(Moved here from the `go-edit-cobra` skill's layout-and-naming.md, which keeps a pointer.)
+(Moved here from the `go-project` skill's layout-and-naming.md, which keeps a pointer.)
 
 - **Hand-editing `const Version = "..."` outside a release.** Use `go run github.com/ngicks/go-common/tools/bump-libver@latest`; manual edits drift from the tag/commit pair the tool produces.
 - **Renaming `Version` or switching it to `var`.** The required source shape is a single top-level `const Version = "..."`; the `bump-libver` tool relies on it — do not diverge.

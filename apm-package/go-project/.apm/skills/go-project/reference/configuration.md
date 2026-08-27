@@ -177,7 +177,7 @@ Exposing `--config` is recommended but optional — pass `""` to `LoadConfig` to
 
 Service-config flags are **not** bound directly into `Config` — that would let a flag's _default_ value clobber file/env.
 
-Bind them to locals (the default flag pattern; see SKILL.md › Cobra design rules) and, in the run function, overlay only the **explicitly-set** ones onto the loaded config.
+Bind them to locals (the default flag pattern; see [cobra.md › Canonical flag pattern](cobra.md#canonical-flag-pattern)) and, in the run function, overlay only the **explicitly-set** ones onto the loaded config.
 
 The flag layer is present-based — `cmd.Flags().Changed(name)` distinguishes set from unset directly, mirroring `PartialConfig`'s present-semantics; an explicit `--port 0` set by the user wins regardless.
 
