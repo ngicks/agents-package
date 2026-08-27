@@ -305,6 +305,23 @@ Prose is where omissions hide — a reader cannot notice a missing line in a
 paragraph. An enumerated code block makes absence visible and askable: if it
 is user-visible and not in the block, ask why.
 
+### One code fence per file
+
+When planned code spans multiple files, write one fenced code block per file,
+each fence headed by the real file path it belongs to — never one big block
+mixing several files, and never a fence with no home.
+
+- The per-file layout makes the intended project layout visible and askable,
+  the same way the surface delta makes omissions visible.
+- The split itself is a plan-phase assumption, not an ultimate decision:
+  better splits often appear during implementation, so implementers must not
+  treat fence boundaries as binding. What is tentative is only the assignment
+  of code to files — the enumerated surface (symbols, keys, flags) itself
+  stays authoritative as defined in **Public surface delta** above.
+- When implementation lands on a different split, that is a normal refinement,
+  not a deviation to escalate; material layout changes still get a DECISION.md
+  entry as usual.
+
 ## Sub-plans
 
 A plan that outgrows one directory splits hierarchically: the plan itself
