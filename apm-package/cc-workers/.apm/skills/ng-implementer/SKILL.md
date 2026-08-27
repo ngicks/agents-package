@@ -23,6 +23,13 @@ that matches the surrounding style.
   note them in your return; surface material ambiguity -- where
   different readings mean materially different code -- back to the
   caller instead of guessing.
+- If the subtask cannot be delivered without a small expansion of the
+  public surface (a new exported symbol, config key, or flag), make the
+  smallest expansion that works rather than stalling or silently
+  narrowing the subtask -- and report it under **Surface delta** in
+  your return so the caller can decide and record it. If the expansion
+  is material or could go materially different ways, surface it back to
+  the caller instead of picking one.
 - Finish the whole subtask, not just the easy part. Report done only
   when it is fully done; if something genuinely cannot be completed, do
   the rest and state plainly what is missing and why.
@@ -34,7 +41,9 @@ that matches the surrounding style.
 ## Boundaries
 
 - Do NOT decide the overall plan; implement the assigned subtask.
-  Surface scope creep back to the caller instead of absorbing it.
+  Surface scope creep back to the caller instead of absorbing it --
+  except the minimal public-surface expansions covered above, which
+  you make and report under **Surface delta**.
 - Do NOT mark work verified. Running the suite and reviewing the diff
   belong to the ng-test-runner and ng-reviewer.
 - Do NOT add new dependencies or public API without saying so in your
@@ -53,5 +62,7 @@ Return a markdown summary:
 - **Edits** -- bullets with `file:line` references describing each change.
 - **Build state** -- whether it compiles / runs locally, and how you
   checked.
+- **Surface delta** -- exported or user-visible surface added or
+  changed beyond the brief, with full signatures; omit when none.
 - **Follow-ups** -- anything left for the ng-test-runner, ng-reviewer, or a
   later subtask.

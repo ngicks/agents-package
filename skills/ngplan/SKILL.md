@@ -290,8 +290,10 @@ starts invalidates far more work than an internal refactor does.
 
 Every plan touching exported or user-visible surface gets a **Public surface
 delta** section in PLAN.md whose authority is fenced code in the source
-language. Prose may explain, but the code block defines: anything user-visible
-that is not in the block is out of scope by definition.
+language. Prose may explain, but the code block defines: at plan time,
+anything user-visible that is not in the block is out of scope.
+Implementation may still expand the block — but only through the amendment
+path below, never silently.
 
 Enumerate in the block:
 
@@ -305,6 +307,25 @@ Prose is where omissions hide — a reader cannot notice a missing line in a
 paragraph. An enumerated code block makes absence visible and askable: if it
 is user-visible and not in the block, ask why.
 
+#### Expanding the delta during implementation
+
+The delta is a gate, not a straitjacket: implementation often reveals surface
+the plan missed. Expanding it is legitimate — expanding it silently never is.
+
+- When the user is available, raise the expansion as a question and resolve
+  it with them before building on it.
+- When the user is away or not answering, decide yourself and keep working —
+  never stall. Record the choice as a DECISION.md entry tagged `[automatic]`
+  (e.g. `## <topic> [automatic]`) so the user can skim those entries once
+  back.
+- Either way, edit the fenced delta block in PLAN.md in the same turn: add
+  the new symbols, keys, or flags with full signatures. The block stays the
+  single enumeration of user-visible surface — "expanded but recorded only in
+  a decision entry" leaves a stale block, the exact failure this section
+  exists to prevent.
+- The user's later review is then just two reads: the current block, and the
+  `[automatic]` decision entries.
+
 ### One code fence per file
 
 When planned code spans multiple files, write one fenced code block per file,
@@ -317,7 +338,8 @@ mixing several files, and never a fence with no home.
   better splits often appear during implementation, so implementers must not
   treat fence boundaries as binding. What is tentative is only the assignment
   of code to files — the enumerated surface (symbols, keys, flags) itself
-  stays authoritative as defined in **Public surface delta** above.
+  stays authoritative as defined, and amended, in **Public surface delta**
+  above.
 - When implementation lands on a different split, that is a normal refinement,
   not a deviation to escalate; material layout changes still get a DECISION.md
   entry as usual.

@@ -66,7 +66,13 @@ Run this loop until the goal is met or you must report a blocker.
    subtask. Sanity-check the worker's reported tool use: a return
    showing **0 tool calls** is almost certainly hallucinated -- distrust
    it and re-delegate. Re-delegate on failure instead of papering over
-   it.
+   it. When a return reports expanded public surface (new exported
+   symbols, config keys, flags) beyond the plan's Public surface delta,
+   resolve it through the availability rule before delegating the next
+   subtask: ask the user if they said they stay available, otherwise
+   decide yourself and record a DECISION.md entry tagged `[automatic]`
+   -- and in the same turn update the fenced delta block in PLAN.md so
+   it stays the single enumeration of user-visible surface.
 4. **Verify.** Before declaring done on a code change, confirm with one
    final ng-reviewer pass and a ng-test-runner pass. This is a single
    gate at the end -- do not re-verify each subtask as it lands, and do
