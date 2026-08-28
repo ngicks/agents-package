@@ -2,11 +2,11 @@
 
 The Cobra-specific rules for the CLI command tree.
 
-Cobra (`spf13/cobra`) is this skill's default framework for a command with subcommands; these rules govern every file under `./cmd` and every `cobra.Command` literal.
+Cobra (`spf13/cobra`) is this skill's framework for a command with subcommands (the framework choice itself lives in SKILL.md › Pre-flight checks); these rules govern every file under `./cmd` and every `cobra.Command` literal.
 
-Read this before touching anything under `./cmd` or any `cobra.Command`.
+Read this before touching anything under `./cmd` or any `cobra.Command`, together with the framework-neutral rules in [cli.md](cli.md).
 
-The "thin run function" rule is the Cobra-mechanics consequence of the broader "no business logic under `./cmd`" rule (SKILL.md › General design rules).
+The "thin run function" rule below is the Cobra-mechanics consequence of the neutral "no business logic under `./cmd`" rule ([cli.md › Thin wiring](cli.md#thin-wiring-under-cmd)).
 
 The rules are grouped below by what they govern: error handling, positional args, command construction, and file naming.
 
@@ -22,7 +22,7 @@ The rules are grouped below by what they govern: error handling, positional args
 
 - **`RunE` only**, never `Run`.
 
-  Return errors; do not `os.Exit` from a command body.
+  Return errors; do not `os.Exit` from a command body ([cli.md › Errors & process exit](cli.md#errors--process-exit)).
 
 - **Root command**: `SilenceUsage: true`, `SilenceErrors: true`.
 
@@ -34,9 +34,7 @@ The rules are grouped below by what they govern: error handling, positional args
 
   **Change it** when positional arguments fit the command better — e.g. `cobra.ExactArgs(1)`, `cobra.MinimumNArgs(1)`, `cobra.MaximumNArgs(2)`, `cobra.RangeArgs(1, 3)`, `cobra.MatchAll(cobra.ExactArgs(1), customValidator)`.
 
-  Treat positional args as the natural shape when the command operates on a target (`mytool inspect <path>`, `mytool delete <id>...`); flags are for options on top of that target.
-
-  The templates set `cobra.NoArgs` as a safe placeholder, not a recommendation.
+  When positional args are the natural shape ([cli.md › Positional arguments vs flags](cli.md#positional-arguments-vs-flags)), use them; the templates set `cobra.NoArgs` as a safe placeholder, not a recommendation.
 
 - **Positional-argument completion (`ValidArgsFunction`)**: fill `ValidArgsFunction` on a leaf command's literal to control shell completion of its positional args.
 
@@ -87,9 +85,7 @@ The rules are grouped below by what they govern: error handling, positional args
 
 - **Run functions are named** (`run{{Name}}`) and live at package level.
 
-  **Run functions are thin wiring**: read positional args, call a service, return its error.
-
-  Business logic is forbidden under `./cmd`.
+  **Run functions are thin wiring** ([cli.md › Thin wiring](cli.md#thin-wiring-under-cmd)): read positional args, call a service, return its error.
 
 - **`RunE` is either a direct reference (`RunE: run{{Name}}`) or a thin closure adapter** that forwards captured flag values: `RunE: func(cmd *cobra.Command, args []string) error { return run{{Name}}(cmd, args, flagFoo, flagBar) }`.
 

@@ -12,6 +12,13 @@ The templates these steps reference live in [command-templates.md](command-templ
 
 ## Scaffold a new project
 
+These steps produce the **Cobra command-tree shape**. Branch first:
+
+- A recorded `cli` decision in `.go-project-decision.md` wins (SKILL.md › Decision record) — it also pre-answers interview questions in its area.
+- Single-command tool, no subcommands wanted → the std-`flag` shape: follow these steps with the [cli-std-flag.md › Scaffold deltas](cli-std-flag.md#scaffold-deltas).
+- Subcommands wanted → Cobra; continue below as written.
+- Nothing decides it (pure scaffolding: empty module, request silent on subcommands) → ask, `cobra` first / `std flag` bottom, per SKILL.md › Asking decisions.
+
 Interview (extract from user message inline; only ask for missing required fields):
 
 | Parameter          | Required | Default                    | Example                    |
@@ -92,7 +99,9 @@ Write creates parent directories — do not run `mkdir` separately.
 
 ## Edit an existing project
 
-Pre-flight checks first (mode + CLI-framework detection, layout classification — see SKILL.md › Pre-flight checks).
+Pre-flight checks first (decision record, mode + CLI-shape detection, layout classification — see SKILL.md › Pre-flight checks).
+
+The operation tables below are the **Cobra shape**; std-`flag` edits follow [cli-std-flag.md](cli-std-flag.md) instead (only the non-CLI operations here apply to them).
 
 Then pick the operation; each entry below lists what to touch.
 
@@ -134,7 +143,7 @@ When any of these adds, renames, or moves a nested-leaf file, check its **traili
 | Rename                                  | flag-name string + Go identifier in `var` block; binding call; closure adapter (if any); `run{{Name}}` parameter. Check `Flags().Lookup`, `Flag(name)`, `LocalFlags()`, `InheritedFlags()`, `BindPFlag`/Viper bindings, env-var names, `RegisterFlagCompletionFunc`, tests, READMEs, examples |
 | Change type                             | update the `var` declaration; switch the binding to the corresponding `<Type>Var`; update the `run{{Name}}` parameter type                                                                                                                                                                    |
 | Change default / shorthand / usage text | update the binding call arguments                                                                                                                                                                                                                                                             |
-| Move scope (persistent ↔ local)         | move both the `var` declaration and the binding call to the appropriate command's wrapper, and use `Flags()` vs `PersistentFlags()`. When a parent's persistent flag must reach a child's run func, pass `&flag` as an extra parameter to the child wrapper; bundle into one unexported struct in the parent's file once the shared set outgrows ~3 flags ([cobra.md › Wrappers](cobra.md#wrappers-run-functions--wiring)) |
+| Move scope (persistent ↔ local)         | move both the `var` declaration and the binding call to the appropriate command's wrapper, and use `Flags()` vs `PersistentFlags()`. When a parent's persistent flag must reach a child's run func, pass `&flag` as an extra parameter to the child wrapper; bundle into one unexported struct in the parent's file once the shared set outgrows ~3 flags ([cli-cobra.md › Wrappers](cli-cobra.md#wrappers-run-functions--wiring)) |
 | Mark required / hidden / deprecated     | call `cmd.MarkFlagRequired(name)` / `cmd.Flags().MarkHidden(name)` / `cmd.Flags().MarkDeprecated(name, "msg")` inside the wrapper, after binding the flag                                                                                                                                     |
 
 ### Command metadata
@@ -155,7 +164,7 @@ Use a closure adapter to forward captured flag values when needed, mirroring the
 - **Flag-value completion**: call `cmd.RegisterFlagCompletionFunc(name, fn)` inside the wrapper, after binding the flag.
 - **Built-in `completion` prefix collision**: when an operation gives the **root** command a subcommand whose name starts with `co`, shell completion of that name now competes with the auto-generated `completion` subcommand (typing `<cli> co<TAB>` no longer completes uniquely).
 
-  Ask the user whether to hide the built-in command from help and completion — use `AskUserQuestion` when the tool is available, otherwise ask as a plain question in the response.
+  Ask the user whether to hide the built-in command from help and completion — per SKILL.md › Asking decisions (`AskUserQuestion` when available, otherwise the indexed-list form).
 
   Hiding means setting on the root literal in `commands/root.go`:
 

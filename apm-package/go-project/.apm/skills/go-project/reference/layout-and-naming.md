@@ -435,7 +435,7 @@ Grouped by the part of the layout each one violates.
   This includes a child re-reading a parent's persistent flag by name — thread `&flag` (or the parent's unexported flag struct) into the child wrapper instead; string lookups break silently on flag renames.
 - **Exporting the parent→child flag bundle** — an exported `ServeFlags` type, or package-level shared flag state.
 
-  Threading is an internal detail of the `commands` package: flag `var`s, child wrappers, and any bundling struct stay unexported so the shape (pointer arguments ↔ one struct) can change freely with the flag count. See [cobra.md › Wrappers, run functions & wiring](cobra.md#wrappers-run-functions--wiring).
+  Threading is an internal detail of the `commands` package: flag `var`s, child wrappers, and any bundling struct stay unexported so the shape (pointer arguments ↔ one struct) can change freely with the flag count. See [cli-cobra.md › Wrappers, run functions & wiring](cli-cobra.md#wrappers-run-functions--wiring).
 
 ### Run functions & the `./cmd` boundary
 
