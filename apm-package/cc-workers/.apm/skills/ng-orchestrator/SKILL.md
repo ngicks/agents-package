@@ -133,7 +133,9 @@ Return a short markdown report:
 If the run's plan directory holds a `HANDOFF.md` (deferred tasks,
 out-of-scope discoveries), its surviving entries are folded into the
 durable issue backlog `<repo root>/doc/plan/issue/issue.md` -- but only
-after the user has signed off on the implementation.
+after the user has signed off on the implementation. issue.md holds only
+open items; a resolved item moves to `doc/plan/issue/closed/`, one item
+per file.
 
 - Timing: never in the same turn as the final report. Deliver the
   report, wait for the user's follow-up on the implementation, and only
@@ -146,11 +148,17 @@ after the user has signed off on the implementation.
   that entry instead, since the tool needs at least two options. Fall
   back to plain chat when the tool is unavailable.
 - Create `doc/plan/issue/` and `issue.md` on first use; append the
-  selected entries, never rewriting or reordering what is already
-  there.
+  selected entries. Existing entries are never rewritten or reordered
+  -- the only other legal mutation is closing one (below).
 - issue.md is a durable artifact: rewrite each folded entry to stand
   alone, with real paths and symbols and the reasoning in plain words
   -- no plan paths, decision IDs like `D15`, or plan step numbers.
+- Closing an item: when the user says an issue.md item is resolved or
+  dropped, move its entry out of issue.md into
+  `doc/plan/issue/closed/<kebab-case-slug>.md`, one item per file,
+  keeping the entry text verbatim (its heading becomes the file's `#`
+  title). Only the user closes items, never the orchestrator on its
+  own judgment.
 - If the user said at run start that they are away, do not fold
   anything automatically: list `HANDOFF.md` under **Open items** in the
   report as awaiting triage instead.

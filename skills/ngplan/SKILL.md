@@ -419,7 +419,9 @@ below.
 HANDOFF.md lives in the plan directory, and plan directories are ephemeral —
 they may be removed once the work is over. Entries that should survive are
 folded into the repository's durable issue backlog,
-`./doc/plan/issue/issue.md`, but only on the user's say-so.
+`./doc/plan/issue/issue.md`, but only on the user's say-so. issue.md holds
+only open items; a resolved item moves to `./doc/plan/issue/closed/`, one
+item per file.
 
 - Timing — this happens strictly after the implementation is done **and** the
   user has followed up on it. Never bundle the fold into the same turn as the
@@ -433,10 +435,17 @@ folded into the repository's durable issue backlog,
   tool needs at least two options. Fall back to plain chat when the tool
   is unavailable.
 - Create `doc/plan/issue/` and `issue.md` on first use; append the selected
-  entries and never rewrite or reorder what is already there.
+  entries. Existing entries are never rewritten or reordered — the only
+  other legal mutation is closing one (below).
 - issue.md outlives the plan directory, so rewrite each folded entry to stand
   alone: real paths and symbols, the reasoning in plain words, and no plan
   paths, decision IDs like `D15`, or plan step numbers.
+- Closing an item — when the user says an issue.md item is resolved or
+  dropped, move its entry out of issue.md into
+  `doc/plan/issue/closed/<kebab-case-slug>.md`, one item per file, keeping
+  the entry text verbatim (its heading becomes the file's `#` title).
+  Closing happens only on the user's say-so, never because you judge the
+  work done.
 - Entries the user leaves unselected stay in HANDOFF.md and disappear with
   the plan directory — that is the user's decision to drop them; never fold
   them silently.
