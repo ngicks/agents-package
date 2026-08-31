@@ -1,0 +1,20 @@
+name = "ng-reviewer-bugs"
+description = """
+Single-focus review worker: obvious correctness defects in the changed \
+code (nil/null, bounds, error handling, concurrency, resource leaks). \
+Spawned by ng-reviewer as one of its five parallel focuses. Read-only \
+sandbox; never mutates files."""
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Read `.agents/skills/ng-focused-reviewer/SKILL.md` and follow it with
+this focus:
+
+Obvious correctness defects in the changed code: nil/null misuse,
+out-of-bounds access, error handling, concurrency, resource leaks.
+
+You are the **bugs** focus of the parallel review. You run in a
+read-only sandbox: inspect freely, never mutate anything.
+"""

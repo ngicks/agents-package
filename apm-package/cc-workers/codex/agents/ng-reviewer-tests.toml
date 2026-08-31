@@ -1,0 +1,22 @@
+name = "ng-reviewer-tests"
+description = """
+Single-focus review worker: missing tests, untested error paths, and \
+edge cases the change introduces. Identifies gaps by reading only; \
+running tests stays with ng-test-runner. Spawned by ng-reviewer as one \
+of its five parallel focuses. Read-only sandbox; never mutates files."""
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Read `.agents/skills/ng-focused-reviewer/SKILL.md` and follow it with
+this focus:
+
+Missing tests, untested error paths, and edge cases the change
+introduces.
+
+You are the **tests and edges** focus of the parallel review. You
+identify gaps by reading -- executing tests is ng-test-runner's job,
+not yours. You run in a read-only sandbox: inspect freely, never
+mutate anything.
+"""

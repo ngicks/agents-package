@@ -83,6 +83,74 @@ Then `apm install`. Skills compile to `.claude/skills/<name>/SKILL.md`
 and agents to `.claude/agents/<name>.md` (verbatim) and
 `.codex/agents/<name>.toml` (frontmatter -> TOML).
 
+## Codex: native agent definitions
+
+APM's Codex transformer is lossy: the generated
+`.codex/agents/<name>.toml` keeps only `name`, `description`, and the
+body (as `developer_instructions`). `model`, `effort`, `tools`, and
+`skills:` are dropped, so the compiled Codex agents fall back to Codex
+defaults, get no preloaded skills, and lose the reviewers' read-only
+pinning.
+
+`codex/agents/*.toml` in this package are hand-authored, Codex-native
+equivalents of the same fleet. They carry what the transform drops, in
+Codex's own vocabulary:
+
+- Skill preloading becomes an explicit first instruction: "Read
+  `.agents/skills/<name>/SKILL.md` and follow it" (APM deploys Codex
+  skills to the cross-tool `.agents/skills/` root).
+- `model` maps to the equivalent GPT-5.6 capability tier: haiku ->
+  `gpt-5.6-luna`, sonnet -> `gpt-5.6-terra`, opus -> `gpt-5.6-sol`.
+  Effort follows suit (medium for terra, high for sol), except the
+  luna agents (`ng-command-invoker`, `ng-test-runner`), which run at
+  `model_reasoning_effort = "max"` -- cheapest tier, deepest
+  reasoning. Tier names churn each model generation, so bump these
+  pins when the GPT-5.6 family is deprecated.
+- Tool pinning maps to `sandbox_mode`. All six review agents AND
+  `ng-explorer` get `sandbox_mode = "read-only"` -- a strict upgrade
+  over the Claude package, where the explorer's read-only boundary is
+  prompt-only. Read-only still permits `ng-reviewer-history`'s
+  `git log` / `blame` / `show`, which is exactly what its Bash
+  exception wanted. Codex sandboxes only restrict downward, so
+  `ng-reviewer`'s read-only sandbox is inherited by its focus workers
+  for free.
+- Codex's default `[agents] max_depth = 1` means `ng-reviewer`, when
+  itself spawned as a subagent, cannot fan out its five focus workers.
+  Either invoke it from the root session, set `max_depth = 2` in
+  `config.toml`, or rely on its built-in fallback: it runs the five
+  focus passes itself sequentially.
+
+To use them, do NOT activate the `codex` target: `apm install` treats
+its compiled `.codex/agents/*.toml` as managed files and silently
+restores the lossy versions over any hand-placed copy on every install
+(verified with apm 0.28.0). Instead, use the `agent-skills` target,
+which deploys only the skills to the same cross-tool
+`.agents/skills/` root and never touches `.codex/`:
+
+```yaml
+# consumer apm.yml
+targets:
+- claude        # if you also use Claude Code
+- agent-skills  # skills only -> .agents/skills/ (no .codex/ output)
+```
+
+Then install and copy the native agents in:
+
+```bash
+apm install
+mkdir -p .codex/agents
+cp apm_modules/ngicks/agents-package/apm-package/cc-workers/codex/agents/*.toml .codex/agents/
+```
+
+Later `apm install` runs leave `.codex/agents/` alone (it is unmanaged
+when the `codex` target is inactive). If you previously installed with
+the `codex` target, switching to `agent-skills` makes apm clean up its
+stale compiled `.codex/agents/*.toml` automatically -- copy the native
+ones in after that. Which targets are active is gated by the
+consumer's `apm.yml` `targets:` (or `--target` / directory detection),
+intersected with this package's `targets:` -- which is why this
+package lists `agent-skills` alongside `claude` and `codex`.
+
 ## Authoring
 
 - Source of truth is `.apm/`. Never edit the compiled copies under
@@ -90,8 +158,10 @@ and agents to `.claude/agents/<name>.md` (verbatim) and
 - The logic lives in the skills; keep agent bodies thin -- they exist to
   preload a skill and pin model/tools.
 - `model`, `effort`, and `skills` reach the Claude target verbatim. The
-  Codex transformer keeps only `name` + `description` + body, so Codex
-  agents fall back to Codex defaults and do not get preloaded skills.
+  Codex transformer keeps only `name` + `description` + body; the
+  hand-authored `codex/agents/*.toml` exist to cover that gap (see the
+  Codex section above). When an agent changes, update its native Codex
+  twin in the same commit.
 - Validate before shipping:
 
   ```bash

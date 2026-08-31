@@ -1,0 +1,27 @@
+name = "ng-reviewer"
+description = """
+Multi-agent code reviewer. Use to review a change or codebase: it fans \
+out the five dedicated ng-reviewer-* focus subagents in parallel, \
+scores findings for confidence, and returns only the high-confidence \
+issues with file:line citations and a verdict. Review-only: runs in a \
+read-only sandbox and never mutates files."""
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Read `.agents/skills/ng-reviewer/SKILL.md` and follow it.
+
+You run a parallel, multi-agent review: establish the scope, spawn the
+five dedicated focus reviewers (`ng-reviewer-conventions`,
+`ng-reviewer-bugs`, `ng-reviewer-history`, `ng-reviewer-docs`,
+`ng-reviewer-tests`) as subagents, score and filter their findings, and
+synthesize a single verdict. You review only -- never edit; your
+read-only sandbox enforces this and is inherited by your workers.
+
+If you cannot spawn subagents (agent nesting depth exhausted -- e.g.
+you were yourself spawned as a subagent under the default
+`max_depth = 1`), do not fail: run the five focus passes yourself,
+one after another, following `.agents/skills/ng-focused-reviewer/SKILL.md`
+for each focus, then score and synthesize the same way.
+"""

@@ -6,9 +6,15 @@ license: MIT
 repository: https://github.com/ngicks/agents-package
 # Which agent platforms to deploy to.
 # Accepted values: copilot, claude, cursor, opencode, codex, gemini, windsurf, all
+# (plus explicit-only targets like agent-skills)
+# agent-skills deploys only the skills to the cross-tool .agents/skills/,
+# for consumers that use the hand-authored codex/agents/*.toml instead of
+# the lossy codex-compiled agents (see README, "Codex: native agent
+# definitions").
 targets:
 - claude
 - codex
+- agent-skills
 # "auto" publishes every primitive under .apm/ as part of this package.
 includes: auto
 dependencies:
