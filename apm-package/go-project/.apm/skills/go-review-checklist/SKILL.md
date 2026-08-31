@@ -29,4 +29,8 @@ Use this checklist to find incorrect or half-baked implementations, or not-match
 
 - Opposing to `Go Review Comments`, do not use ALL-UPPERCASE for abbreviations. e.g. Id instead of ID.
 
+## Testing
 
+- Don't wire up fake timer / clock yourself.
+  - Use `synctest` for almost all cases
+  - In case `synctest` is infeasible, use `github.com/jonboulle/clockwork`
