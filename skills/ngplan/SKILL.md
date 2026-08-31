@@ -444,10 +444,47 @@ below.
 
 HANDOFF.md lives in the plan directory, and plan directories are ephemeral —
 they may be removed once the work is over. Entries that should survive are
-folded into the repository's durable issue backlog,
-`./doc/plan/issue/issue.md`, but only on the user's say-so. issue.md holds
-only open items; a resolved item moves to `./doc/plan/issue/closed/`, one
-item per file.
+folded into the repository's durable issue backlog under `./doc/plan/issue/`,
+but only on the user's say-so.
+
+#### Issue backlog layout
+
+The backlog is one item per file, with a derived catalog on top.
+
+- `doc/plan/issue/open/<kebab-case-slug>.md` — one open item per file; these
+  files are the authoritative backlog.
+- `doc/plan/issue/closed/<kebab-case-slug>.md` — closed items; closing moves
+  the file from `open/` verbatim, filename and all.
+- `doc/plan/issue/catalog.md` — a derived index, occasionally reconstructed
+  from the open items: one entry per item with its title, file path, and
+  tags. Regenerate it wholesale after any fold or close; never hand-edit
+  item content there, and when it disagrees with `open/`, `open/` wins —
+  the catalog is merely stale.
+- Every item file — open and closed alike — starts with YAML frontmatter
+  carrying a `tags` field: merely a string, a space-separated topic list.
+
+      ---
+      tags: cli config planning
+      ---
+
+      # <item title>
+
+      <item body>
+
+#### Searching the backlog by frontmatter
+
+Search item frontmatter with `scripts/issue-search.sh`, bundled next to this
+SKILL.md — resolve it relative to this skill's directory.
+
+- `issue-search.sh <pattern> [path ...]` wraps `rg` so that only each
+  `*.md` file's leading frontmatter block is searched, never item bodies;
+  the path defaults to `doc/plan/issue`.
+- It needs `rg` on PATH and must stay executable — `rg --pre` re-invokes
+  the script itself per file.
+- Run it before folding to find existing items on the same topics — extend
+  or cross-reference a matching item rather than duplicating it.
+
+#### Folding and closing mechanics
 
 - Timing — this happens strictly after the implementation is done **and** the
   user has followed up on it. Never bundle the fold into the same turn as the
@@ -460,18 +497,20 @@ item per file.
   ledger gets a fold-or-drop question for that entry instead, since the
   tool needs at least two options. Fall back to plain chat when the tool
   is unavailable.
-- Create `doc/plan/issue/` and `issue.md` on first use; append the selected
-  entries. Existing entries are never rewritten or reordered — the only
-  other legal mutation is closing one (below).
-- issue.md outlives the plan directory, so rewrite each folded entry to stand
-  alone: real paths and symbols, the reasoning in plain words, and no plan
-  paths, decision IDs like `D15`, or plan step numbers.
-- Closing an item — when the user says an issue.md item is resolved or
-  dropped, move its entry out of issue.md into
-  `doc/plan/issue/closed/<kebab-case-slug>.md`, one item per file, keeping
-  the entry text verbatim (its heading becomes the file's `#` title).
+- Create `doc/plan/issue/open/` (and `doc/plan/issue/` itself) on first use;
+  write each selected entry as its own `open/<kebab-case-slug>.md` with the
+  frontmatter `tags` line, choosing tags from the item's topics. Existing
+  item files are never rewritten — the only other legal mutation is closing
+  one (below).
+- The backlog outlives the plan directory, so rewrite each folded item to
+  stand alone: real paths and symbols, the reasoning in plain words, and no
+  plan paths, decision IDs like `D15`, or plan step numbers.
+- Closing an item — when the user says an open item is resolved or dropped,
+  move its file from `open/` to `closed/` verbatim, frontmatter included.
   Closing happens only on the user's say-so, never because you judge the
   work done.
+- After any fold or close, reconstruct `catalog.md` from what `open/` now
+  holds.
 - Entries the user leaves unselected stay in HANDOFF.md and disappear with
   the plan directory — that is the user's decision to drop them; never fold
   them silently.
@@ -531,6 +570,7 @@ step — review catches what is listed, not what is implied.
 - HANDOFF.md is part of the gate: if it exists, every entry must be an
   out-of-scope discovery or link a user-made DECISION.md entry — anything
   else is scope silently dropped, and the plan is not finalized. A ledger
-  that passes the gate is what later gets offered for folding into
-  `doc/plan/issue/issue.md` — after implementation, once the user has
-  followed up on it (see **Fold the ledger into the issue backlog**).
+  that passes the gate is what later gets offered for folding into the
+  issue backlog under `doc/plan/issue/` — after implementation, once the
+  user has followed up on it (see **Fold the ledger into the issue
+  backlog**).
