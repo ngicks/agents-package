@@ -275,6 +275,9 @@ change later. Implementation internals can stay rough.
 - **Public API** — the exported surface consumers will call: packages, types,
   functions, and their signatures — plus the surface end users actually touch:
   config file keys, CLI flags and subcommands, and environment variables.
+- **Dependencies** — what the project pulls in: entries in the manifest
+  (`go.mod`, `package.json`, `moon.mod.json`, …). Cheap to add, expensive to
+  reverse once code builds on them.
 - **RPC schema** — the wire contracts between processes: proto / OpenAPI /
   Connect definitions, endpoints, message shapes.
 - **Project layout** — where things live: directories, packages / modules, and
@@ -288,15 +291,17 @@ starts invalidates far more work than an internal refactor does.
 
 ### Public surface delta — fenced code, not prose
 
-Every plan touching exported or user-visible surface gets a **Public surface
-delta** section in PLAN.md whose authority is fenced code in the source
-language. Prose may explain, but the code block defines: at plan time,
+Every plan touching exported or user-visible surface — dependency changes
+included, even when nothing else changes — gets a **Public surface delta**
+section in PLAN.md whose authority is fenced code in the source language. Prose may explain, but the code block defines: at plan time,
 anything user-visible that is not in the block is out of scope.
 Implementation may still expand the block — but only through the amendment
 path below, never silently.
 
 Enumerate in the block:
 
+- added / removed / major-version-bumped dependencies, first — see
+  **Dependency delta** below;
 - added / changed / removed exported symbols, with full signatures;
 - struct fields, with tags;
 - config keys, as a literal example-config snippet;
@@ -306,6 +311,25 @@ Enumerate in the block:
 Prose is where omissions hide — a reader cannot notice a missing line in a
 paragraph. An enumerated code block makes absence visible and askable: if it
 is user-visible and not in the block, ask why.
+
+#### Dependency delta — enumerated first, each addition justified
+
+Dependency changes are surface, not housekeeping: the manifest is a durable,
+consumer-visible file, and a dependency is expensive to reverse once code
+builds on it. They lead the delta block and never end as prose alone.
+
+- Enumerate added / removed / major-version-bumped dependencies at the top of
+  the fenced delta, as a literal manifest diff or snippet — real module paths
+  or package names, real versions.
+- Every **added** dependency gets a DECISION.md entry stating why this
+  dependency fits this project — license, maintenance health, footprint, fit
+  with the existing stack — and which alternatives were rejected and why:
+  other libraries considered, the standard library, and writing it in-repo.
+- A removal states what replaces the removed capability, or that nothing
+  needs it anymore.
+- The block's authority applies: a dependency not enumerated is out of scope,
+  and a mid-implementation addition (`go get`, `npm install`, …) goes through
+  the amendment path below, never in silently.
 
 #### Expanding the delta during implementation
 
@@ -319,7 +343,9 @@ the plan missed. Expanding it is legitimate — expanding it silently never is.
   (e.g. `## <topic> [automatic]`) so the user can skim those entries once
   back.
 - Either way, edit the fenced delta block in PLAN.md in the same turn: add
-  the new symbols, keys, or flags with full signatures. The block stays the
+  the new symbols, keys, or flags with full signatures — or, for a
+  dependency, its real path and version, plus the justifying DECISION.md
+  entry **Dependency delta** requires. The block stays the
   single enumeration of user-visible surface — "expanded but recorded only in
   a decision entry" leaves a stale block, the exact failure this section
   exists to prevent.
