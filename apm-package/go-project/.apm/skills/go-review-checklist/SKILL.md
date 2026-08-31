@@ -17,17 +17,16 @@ Use this checklist to find incorrect or half-baked implementations, or not-match
 
 ## Concurrent Constructs
 
-Use:
+- Did you use appropriate concurrency constructs?
+  - As long as std or semi-std package cover use case, Do not wire concurrency primitives yourself
+  - Use instead:
+    - golang.org/x/sync/errgroup for multiple simultaneous works
+    - golang.org/x/sync/semaphore for (weighted) semaphore
+    - golang.org/x/sync/singleflight for a duplicate function call suppression mechanism
+    - golang.org/x/time/rate for a rate limiter
 
-- golang.org/x/sync/errgroup for multiple simultaneous works
-- golang.org/x/sync/semaphore for (weighted) semaphore
-- golang.org/x/sync/singleflight for a duplicate function call suppression mechanism
-- golang.org/x/time/rate for a rate limiter
-
-Rules:
-
-- Do not wire `sync.WaitGroup` and `chan struct{}` by yourself as long as errgroup, semaphore and/or singleflight cover(s) the usecase.
-
-## Preference
+## Naming
 
 - Opposing to `Go Review Comments`, do not use ALL-UPPERCASE for abbreviations. e.g. Id instead of ID.
+
+
