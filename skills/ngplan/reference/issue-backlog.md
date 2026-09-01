@@ -11,8 +11,8 @@ The backlog is one item per file, with a derived catalog on top.
 
 - `doc/plan/issue/open/<kebab-case-slug>.md` — one open item per file; these
   files are the authoritative backlog.
-- `doc/plan/issue/closed/<kebab-case-slug>.md` — closed items; closing moves
-  the file from `open/` verbatim, filename and all.
+- `doc/plan/issue/closed/<kebab-case-slug>.md` — closed items; closing
+  appends a conclusion and moves the file from `open/`, filename and all.
 - `doc/plan/issue/catalog.md` — a derived index, occasionally reconstructed
   from the open items: one entry per item with its title, file path, and
   tags. Regenerate it wholesale after any fold or close; never hand-edit
@@ -20,6 +20,11 @@ The backlog is one item per file, with a derived catalog on top.
   the catalog is merely stale.
 - Every item file — open and closed alike — starts with YAML frontmatter
   carrying a `tags` field: merely a string, a space-separated topic list.
+- Below the body, an item accumulates append-only sections while it lives:
+  `## Discussion` entries (dated points worth keeping from exchanges about
+  the item) and `## Decision` entries (dated choices made about it, with
+  rationale). At close, a `## Conclusion` is appended — see the closing
+  mechanics below.
 
       ---
       tags: cli config planning
@@ -28,6 +33,18 @@ The backlog is one item per file, with a derived catalog on top.
       # <item title>
 
       <item body>
+
+      ## Discussion
+
+      - <YYYY-MM-DD>: <point raised, by whom>
+
+      ## Decision
+
+      - <YYYY-MM-DD>: <choice made and its rationale>
+
+      ## Conclusion
+
+      <outcome — appended only when the item is closed>
 
 ## Searching the backlog by frontmatter
 
@@ -58,15 +75,17 @@ skill's directory.
 - Create `doc/plan/issue/open/` (and `doc/plan/issue/` itself) on first use;
   write each selected entry as its own `open/<kebab-case-slug>.md` with the
   frontmatter `tags` line, choosing tags from the item's topics. Existing
-  item files are never rewritten — the only other legal mutation is closing
-  one (below).
+  item text is never rewritten — the legal mutations are appending
+  `## Discussion` and `## Decision` entries as the item is discussed and
+  decided on, and closing it (below).
 - The backlog outlives the plan directory, so rewrite each folded item to
   stand alone: real paths and symbols, the reasoning in plain words, and no
   plan paths, decision IDs like `D15`, or plan step numbers.
 - Closing an item — when the user says an open item is resolved or dropped,
-  move its file from `open/` to `closed/` verbatim, frontmatter included.
-  Closing happens only on the user's say-so, never because you judge the
-  work done.
+  append a `## Conclusion` section stating the outcome — what resolved it,
+  or why it was dropped — then move the file from `open/` to `closed/` with
+  frontmatter, body, and accumulated history intact. Closing happens only on
+  the user's say-so, never because you judge the work done.
 - After any fold or close, reconstruct `catalog.md` from what `open/` now
   holds.
 - Entries the user leaves unselected stay in HANDOFF.md and disappear with
