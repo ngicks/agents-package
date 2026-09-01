@@ -195,9 +195,10 @@ starts invalidates far more work than an internal refactor does.
 
 ### Public surface delta — fenced code, not prose
 
-Every plan touching exported or user-visible surface — dependency changes
-included, even when nothing else changes — gets a **Public surface delta**
-section in PLAN.md whose authority is fenced code in the source language. Prose may explain, but the code block defines: at plan time,
+Every plan touching exported, user-visible, or durable surface — dependency
+changes included, even when nothing else changes — gets a **Public surface
+delta** section in PLAN.md whose authority is fenced code in the source
+language. Prose may explain, but the code block defines: at plan time,
 anything user-visible that is not in the block is out of scope.
 Implementation may still expand the block — but only through the amendment
 path below, never silently.
@@ -210,11 +211,12 @@ Enumerate in the block:
 - struct fields, with tags;
 - config keys, as a literal example-config snippet;
 - CLI flags and subcommands, as example invocations;
-- durable state vocabulary — option / setting names, DB columns, file formats.
+- durable state vocabulary — option / setting names, and the persistent data
+  schema under its hard trigger: see **Persistent data delta** below.
 
 Prose is where omissions hide — a reader cannot notice a missing line in a
 paragraph. An enumerated code block makes absence visible and askable: if it
-is user-visible and not in the block, ask why.
+is user-visible or durable and not in the block, ask why.
 
 #### Dependency delta — enumerated first, each addition justified
 
@@ -234,6 +236,26 @@ builds on it. They lead the delta block and never end as prose alone.
 - The block's authority applies: a dependency not enumerated is out of scope,
   and a mid-implementation addition (`go get`, `npm install`, …) goes through
   the amendment path below, never in silently.
+
+#### Persistent data delta — schema as DDL, never prose
+
+Durability, not visibility, is what makes a contract: data that outlives the
+process is expensive to change whether or not an end user ever sees it.
+"Not user-visible, therefore internal, therefore rough" is not a valid
+escape hatch here.
+
+- Hard trigger: any plan that names a database or an on-disk persistent
+  format must include the schema in the Public surface delta — as fenced DDL
+  (`CREATE TABLE …`, the file the code will actually embed, e.g. the sqlc
+  schema file) **and** an `erDiagram` beside it — in its own subsection
+  beside the proto / CLI / config ones. The DDL defines; the diagram shows
+  the shape for the human reader.
+- The only alternative is an explicit user-approved deferral, recorded as a
+  DECISION.md entry. Naming the store in the approach while leaving the
+  schema to implementation is exactly the omission this trigger exists to
+  kill.
+- Mid-implementation schema changes — a new table, column, or file format —
+  go through the amendment path below, never in silently.
 
 #### Expanding the delta during implementation
 
@@ -411,6 +433,12 @@ step — review catches what is listed, not what is implied.
   as an open question.
 - Then replay each IDEA.md use case against the union of planned steps across
   the plan family; a use case no step delivers is flagged the same way.
+- Then walk the contract areas listed under **Focus of the plan** — public
+  API, dependencies, RPC schema, project layout, persistent data format:
+  each must either be concretely present as a fenced block in PLAN.md or be
+  explicitly marked "no change". An area merely described in prose is
+  unfinalized — e.g. SQLite named in the approach with no DDL block anywhere
+  fails this check.
 - HANDOFF.md is part of the gate: if it exists, every entry must be an
   out-of-scope discovery or link a user-made DECISION.md entry — anything
   else is scope silently dropped, and the plan is not finalized. A ledger
