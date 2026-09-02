@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "EnterWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crabswarm hook exec 'true' '{{permission \"allow\" \"EnterWorktree is always approved.\"}}'",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
