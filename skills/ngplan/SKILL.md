@@ -23,6 +23,20 @@ specific to this codebase, not generic.
 - Resolve anything answerable by looking. Only unknowns that genuinely need the
   user become open questions.
 
+## Beads
+
+The repository's issue backlog is beads (`bd`), one database shared by every
+git worktree. Read [reference/beads.md](reference/beads.md) for the detail.
+
+- On every invocation run `scripts/bd-init.sh`, bundled in this skill's
+  `scripts/` directory. It is idempotent and picks the prefix itself; never
+  run raw `bd init`, never pass a prefix, never run `bd hooks install`.
+- Never run `bd dolt push`; syncing off the machine is the user's job.
+- Agent commits get an `Executed-By: <agent>` trailer automatically, from
+  `scripts/executed-by-trailer.sh` wired by the user as the
+  `prepare-commit-msg` hook. Commit normally; do not set variables, add,
+  strip, or edit the trailer.
+
 ## Locate the plan directory
 
 - Restate, in one sentence, what the user wants planned. If they never said, ask.
@@ -122,7 +136,7 @@ Write the plan directory now, as a rough first pass — do not wait for answers.
 - **PLAN.md** — the implementation plan: title and one-line summary; goal /
   success criteria and scope (both grounded in IDEA.md); non-goals; context
   (real file paths, current behavior); approach (chosen design plus rejected
-  alternatives); a **Public surface delta** section (see Focus of the plan)
+  alternatives); a **Public surface delta** section (see **Contracts**)
   whenever exported or user-visible surface changes; ordered implementation
   steps, each independently verifiable and naming real files and symbols;
   testing and verification; risks; and a numbered **Open questions** section
@@ -171,172 +185,38 @@ catalogue, the presentation-preview rules (when a runnable preview is
 warranted and how to keep it isolated), the mock limitation and promotion
 rules, and how to offload mock generation to a subagent.
 
-## Focus of the plan
+## Contracts — focus of the plan
 
 Spend the plan's precision on the contracts — the parts that are expensive to
-change later. Implementation internals can stay rough.
+change later: public API and user-visible surface (config keys, CLI flags,
+environment variables), dependencies, RPC schema, project layout, and
+persistent data format. Implementation internals can stay rough. Read
+[reference/contracts.md](reference/contracts.md) before writing PLAN.md's
+approach, delta, or steps; its hard rules in brief:
 
-- **Public API** — the exported surface consumers will call: packages, types,
-  functions, and their signatures — plus the surface end users actually touch:
-  config file keys, CLI flags and subcommands, and environment variables.
-- **Dependencies** — what the project pulls in: entries in the manifest
-  (`go.mod`, `package.json`, `moon.mod.json`, …). Cheap to add, expensive to
-  reverse once code builds on them.
-- **RPC schema** — the wire contracts between processes: proto / OpenAPI /
-  Connect definitions, endpoints, message shapes.
-- **Project layout** — where things live: directories, packages / modules, and
-  what depends on what.
-- **Persistent data format** — anything that outlives a process: database
-  schema, and the data format of files written to disk.
-
-Nail these down concretely (real names, real fields, real paths) before
-detailing implementation steps; a change to any of them after implementation
-starts invalidates far more work than an internal refactor does.
-
-### Public surface delta — fenced code, not prose
-
-Every plan touching exported, user-visible, or durable surface — dependency
-changes included, even when nothing else changes — gets a **Public surface
-delta** section in PLAN.md whose authority is fenced code in the source
-language. Prose may explain, but the code block defines: at plan time,
-anything user-visible that is not in the block is out of scope.
-Implementation may still expand the block — but only through the amendment
-path below, never silently.
-
-Enumerate in the block:
-
-- added / removed / major-version-bumped dependencies, first — see
-  **Dependency delta** below;
-- added / changed / removed exported symbols, with full signatures;
-- struct fields, with tags;
-- config keys, as a literal example-config snippet;
-- CLI flags and subcommands, as example invocations;
-- durable state vocabulary — option / setting names, and the persistent data
-  schema under its hard trigger: see **Persistent data delta** below.
-
-Prose is where omissions hide — a reader cannot notice a missing line in a
-paragraph. An enumerated code block makes absence visible and askable: if it
-is user-visible or durable and not in the block, ask why.
-
-#### Dependency delta — enumerated first, each addition justified
-
-Dependency changes are surface, not housekeeping: the manifest is a durable,
-consumer-visible file, and a dependency is expensive to reverse once code
-builds on it. They lead the delta block and never end as prose alone.
-
-- Enumerate added / removed / major-version-bumped dependencies at the top of
-  the fenced delta, as a literal manifest diff or snippet — real module paths
-  or package names, real versions.
-- Every **added** dependency gets a DECISION.md entry stating why this
-  dependency fits this project — license, maintenance health, footprint, fit
-  with the existing stack — and which alternatives were rejected and why:
-  other libraries considered, the standard library, and writing it in-repo.
-- A removal states what replaces the removed capability, or that nothing
-  needs it anymore.
-- The block's authority applies: a dependency not enumerated is out of scope,
-  and a mid-implementation addition (`go get`, `npm install`, …) goes through
-  the amendment path below, never in silently.
-
-#### Persistent data delta — schema as DDL, never prose
-
-Durability, not visibility, is what makes a contract: data that outlives the
-process is expensive to change whether or not an end user ever sees it.
-"Not user-visible, therefore internal, therefore rough" is not a valid
-escape hatch here.
-
-- Hard trigger: any plan that names a database or an on-disk persistent
-  format must include the schema in the Public surface delta — as fenced DDL
-  (`CREATE TABLE …`, the file the code will actually embed, e.g. the sqlc
-  schema file) **and** an `erDiagram` beside it — in its own subsection
-  beside the proto / CLI / config ones. The DDL defines; the diagram shows
-  the shape for the human reader.
-- The only alternative is an explicit user-approved deferral, recorded as a
-  DECISION.md entry. Naming the store in the approach while leaving the
-  schema to implementation is exactly the omission this trigger exists to
-  kill.
-- Mid-implementation schema changes — a new table, column, or file format —
-  go through the amendment path below, never in silently.
-
-#### Expanding the delta during implementation
-
-The delta is a gate, not a straitjacket: implementation often reveals surface
-the plan missed. Expanding it is legitimate — expanding it silently never is.
-
-- When the user is available, raise the expansion as a question and resolve
-  it with them before building on it.
-- When the user is away or not answering, decide yourself and keep working —
-  never stall. Record the choice as a DECISION.md entry tagged `[automatic]`
-  (e.g. `## <topic> [automatic]`) so the user can skim those entries once
-  back.
-- Either way, edit the fenced delta block in PLAN.md in the same turn: add
-  the new symbols, keys, or flags with full signatures — or, for a
-  dependency, its real path and version, plus the justifying DECISION.md
-  entry **Dependency delta** requires. The block stays the
-  single enumeration of user-visible surface — "expanded but recorded only in
-  a decision entry" leaves a stale block, the exact failure this section
-  exists to prevent.
-- The user's later review is then just two reads: the current block, and the
-  `[automatic]` decision entries.
-
-### One code fence per file
-
-When planned code spans multiple files, write one fenced code block per file,
-each fence headed by the real file path it belongs to — never one big block
-mixing several files, and never a fence with no home.
-
-- The per-file layout makes the intended project layout visible and askable,
-  the same way the surface delta makes omissions visible.
-- The split itself is a plan-phase assumption, not an ultimate decision:
-  better splits often appear during implementation, so implementers must not
-  treat fence boundaries as binding. What is tentative is only the assignment
-  of code to files — the enumerated surface (symbols, keys, flags) itself
-  stays authoritative as defined, and amended, in **Public surface delta**
-  above.
-- When implementation lands on a different split, that is a normal refinement,
-  not a deviation to escalate; material layout changes still get a DECISION.md
-  entry as usual.
+- Every plan touching exported, user-visible, or durable surface — dependency
+  changes included — gets a **Public surface delta** section in PLAN.md
+  whose authority is fenced code, not prose; surface not in the block is out
+  of scope.
+- Dependency changes lead the delta, and every added dependency gets a
+  DECISION.md entry justifying it against alternatives.
+- Naming a database or on-disk format requires its schema as fenced DDL plus
+  an `erDiagram` in the delta, or a user-approved deferral recorded in
+  DECISION.md.
+- Implementation may expand the delta, never silently: ask the user when
+  available, otherwise decide, tag the DECISION.md entry `[automatic]`, and
+  edit the block in the same turn.
+- Planned code spanning files is written one fence per file, headed by the
+  real path; the split is tentative, the enumerated surface is not.
 
 ## Sub-plans
 
-A plan that outgrows one directory splits hierarchically: the plan itself
-becomes a **master plan** owning the whole scope end-to-end, and the details
-move down into sub-plans it manages. Never split by narrowing — shrinking the
-plan to a first slice and deferring the rest into succeeding plans hides
-dropped scope where the user cannot easily detect it.
-
-### Splitting is a user decision
-
-- Treat any split — and especially any deferral of scope — as a material
-  decision: raise it as an open question, resolve it with the user, and
-  record the outcome as a DECISION.md entry.
-- A reduced-scope follow-up plan is legitimate only when the user explicitly
-  chose that reduction; it never happens as a silent default.
-
-### Master plan manages, sub-plans hold the detail
-
-- The master plan keeps IDEA.md, goal, success criteria, and scope for the
-  whole feature; none of them shrink when sub-plans appear.
-- Master PLAN.md steps say which sub-plan delivers what, in what order, and
-  what depends on what; implementation detail lives in the sub-plans.
-- Each sub-plan is a full plan directory with the four canonical files,
-  nested under the master's `sub/` directory as
-  `<master_dir>/sub/NN-<plan_name>/`, with `NN` starting at `01`.
-- Master STATUS.md tracks each sub-plan's state alongside its own checklist.
-
-### Keep the boundary explicit
-
-The split boundary is where deliverables fall through the cracks, so make it
-explicit in both directions.
-
-- **Boundary ledger, both directions** — the master and every sub-plan each
-  carry the same table listing every deliverable the feature needs
-  end-to-end, with the plan and step that owns it. An inbound list alone
-  ("what the master consumes from us") is not enough; a deliverable owned by
-  nobody must appear as a visible empty cell, never as silence.
-- **Quote inherited decisions verbatim** — when a sub-plan restates an
-  upstream DECISION.md entry, quote its operative sentence or link to it
-  directly; never re-summarize. A compressed paraphrase can invert meaning
-  and camouflage a requirement through implementation and review.
+A plan that outgrows one directory splits hierarchically into a master plan
+that owns the whole scope and sub-plans under its `sub/` directory — never
+by narrowing the plan to a first slice. Splitting, and especially deferring
+scope, is a user decision recorded in DECISION.md. Read
+[reference/sub-plans.md](reference/sub-plans.md) whenever a split comes up
+or a plan already has a `sub/` directory.
 
 ## HANDOFF.md — ledger of what leaves the plan
 
@@ -345,7 +225,7 @@ fixed, required follow-ups — is recorded in a `HANDOFF.md` in the plan
 directory. It is a ledger, not a license: writing an item there does not
 authorize deferring it. It is also not the final resting place: once the
 implementation is done and the user has reviewed it, the ledger drains into
-the durable issue backlog — see **Fold the ledger into the issue backlog**
+the beads backlog — see **Fold the ledger into the beads backlog**
 below.
 
 - Do not scaffold it. Create the file only when the first real item appears.
@@ -366,21 +246,20 @@ below.
   required — who or which future plan should pick it up.
 - Tell the user whenever you add an entry; the file never grows quietly.
 
-### Fold the ledger into the issue backlog
+### Fold the ledger into the beads backlog
 
 HANDOFF.md lives in the plan directory, and plan directories are ephemeral —
 they may be removed once the work is over. Entries that should survive are
-folded into the repository's durable issue backlog under `./doc/plan/issue/`,
-but only on the user's say-so — strictly after the implementation is done
-**and** the user has followed up on it, never in the same turn as the
-completion report.
+folded into the repository's durable issue backlog — the beads database,
+one bead per item — but only on the user's say-so — strictly after the
+implementation is done **and** the user has followed up on it, never in the
+same turn as the completion report.
 
 At that fold moment — and whenever opening, searching, or closing backlog
-items — read [reference/issue-backlog.md](reference/issue-backlog.md) and
-follow it. It defines the backlog layout (`open/` items as the authority,
-`closed/`, the derived `catalog.md`), the frontmatter `tags` field, the
-`scripts/issue-search.sh` frontmatter search, and the folding and closing
-mechanics.
+items — read **The beads backlog** in
+[reference/beads.md](reference/beads.md) and follow it. It defines the item
+shape (type, labels, `Discussion:` / `Decision:` comments, close reason),
+how to search before folding, and the folding and closing mechanics.
 
 ## Record open questions
 
@@ -433,7 +312,7 @@ step — review catches what is listed, not what is implied.
   as an open question.
 - Then replay each IDEA.md use case against the union of planned steps across
   the plan family; a use case no step delivers is flagged the same way.
-- Then walk the contract areas listed under **Focus of the plan** — public
+- Then walk the contract areas listed under **Contracts** — public
   API, dependencies, RPC schema, project layout, persistent data format:
   each must either be concretely present as a fenced block in PLAN.md or be
   explicitly marked "no change". An area merely described in prose is
@@ -443,6 +322,5 @@ step — review catches what is listed, not what is implied.
   out-of-scope discovery or link a user-made DECISION.md entry — anything
   else is scope silently dropped, and the plan is not finalized. A ledger
   that passes the gate is what later gets offered for folding into the
-  issue backlog under `doc/plan/issue/` — after implementation, once the
-  user has followed up on it (see **Fold the ledger into the issue
-  backlog**).
+  beads backlog — after implementation, once the user has followed up on
+  it (see **Fold the ledger into the beads backlog**).
