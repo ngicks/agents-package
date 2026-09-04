@@ -29,8 +29,9 @@ The repository's issue backlog is beads (`bd`), one database shared by every
 git worktree. Read [reference/beads.md](reference/beads.md) for the detail.
 
 - On every invocation run `scripts/bd-init.sh`, bundled in this skill's
-  `scripts/` directory. It is idempotent and picks the prefix itself; never
-  run raw `bd init`, never pass a prefix, never run `bd hooks install`.
+  `scripts/` directory. It is idempotent, picks the prefix itself, and
+  mirrors the git origin as the Dolt remote; never run raw `bd init`, never
+  pass a prefix, never run `bd hooks install`.
 - Never run `bd dolt push`; syncing off the machine is the user's job.
 - Agent commits get an `Executed-By: <agent>` trailer automatically, from
   `scripts/executed-by-trailer.sh` wired by the user as the

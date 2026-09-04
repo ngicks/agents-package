@@ -21,6 +21,10 @@ database exists. Run `scripts/bd-init.sh`, bundled in this skill's
 - It writes nothing into the worktree: no `AGENTS.md`, no git hooks, no
   remote push. The database lives in the git common directory and is
   shared by every worktree of the repository.
+- It mirrors the git `origin` remote as the Dolt remote `origin`
+  (`git+https://` or `git+ssh://` form) on every run, so the user's
+  `bd dolt push` has somewhere to go. Only the URL is recorded; nothing is
+  fetched or pushed.
 - It never pushes. `bd dolt push` is the user's job; do not run it.
 - If `bd` is not installed the script says so and exits 0. Planning can
   proceed, but folding HANDOFF.md into the backlog (below) is blocked until
