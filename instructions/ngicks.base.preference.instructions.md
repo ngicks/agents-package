@@ -3,15 +3,27 @@ description: "Basic instructions for my preference"
 applyTo: ""
 ---
 
-### Base preference
+### Ask back the user
 
-- Make routine judgment calls (naming, defaults, choice among equivalent approaches) yourself and note them.
-- Ask back the user — using `AskUserQuestion` (if available) or just a response — when different readings of the request would lead to materially different work, or before destructive / scope-changing actions.
+- Ask back the user using `AskUserQuestion` (if available) or just a response
+  - When:
+    - anything is unclear to you
+    - different readings of the request would lead to materially different work
+    - before destructive / scope-changing actions.
+
+### Preference for documents
+
+- Use clear subject/verb/object constructions. Do not use cleft sentences, contrastive appositives, appended-glosses, or trailing clauses.
+- Assume I may edit documents myself. Especially markdown documents.
+- When writing documents, don't include references to conversations/threads/anything a reader would not know about.
+  - Do not refer to internal beads issues.
+  - Do not refer to internal documents in public documents.
 - Do not emit redundant code / comments when coding. Write:
   - How in code
   - What in tests
   - Why not in code comments.
     - e.g. why you didn't do thing A or B.
+- Proactively Write comments explaining why, if otherwise readers would not know.
 
 ### Task runner
 
