@@ -17,7 +17,10 @@ When building an SPA frontend, prefer the following stack (as used in crabswarm'
 - State:
   - Client state: `@preact/signals`.
   - Server state / data fetching: `@tanstack/preact-query`.
-- Headless components: `@ark-ui/react` (works through `preact/compat`).
+- Headless components: `@ark-ui/react` (works through `preact/compat`), for interactive widgets only.
+  - Use Ark where the behavior is non-trivial to get right by hand — focus trapping, keyboard navigation, ARIA: dialogs, tabs, combobox / select / multi-select, toggle groups, popovers, menus.
+  - Do not wrap static or checkbox-driven chrome in Ark: daisyUI classes on plain elements cover drawers, navbars, badges, buttons, lists, cards and tables on their own.
+  - Import per component (`@ark-ui/react/dialog`), and style the parts with daisyUI classes; Ark supplies behavior, never the skin.
 - Styling: `tailwindcss` v4 via `@tailwindcss/vite` plugin + `daisyui`.
 - API layer: Connect RPC.
   - `@connectrpc/connect` + `@connectrpc/connect-web` clients.
