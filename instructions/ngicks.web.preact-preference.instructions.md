@@ -27,4 +27,37 @@ When building an SPA frontend, prefer the following stack (as used in crabswarm'
   - Codegen from proto with `buf generate` + `@bufbuild/protoc-gen-es` into `src/gen/`; runtime is `@bufbuild/protobuf`.
 - Markdown rendering extras (when previewing docs): `github-markdown-css`, `mermaid`, and `mathjax` (vendor MathJax assets locally with a copy script instead of loading from a CDN).
 - TypeScript: `strict: true`, `noEmit` (Vite does the transpiling); typecheck with `tsc --noEmit`; also `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, `isolatedModules`.
-- Suggested layout under `src/`: `api/` (clients, queries, events), `components/`, `signals/` (UI state), `gen/` (generated code), `routes.tsx`, `main.tsx`, `index.css`.
+- Layout under `src/` — page-based; components used by one page live with that page, only genuinely shared UI goes under `components/`:
+
+  ```
+  src/
+  ├── main.tsx                  # Mount the app, install providers
+  ├── app.tsx                   # App shell and routing
+  ├── index.css                 # Global styles, Tailwind/DaisyUI
+  ├── pages/                    # Route-level screens
+  │   ├── preview/
+  │   │   ├── index.tsx         # Preview page
+  │   │   ├── FileTree.tsx      # Components used only by this page
+  │   │   ├── DocumentView.tsx
+  │   │   └── usePreview.ts
+  │   └── not-found.tsx
+  ├── components/               # UI shared across pages
+  │   ├── Layout.tsx
+  │   ├── Header.tsx
+  │   └── ui/                   # Reusable UI primitives (Ark-backed where interactive)
+  │       ├── Button.tsx
+  │       └── Dialog.tsx
+  ├── api/
+  │   ├── gen/                  # Generated protobuf code
+  │   ├── client.ts             # Connect transport and clients
+  │   ├── preview.ts            # Query options and mutations
+  │   └── events.ts             # Server event subscriptions
+  ├── signals/                  # Shared client-side state
+  │   └── preferences.ts
+  ├── hooks/                    # Hooks used across pages
+  │   └── useMediaQuery.ts
+  ├── lib/                      # Focused non-UI helpers
+  │   ├── paths.ts
+  │   └── paths.test.ts
+  └── assets/                   # Imported images, icons, fonts
+  ```
