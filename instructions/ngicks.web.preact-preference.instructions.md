@@ -1,6 +1,6 @@
 ---
 description: "Preferred stack for Preact SPA frontends"
-applyTo: "**/*.{ts,tsx,css,html}"
+applyTo: ""
 ---
 
 ### Preact SPA stack preference

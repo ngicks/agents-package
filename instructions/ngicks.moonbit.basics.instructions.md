@@ -1,6 +1,6 @@
 ---
 description: "Basic moonbit rule"
-applyTo: "**/{*.mbt,moon.pkg,*.mbti}"
+applyTo: ""
 ---
 
 ### About moonbit

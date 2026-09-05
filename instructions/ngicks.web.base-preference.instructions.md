@@ -1,6 +1,6 @@
 ---
 description: "Base preference for web (frontend) projects"
-applyTo: "**/*.{ts,tsx,js,jsx,mjs,css,html}"
+applyTo: ""
 ---
 
 ### Package manager

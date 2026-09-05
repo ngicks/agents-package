@@ -1,6 +1,6 @@
 ---
 description: "Basic instructions for my preference"
-applyTo: "*"
+applyTo: ""
 ---
 
 ### Base preference
