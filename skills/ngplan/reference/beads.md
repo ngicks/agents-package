@@ -21,8 +21,10 @@ database exists. Run `scripts/bd-init.sh`, bundled in this skill's
   `BEADS_PREFIX` to override. Do not pass a prefix of your own — a mismatch
   with the existing database is a hard error.
 - It writes nothing into the worktree: no `AGENTS.md`, no git hooks, no
-  remote push. The database lives in the git common directory and is
-  shared by every worktree of the repository.
+  remote push. The database is created at the repository root, the parent
+  of the git common directory, and is shared by every worktree of the
+  repository. Run the script from any worktree; it finds the root itself.
+- It turns off bd's anonymous usage metrics (`bd metrics off`).
 - It mirrors the git `origin` remote as the Dolt remote `origin`
   (`git+https://` or `git+ssh://` form) on every run, so the user's
   `bd dolt push` has somewhere to go. Only the URL is recorded; nothing is

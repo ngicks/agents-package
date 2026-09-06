@@ -3,9 +3,10 @@
 # checked out as several git worktrees.
 #
 # - No-op (exit 0) when bd is already initialized.
-# - Derives the issue prefix from the repository root directory, never from
-#   the worktree directory, so every worktree agrees on the same prefix.
-#   Override with BEADS_PREFIX=<prefix>.
+# - Creates the database at the repository root (the parent of the git
+#   common dir), never in the current worktree, so every worktree shares it.
+# - Derives the issue prefix from that same root directory, so every
+#   worktree agrees on the prefix. Override with BEADS_PREFIX=<prefix>.
 # - Turns off bd's anonymous usage metrics (`bd metrics off`).
 # - Writes nothing into the worktree: no AGENTS.md, no git hooks, no push.
 # - Mirrors the git `origin` remote as the Dolt remote `origin` (git+https://
@@ -49,15 +50,17 @@ if bd info -q >/dev/null 2>&1; then
   exit 0
 fi
 
+# The git common dir is `<root>/.git` for a normal checkout and
+# `<root>/.bare` (or similar) for a bare-repo + sibling-worktrees layout.
+# Its parent is the repository root in both cases. The database is created
+# there, not in the current worktree, so you can manipulate it even on bare root.
+common=$(git rev-parse --git-common-dir)
+common=$(cd "$common" && pwd -P)
+root=$(dirname "$common")
+
 if [ -n "${BEADS_PREFIX:-}" ]; then
   prefix=$BEADS_PREFIX
 else
-  # The git common dir is `<root>/.git` for a normal checkout and
-  # `<root>/.bare` (or similar) for a bare-repo + sibling-worktrees layout.
-  # Its parent is the repository root in both cases.
-  common=$(git rev-parse --git-common-dir)
-  common=$(cd "$common" && pwd -P)
-  root=$(dirname "$common")
   prefix=$(basename "$root" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9\n' '-' | sed 's/^-*//; s/-*$//')
 fi
 
@@ -66,5 +69,6 @@ if [ -z "$prefix" ]; then
   exit 1
 fi
 
+cd "$root"
 bd init -p "$prefix" --init-if-missing --skip-agents --skip-hooks --non-interactive -q
 sync_remote
