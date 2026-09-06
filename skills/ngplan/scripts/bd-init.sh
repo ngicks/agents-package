@@ -6,6 +6,7 @@
 # - Derives the issue prefix from the repository root directory, never from
 #   the worktree directory, so every worktree agrees on the same prefix.
 #   Override with BEADS_PREFIX=<prefix>.
+# - Turns off bd's anonymous usage metrics (`bd metrics off`).
 # - Writes nothing into the worktree: no AGENTS.md, no git hooks, no push.
 # - Mirrors the git `origin` remote as the Dolt remote `origin` (git+https://
 #   or git+ssh://), so `bd dolt push` works once the user runs it. This only
@@ -16,6 +17,10 @@ if ! command -v bd >/dev/null 2>&1; then
   echo "bd-init: bd is not installed; skipping beads initialization" >&2
   exit 0
 fi
+
+# Opt out of anonymous usage metrics. The setting is machine-global and the
+# command is idempotent, so run it before any other bd command on every path.
+bd metrics off >/dev/null 2>&1 || true
 
 # Git origin URL -> Dolt remote URL. Prints nothing for forms Dolt cannot use.
 dolt_remote_url() {
