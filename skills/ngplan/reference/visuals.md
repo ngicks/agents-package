@@ -1,9 +1,9 @@
 # Visual artifacts for plans
 
 Detail for ngplan's **Use the right visual artifact** section: the mermaid
-type catalogue, presentation previews, mock limitation and promotion rules,
-and offloading mock generation. Read this when a plan warrants a diagram,
-preview, or mock.
+type catalogue, the presentation-preview loop, mock limitation and promotion
+rules, and offloading mock generation. Read this when a plan warrants a
+diagram, preview, or mock.
 
 ## Mermaid type catalogue
 
@@ -16,7 +16,7 @@ Flow and behavior — things that happen over time:
 | `flowchart`       | steps, branches, decisions                | use-case workflows, control flow, error paths              |
 | `sequenceDiagram` | ordered messages between actors           | RPC / protocol exchanges, multi-component use cases        |
 | `stateDiagram-v2` | states and transitions                    | lifecycles, modes, connection / session state              |
-| `journey`         | user steps scored by experience           | IDEA.md end-to-end walkthroughs, pain-point hunting        |
+| `journey`         | user steps scored by experience           | idea-phase end-to-end walkthroughs, pain-point hunting     |
 | `timeline`        | events in chronological order             | rollout, migration, and deprecation phases                 |
 | `gantt`           | schedule with durations and dependencies  | ordering across steps or sub-plans                         |
 
@@ -43,13 +43,18 @@ Quantitative and tracking — occasionally useful evidence:
 | `quadrantChart` | items placed on two axes       | option triage — effort vs impact                    |
 | `radar`         | multi-axis comparison          | scoring rejected vs chosen alternatives             |
 | `sankey`        | volume flowing between nodes   | data volume moving between components               |
-| `kanban`        | work items in status columns   | rarely — STATUS.md's checklist usually suffices     |
+| `kanban`        | work items in status columns   | rarely — the step children usually suffice          |
 | `treemap`       | nested proportions             | relative size of packages / areas touched           |
 
 Newer niche types exist (`venn`, `wardley`, `cynefin`, `ishikawa`,
-`railroad`, …). Plan documents are read in many renderers — GitHub, editors,
-doc sites — so prefer the long-stable types above when either fits; a diagram
-that does not render is worse than prose.
+`railroad`, …). Plan fields are rendered by the issues viewer and linted by
+`crabswarm issues lint`, which refuses a fence `mermaid-lint` refuses and
+re-blocks every turn until it is fixed — so prefer the long-stable types
+above when either fits; a diagram that does not render is worse than prose.
+
+Headless screenshots do not prove a diagram renders: font substitution
+(measure in one face, draw in another) clips labels invisibly. Open the
+page once yourself before relying on it.
 
 ## Presentation previews
 
@@ -61,19 +66,45 @@ spatial or interactive evidence, also create a runnable presentation preview.
   create placeholder presentation artifacts for other work.
 - Prefer the repository's existing presentation stack, dependencies, components,
   and design tokens. For example, use an isolated React / Preact entrypoint or
-  story in a web project, or a small `charm.land/bubbletea/v2` program in a Go TUI project.
+  story in a web project, or a small `charm.land/bubbletea/v2` program in a Go
+  TUI project.
 - Follow an established preview, story, example, or development-entrypoint
-  convention when one exists. Otherwise keep the preview under the plan
-  directory so its temporary ownership is obvious.
+  convention when one exists.
+- A mock that imports application code lives under the application's own
+  toolchain (next to the code it imports, in a clearly named `mock` or
+  `preview` entry) and is expected to graduate: the plan's reorganisation
+  step either promotes it into the real feature or deletes it, and moves its
+  limits file into the plan (a `notes` entry or a comment on the step).
 - Keep the preview isolated from normal application behavior. Do not add a
   production route or dependency merely to host planning UI.
-- Link the preview from the relevant PLAN.md section. Record the decision it
+- Link the preview from the relevant `design` section. Record the decision it
   demonstrates, how to run it, and whether it is disposable or expected to
   graduate into production code.
-- Use one or more self-contained `display-<NN>-<screen_name>.html` files only as
-  a fallback when the repository has no suitable presentation stack or starting
-  that stack would be disproportionate. Start numbering at `01`; use semantic
-  HTML, embedded CSS, native controls, and no external assets.
+- Use one or more self-contained `display-<NN>-<screen_name>.html` files only
+  as a fallback when the repository has no suitable presentation stack or
+  starting that stack would be disproportionate. Put them under
+  `doc/mock/<plan id>/`, start numbering at `01`, use semantic HTML,
+  embedded CSS, native controls, and no external assets; the reorganisation
+  step deletes the directory.
+
+### The preview loop
+
+A preview is refined over many user-driven passes, not delivered once; a
+real mock went through about fifteen (tabs, fonts, sizes, query bar,
+labels page, graph zoom, section cards, borders, lightbox, TOC). Run it as
+a loop:
+
+- One subagent pass per user request (see **Offload mock generation**
+  below); the brief names the one change asked for and the files the pass
+  may touch.
+- The planner reviews the result — screenshots and the driver's assertions
+  — and opens the page once in a real browser for anything font- or
+  layout-sensitive.
+- One commit per pass, so a pass can be reverted alone.
+- Findings appended to the limits file after every pass: what the pass
+  proved, what it faked, what it could not show.
+- The loop ends when the user says so, and the state of the mock at that
+  point is what the `Decision:` comments cite.
 
 ## Mock limitations and promotion
 
@@ -82,28 +113,28 @@ everything else — data sources, filesystem, timing, fixture data. State that
 substitution explicitly at the moment it is cheapest to see.
 
 - Every mock or preview states, in its header comment or a sibling
-  `MOCK_LIMITS.md`: what the mock fakes, and which requirements it therefore
-  cannot validate.
-- A DECISION.md entry justified by "validated in the mock" must name which
+  `MOCK_LIMITS.md` next to the mock: what the mock fakes, and which
+  requirements it therefore cannot validate.
+- A `Decision:` comment justified by "validated in the mock" must name which
   mock, and holds only for behaviors outside that mock's known-limitations
   list.
 - When mock code is lifted into production, read its claimed semantics — its
-  own comments — side by side against the DECISION.md wording it implements.
+  own comments — side by side against the `Decision:` wording it implements.
   A discrepancy is a deviation to raise with the user, never to copy forward.
 
 ## Offload mock generation to a subagent
 
 Writing a GUI / TUI mock is bulk output that crowds the planning context.
 When a preview is warranted, delegate its generation instead of writing it
-inline.
+inline — on the first pass and on every later one.
 
-- Use available subagent definition that best suits the task
+- Use the available subagent definition that best suits the task.
 - If the tool supports a per-call model override, choose the subagent's model
   relative to your own: step down one class when you are running as the
   highest-capability model, otherwise stay at your own class — e.g. Fable
   delegates to Opus, and Opus delegates to Opus.
 - On return, review the generated files yourself — including that the
-  known-limitations list is present — then link them from PLAN.md as
+  known-limitations list is present — then link them from `design` as
   described above; the linking and decision record stay your job.
 - Fall back to writing the mock directly in the current context only when
   no delegation tool is available.

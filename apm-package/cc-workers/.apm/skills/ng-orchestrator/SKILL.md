@@ -37,11 +37,12 @@ during the run.
   decisions to them as they come up.
 - If the user answers they will be away, or does not answer: decide
   every unclear corner yourself and keep working -- never stall waiting
-  for input. Record each such decision in `DECISION.md` (next to the
-  plan files if the run has any, otherwise at the repo root), tagging
-  the entry `[automatic]`, e.g. `## <topic> [automatic]`, so the user
-  can skim those entries once they are back. Entries confirmed with the
-  user need no tag.
+  for input. Record each such decision as a comment on the run's plan
+  issue in beads (`bd comment <plan> "Decision: <topic> [automatic] --
+  <choice>, <rationale>, <rejected alternatives>"`), or under **Open
+  items** in the final report when the run has no plan, so the user can
+  skim those once they are back. Decisions confirmed with the user need
+  no tag.
 
 ## Operating loop
 
@@ -58,10 +59,13 @@ Run this loop until the goal is met or you must report a blocker.
    obtainable by running tools (exact `file:line`, verbatim quotes) and
    tell the worker: "cite file:line from real reads; never paraphrase or
    reconstruct code; if a tool didn't run, say so." When a subtask stems
-   from a plan or `DECISION.md` entry, paraphrase the decision into the
-   brief in plain words -- never pass bare IDs like `D15` or plan step
-   numbers, because workers echo the tokens they are given and the plan
-   files may be removed later.
+   from a plan step or a `Decision:` comment, paraphrase the decision
+   into the brief in plain words -- never pass bare bead ids or plan
+   step numbers, because workers echo the tokens they are given into
+   code and commits. Repeat the ban in every brief; it does not carry
+   over. When several workers will touch one package, name in each
+   brief the files that worker may create or edit -- see **Worker
+   rules** below.
 3. **Integrate.** Read each return, update the plan, and decide the next
    subtask. Sanity-check the worker's reported tool use: a return
    showing **0 tool calls** is almost certainly hallucinated -- distrust
@@ -70,9 +74,13 @@ Run this loop until the goal is met or you must report a blocker.
    symbols, config keys, flags) beyond the plan's Public surface delta,
    resolve it through the availability rule before delegating the next
    subtask: ask the user if they said they stay available, otherwise
-   decide yourself and record a DECISION.md entry tagged `[automatic]`
-   -- and in the same turn update the fenced delta block in PLAN.md so
-   it stays the single enumeration of user-visible surface.
+   decide yourself and record a `Decision:` comment tagged `[automatic]`
+   -- and in the same turn rewrite the fenced delta block in the plan's
+   `design` field (`bd update <plan> --design-file -`) so it stays the
+   single enumeration of user-visible surface. When a return reports an
+   **interim symbol** -- something added because the file it belonged in
+   is owned by another worker -- schedule the cleanup as a subtask for
+   that file's owner; never accept the interim shape as final.
 4. **Verify.** Before declaring done on a code change, confirm with one
    final ng-reviewer pass and a ng-test-runner pass. This is a single
    gate at the end -- do not re-verify each subtask as it lands, and do
@@ -110,10 +118,29 @@ it yourself instead of delegating. Start unknown-heavy tasks with
   the worker cannot have grounded its answer -- treat it as hallucinated
   and re-run it.
 - Do NOT declare success without a verification pass when code changed.
-- Do NOT let plan tokens leak into durable artifacts. Plan files and
-  `DECISION.md`/`STATUS.md` are ephemeral; code, comments, commit
-  messages, and docs must spell out the reasoning in plain words instead
-  of citing IDs like `D15` or plan steps.
+- Do NOT let plan tokens leak into durable artifacts. Code, comments,
+  commit messages, and docs must spell out the reasoning in plain words
+  instead of citing bead ids, decision labels, or plan steps.
+
+## Worker rules
+
+Pass these to every worker that edits files, in the brief, every time.
+
+- **Never `git stash`.** The stash stack is shared by every worktree of
+  the repository and by other sessions; a `stash` / `pop` for a baseline
+  comparison has unstaged files the worker did not own. Compare against
+  `git show HEAD:<path>` or a temporary WIP commit instead.
+- **File ownership.** When several workers share a package, each brief
+  names the files that worker may create or edit. A worker that needs a
+  change in a file it does not own reports the need instead of making
+  it -- or, when the subtask cannot land without it, adds the smallest
+  interim symbol in a file it does own and says so under **Surface
+  delta** in its return. The orchestrator then schedules the cleanup
+  for the owner; an interim symbol is never accepted as the final shape.
+- **Concurrent workers in one package** produce transient compile
+  failures; sequence subtasks that touch the same package unless the
+  file ownership is disjoint and the shared symbols already exist.
+- **No plan tokens** in code, comments, commit messages, or docs.
 
 ## Output contract
 
@@ -124,50 +151,30 @@ Return a short markdown report:
   returns.
 - **Verification** -- what ng-reviewer / ng-test-runner confirmed (or why
   skipped).
-- **Open items** -- anything deferred, with the reason, including
-  `HANDOFF.md` entries not yet folded into the beads backlog
-  (see **Fold HANDOFF.md into the beads backlog**).
+- **Open items** -- anything deferred, with the reason, including the
+  ids of handoff issues created during the run (see **Handoff items**).
 
-## Fold ## Fold HANDOFF.md into the beads backlog
+## Handoff items
 
-If the run's plan directory holds a `HANDOFF.md` (deferred tasks,
-out-of-scope discoveries), its surviving entries are folded into the
-durable issue backlog -- the repository's beads (`bd`) database, one
-bead per item, shared by every worktree -- but only after the user has
-signed off on the implementation.
+Work that leaves the run -- an out-of-scope defect, an improvement the
+scope does not cover, a user-approved deferral -- is born as its own
+issue in the repository's beads (`bd`) database at the moment it is
+discovered, never kept in a file or in memory for a later fold.
 
-- Timing: never in the same turn as the final report. Deliver the
-  report, wait for the user's follow-up on the implementation, and only
-  after their review and approval offer the fold.
-- Ask which entries to fold with `AskUserQuestion`
-  (`multiSelect: true`), one option per entry; at most ~4 options per
-  round, going in rounds for a longer ledger. The built-in "Other"
-  choice is how the user answers "all of them" or gives a custom
-  instruction. A single-entry ledger gets a fold-or-drop question for
-  that entry instead, since the tool needs at least two options. Fall
-  back to plain chat when the tool is unavailable.
-- Search first (`bd search "<text>" --status all`, `bd list --status all
-  -l <label>`) and extend or cross-reference an existing bead rather
-  than duplicating it.
-- Create each selected entry as a `task` bead, labels chosen from its
-  topics (reuse labels from `bd label list-all`):
+- Create it as a `task` with a `discovered-from` edge to the plan step
+  (or the plan) that surfaced it, then defer it:
 
-      printf '%s\n' "<body>" | bd create "<title>" -t task -l <label>,<label> --body-file - --silent
+      H=$(printf '%s\n' "<what, why not here, follow-up>" | bd create "<title>" -t task --deps discovered-from:<step id> --body-file - --silent)
+      bd defer $H --reason "awaiting triage"
 
-  Existing bead text is never rewritten -- the only other legal
-  mutations are appending `Discussion:` / `Decision:` comments
-  (`bd comment <id> "..."`) and closing (below).
-- The backlog is a durable artifact: rewrite each folded entry to stand
-  alone, with real paths and symbols and the reasoning in plain words
-  -- no plan paths, decision IDs like `D15`, or plan step numbers.
-- Closing an item: when the user says a bead is resolved or dropped,
-  `bd close <id> --reason "<outcome>"`. Only the user closes items,
-  never the orchestrator on its own judgment.
-- Never run `bd dolt push`; syncing the backlog off the machine is the
-  user's job. Report the new bead IDs.
-- If the user said at run start that they are away, do not fold
-  anything automatically: list `HANDOFF.md` under **Open items** in the
-  report as awaiting triage instead.
-- Unselected entries stay in `HANDOFF.md` and are removed with the plan
-  directory -- that is the user's decision to drop them; never fold
-  them silently.
+- Deferred is the awaiting-triage state: hidden from `bd ready`, listed
+  by `bd list -s deferred`. The user promotes an item with `bd undefer`
+  or drops it with `bd close --reason`; never do either yourself.
+- Search first (`bd search "<text>" --status all`) and cross-reference
+  an existing bead rather than duplicating it. Reuse labels from
+  `bd label list-all`.
+- The item stands alone: real paths and symbols, the reasoning in plain
+  words. In-scope work is never handed off by default -- a step turning
+  out hard is a question for the user, not a deferral.
+- Never run `bd dolt push`; syncing the database off the machine is the
+  user's job. Report every id created under **Open items**.

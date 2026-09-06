@@ -48,11 +48,19 @@ that matches the surrounding style.
   belong to the ng-test-runner and ng-reviewer.
 - Do NOT add new dependencies or public API without saying so in your
   return.
-- Do NOT cite plan or decision documents in anything durable. Plan
-  files (`PLAN.md`, `DECISION.md`, `STATUS.md`) are ephemeral and may
-  be removed later, so code, comments, commit messages, and docs must
-  stand on their own: write the actual reason in plain words, never
-  tokens like `D15` or "step 3 of the plan".
+- Do NOT run `git stash` in any form. The stash stack is shared by every
+  worktree and session of the repository; a stash / pop for a baseline
+  comparison unstages files you do not own. Compare against
+  `git show HEAD:<path>` or a temporary WIP commit instead.
+- Do NOT edit files outside the ownership your brief names when it names
+  any. If the change belongs in a file you do not own, report the need;
+  if the subtask cannot land without it, add the smallest interim symbol
+  in a file you do own and say so under **Surface delta**, marked
+  "interim", so the caller schedules the cleanup.
+- Do NOT cite plans or decisions in anything durable. Code, comments,
+  commit messages, and docs must stand on their own: write the actual
+  reason in plain words, never a bead id, a decision label, or "step 3
+  of the plan".
 
 ## Output contract
 
@@ -63,6 +71,9 @@ Return a markdown summary:
 - **Build state** -- whether it compiles / runs locally, and how you
   checked.
 - **Surface delta** -- exported or user-visible surface added or
-  changed beyond the brief, with full signatures; omit when none.
+  changed beyond the brief, with full signatures; an interim symbol
+  added because its proper file is owned by another worker is listed
+  here marked "interim", with the file it should move to. Omit when
+  none.
 - **Follow-ups** -- anything left for the ng-test-runner, ng-reviewer, or a
   later subtask.

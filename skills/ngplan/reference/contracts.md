@@ -1,10 +1,10 @@
 # Contracts — focus of the plan
 
 Detail for ngplan's **Contracts** section: what a plan must nail down
-before implementation steps, and how the **Public surface delta** in PLAN.md
-enumerates it. Read this before writing PLAN.md's approach, surface delta,
-or implementation steps, and again whenever implementation discovers new
-surface.
+before implementation steps, and how the **Public surface delta** in the
+epic's `design` field enumerates it. Read this before writing the design's
+approach, surface delta, or the step children, and again whenever
+implementation discovers new surface.
 
 Spend the plan's precision on the contracts — the parts that are expensive to
 change later. Implementation internals can stay rough.
@@ -30,7 +30,7 @@ starts invalidates far more work than an internal refactor does.
 
 Every plan touching exported, user-visible, or durable surface — dependency
 changes included, even when nothing else changes — gets a **Public surface
-delta** section in PLAN.md whose authority is fenced code in the source
+delta** section in `design` whose authority is fenced code in the source
 language. Prose may explain, but the code block defines: at plan time,
 anything user-visible that is not in the block is out of scope.
 Implementation may still expand the block — but only through the amendment
@@ -44,6 +44,8 @@ Enumerate in the block:
 - struct fields, with tags;
 - config keys, as a literal example-config snippet;
 - CLI flags and subcommands, as example invocations;
+- routes and URLs, together with every place that **prints** them — a
+  moved URL surface is missed by the printer, not the router;
 - durable state vocabulary — option / setting names, and the persistent data
   schema under its hard trigger: see **Persistent data delta** below.
 
@@ -60,7 +62,7 @@ builds on it. They lead the delta block and never end as prose alone.
 - Enumerate added / removed / major-version-bumped dependencies at the top of
   the fenced delta, as a literal manifest diff or snippet — real module paths
   or package names, real versions.
-- Every **added** dependency gets a DECISION.md entry stating why this
+- Every **added** dependency gets a `Decision:` comment stating why this
   dependency fits this project — license, maintenance health, footprint, fit
   with the existing stack — and which alternatives were rejected and why:
   other libraries considered, the standard library, and writing it in-repo.
@@ -84,7 +86,7 @@ escape hatch here.
   beside the proto / CLI / config ones. The DDL defines; the diagram shows
   the shape for the human reader.
 - The only alternative is an explicit user-approved deferral, recorded as a
-  DECISION.md entry. Naming the store in the approach while leaving the
+  `Decision:` comment. Naming the store in the approach while leaving the
   schema to implementation is exactly the omission this trigger exists to
   kill.
 - Mid-implementation schema changes — a new table, column, or file format —
@@ -98,18 +100,34 @@ the plan missed. Expanding it is legitimate — expanding it silently never is.
 - When the user is available, raise the expansion as a question and resolve
   it with them before building on it.
 - When the user is away or not answering, decide yourself and keep working —
-  never stall. Record the choice as a DECISION.md entry tagged `[automatic]`
-  (e.g. `## <topic> [automatic]`) so the user can skim those entries once
-  back.
-- Either way, edit the fenced delta block in PLAN.md in the same turn: add
-  the new symbols, keys, or flags with full signatures — or, for a
-  dependency, its real path and version, plus the justifying DECISION.md
-  entry **Dependency delta** requires. The block stays the
-  single enumeration of user-visible surface — "expanded but recorded only in
-  a decision entry" leaves a stale block, the exact failure this section
-  exists to prevent.
+  never stall. Record the choice as a `Decision:` comment tagged
+  `[automatic]` so the user can skim those once back.
+- Either way, rewrite the fenced delta block in `design` in the same turn:
+  add the new symbols, keys, or flags with full signatures — or, for a
+  dependency, its real path and version, plus the justifying `Decision:`
+  comment **Dependency delta** requires. The block stays the single
+  enumeration of user-visible surface — "expanded but recorded only in a
+  comment" leaves a stale block, the exact failure this section exists to
+  prevent.
 - The user's later review is then just two reads: the current block, and the
-  `[automatic]` decision entries.
+  `[automatic]` comments.
+
+## Keep the fences, cut the prose
+
+What implementers use from a plan are the fenced contracts and the step
+list. Prose describing how some external thing behaves — a CLI's JSON, a
+library's return shape, a wire format — is wrong by implementation time
+more often than not.
+
+- Do not describe observed behavior of an external tool in prose. Probe it
+  and record the raw output (`bd … --json` samples, an HTTP response, a
+  file the tool wrote) as fixtures.
+- Fixtures are committed in the repository where the tests that will
+  consume them live (the package's `testdata/` or the project's
+  equivalent), so the client's tests reuse exactly those recordings. The
+  design's context section names their paths.
+- A fixture states how it was produced (the exact command and tool
+  version) in a sibling file or a header comment, so it can be re-recorded.
 
 ## One code fence per file
 
@@ -126,6 +144,5 @@ mixing several files, and never a fence with no home.
   stays authoritative as defined, and amended, in **Public surface delta**
   above.
 - When implementation lands on a different split, that is a normal refinement,
-  not a deviation to escalate; material layout changes still get a DECISION.md
-  entry as usual.
-
+  not a deviation to escalate; material layout changes still get a
+  `Decision:` comment as usual.
