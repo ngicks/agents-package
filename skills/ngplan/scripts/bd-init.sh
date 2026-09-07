@@ -9,9 +9,12 @@
 #   worktree agrees on the prefix. Override with BEADS_PREFIX=<prefix>.
 # - Turns off bd's anonymous usage metrics (`bd metrics off`).
 # - Writes nothing into the worktree: no AGENTS.md, no git hooks, no push.
+# - On first init, if the git `origin` already holds Dolt data
+#   (refs/dolt/data), clones that history instead of minting an empty
+#   database, so a fresh clone on another machine continues the same plan.
 # - Mirrors the git `origin` remote as the Dolt remote `origin` (git+https://
-#   or git+ssh://), so `bd dolt push` works once the user runs it. This only
-#   records the URL; nothing is fetched or pushed.
+#   or git+ssh://), so `bd dolt push` works once the user runs it. Apart from
+#   the first-init clone above, nothing is fetched and nothing is ever pushed.
 set -eu
 
 if ! command -v bd >/dev/null 2>&1; then
@@ -27,8 +30,7 @@ bd metrics off >/dev/null 2>&1 || true
 dolt_remote_url() {
   case "$1" in
     git+https://*|git+ssh://*) echo "$1" ;;
-    https://*) echo "git+$1" ;;
-    ssh://*) echo "git+$1" ;;
+    https://*|ssh://*|file://*) echo "git+$1" ;;
     *@*:*) # scp-like: user@host:path
       echo "git+ssh://$(echo "$1" | sed 's#:#/#')" ;;
     *) ;;
@@ -69,6 +71,19 @@ if [ -z "$prefix" ]; then
   exit 1
 fi
 
+# Adopt the remote's Dolt history when the git origin already carries one
+# (refs/dolt/data, written by `bd dolt push` elsewhere). Plain `bd init` does
+# this on its own in a normal checkout but not from a bare root, and
+# `bd bootstrap` cannot run there at all, so pass --remote explicitly. This
+# ls-remote is the only network call, made once on first init; if it fails
+# (no network, no origin) a fresh local database is created as before.
+url=$(dolt_remote_url "$(git remote get-url origin 2>/dev/null || true)")
+if [ -n "$url" ] && git ls-remote --exit-code origin refs/dolt/data >/dev/null 2>&1; then
+  set -- --remote "$url"
+else
+  set --
+fi
+
 cd "$root"
-bd init -p "$prefix" --init-if-missing --skip-agents --skip-hooks --non-interactive -q
+bd init -p "$prefix" "$@" --init-if-missing --skip-agents --skip-hooks --non-interactive -q
 sync_remote

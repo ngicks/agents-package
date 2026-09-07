@@ -25,11 +25,17 @@ database exists. Run `scripts/bd-init.sh`, bundled in this skill's
   of the git common directory, and is shared by every worktree of the
   repository. Run the script from any worktree; it finds the root itself.
 - It turns off bd's anonymous usage metrics (`bd metrics off`).
+- On first init it checks whether the git `origin` already holds Dolt data
+  (pushed from another machine with `bd dolt push`). If so it clones that
+  history instead of creating an empty database, so a fresh clone picks
+  up the existing plan. Never run `bd bootstrap` yourself: it fails from a
+  bare repository root and errors on an already initialized database.
 - It mirrors the git `origin` remote as the Dolt remote `origin`
   (`git+https://` or `git+ssh://` form) on every run, so the user's
-  `bd dolt push` has somewhere to go. Only the URL is recorded; nothing is
-  fetched or pushed.
-- It never pushes. `bd dolt push` is the user's job; do not run it.
+  `bd dolt push` has somewhere to go. Only the URL is recorded; apart from
+  the first-init clone, nothing is fetched or pushed.
+- It never pushes or pulls after that. `bd dolt push` and `bd dolt pull`
+  are the user's job; do not run them.
 - If `bd` is not installed the script says so and exits 0. Planning cannot
   proceed without it — a plan has nowhere to live — so tell the user and
   stop rather than writing plan files.
