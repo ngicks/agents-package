@@ -37,3 +37,7 @@ Prefer the toolchain's built-in task runner within a single project; use `just` 
 - NEVER use make (a `Makefile`); reach for `just` wherever you would otherwise use make.
 - If `just` is missing from the environment, do NOT silently fall back to make or any other tool.
   - Ask the user whether to continue with another tool or stop.
+
+### Commit and Push
+
+- Merge with merge commit.
