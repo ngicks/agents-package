@@ -44,14 +44,14 @@ database exists. Run `scripts/bd-init.sh`, bundled in this skill's
 
 Commits made by a coding agent carry an `Executed-By: <agent>` trailer so
 they can be told apart from human commits in `git log`. The trailer is
-stamped by `scripts/executed-by-trailer.sh`, bundled in this skill's
-`scripts/` directory, running as the repository's `prepare-commit-msg` git
-hook.
+stamped by the `prepare-commit-msg` step in `reference/beads.hk.pkl`, an
+`hk` config bundled in this skill, running as the repository's
+`prepare-commit-msg` git hook. That file is the single source of the hook
+logic; there is no separate script.
 
 - Do not install git hooks yourself, and do not run `bd hooks install`. The
-  user wires the script into their hook manager (e.g. `hk`) as the
-  `prepare-commit-msg` step; the skill only ships the script.
-- The script detects the agent on its own — never set an environment
+  user wires the config into `hk` (see **Wiring with hk** below).
+- The step detects the agent on its own — never set an environment
   variable or add the trailer by hand. It walks the process ancestry for
   `claude`, `codex`, or `opencode` (nearest wins, so an agent nested inside
   another is the one recorded), and falls back to the `CODEX_THREAD_ID`,
@@ -62,18 +62,53 @@ hook.
 - Commit normally. Do not strip or edit the trailer if you rewrite a
   message.
 
-To wire it in `hk`, add a `prepare-commit-msg` step in `hk.pkl` that
-passes the commit message file and source through:
+### Wiring with hk
 
-    hooks {
-      ["prepare-commit-msg"] {
-        steps {
-          ["executed-by"] {
-            check = "sh path/to/executed-by-trailer.sh {{commit_msg_file}} {{source}}"
-          }
-        }
-      }
+`reference/beads.hk.pkl` is a complete `hk` config for a repository that
+keeps its plan in beads. It is for the user to copy, not for the agent to
+install; the name is deliberately not one `hk` looks for, so the copy inside
+the skill directory is inert wherever the skill is installed. Skills are not
+installed at a stable path, so the repository keeps its own copy under
+`.hk/` and `hk.pkl` references that.
+
+    mkdir -p .hk && cp <skill dir>/reference/beads.hk.pkl .hk/beads.pkl
+
+Then, in a repository with no `hk.pkl` yet, a one-line `hk.pkl` is enough:
+
+    amends ".hk/beads.pkl"
+
+In a repository that already has an `hk.pkl` (which amends hk's `Config`),
+import the copy and wrap the existing `hooks` body with it. Steps under the
+same hook name merge, so an existing `pre-push` keeps its steps and gains
+`beads-push`:
+
+    import ".hk/beads.pkl" as beads
+
+    hooks = (beads.hooks) {
+      // existing hooks body, unchanged
     }
+
+Finally `hk install`. To update, copy the file again; `hk.pkl` is untouched.
+
+- `prepare-commit-msg`: the `Executed-By` trailer. The shell body is
+  embedded in the config as a Pkl raw string, so the hook depends on nothing
+  outside `.hk/beads.pkl`. For a hook manager other than `hk`, lift that
+  string into a script and pass the message file and source as `$1`, `$2`.
+- `pre-push`: `bd dolt push -q`, so `git push` ships the Dolt history
+  (`refs/dolt/data`) with the code. This is how the user's "syncing is my
+  job" rule is met without anyone typing `bd dolt push`: an agent's
+  `git push` pushes the plan implicitly.
+- `post-merge`: `bd dolt pull -q`, so `git pull` refreshes the local plan.
+- Both Dolt steps have `allow_failure = true`: no network or a diverged
+  remote prints a warning and does not block the code push or merge. Drop it
+  to be forced to resolve Dolt first.
+- `bd dolt push` assumes `dolt.auto-commit` is `on` (bd's default). With
+  `batch`, prefix the step with `bd dolt commit -q;`.
+- The database lives at the repository root, so `bd` finds it from any
+  worktree; `hk install` writes to the shared hooks directory, so one install
+  covers every worktree.
+- Add project steps in `hk.pkl`, never in `.hk/beads.pkl`, so the copy can
+  be replaced wholesale when the skill updates it.
 
 ## Plans in beads
 

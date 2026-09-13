@@ -38,9 +38,9 @@ for the setup, the exact field mapping, and every command this skill uses.
   stop instead of writing files.
 - Never run `bd dolt push`; syncing off the machine is the user's job.
 - Agent commits get an `Executed-By: <agent>` trailer automatically, from
-  `scripts/executed-by-trailer.sh` wired by the user as the
-  `prepare-commit-msg` hook. Commit normally; do not set variables, add,
-  strip, or edit the trailer.
+  the `prepare-commit-msg` hook in `reference/beads.hk.pkl` that the user
+  wires into `hk`. Commit normally; do not set variables, add, strip, or
+  edit the trailer.
 
 How the plan maps onto one issue:
 
