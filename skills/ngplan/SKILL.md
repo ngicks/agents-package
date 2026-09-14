@@ -30,10 +30,17 @@ The plan lives in the repository's beads (`bd`) database, one database
 shared by every git worktree. Read [reference/beads.md](reference/beads.md)
 for the setup, the exact field mapping, and every command this skill uses.
 
+- Pass `--actor <actor>` on every `bd` invocation, reads included, so the
+  audit trail names the agent instead of the git user. The actor is
+  `<agent>/<model>`: the agent harness (`claude`, `codex`, `opencode`) and
+  the model id it is running, e.g. `claude/claude-fable-5-1`; drop the
+  `/<model>` part only when the model is genuinely unknown. Never use the
+  user's name. See [reference/beads.md](reference/beads.md) for details.
 - On every invocation run `scripts/bd-init.sh`, bundled in this skill's
-  `scripts/` directory. It is idempotent, picks the prefix itself, and
-  mirrors the git origin as the Dolt remote; never run raw `bd init`, never
-  pass a prefix, never run `bd hooks install`.
+  `scripts/` directory, as `BEADS_ACTOR=<actor> scripts/bd-init.sh`. It is
+  idempotent, picks the prefix itself, and mirrors the git origin as the
+  Dolt remote; never run raw `bd init`, never pass a prefix, never run
+  `bd hooks install`.
 - `bd` missing is blocking: the plan has nowhere to live. Tell the user and
   stop instead of writing files.
 - Never run `bd dolt push`; syncing off the machine is the user's job.
@@ -65,10 +72,11 @@ at one; never migrate or extend them.
 ## Locate the plan
 
 - Restate, in one sentence, what the user wants planned. If they never said, ask.
-- List the existing plans with `bd list -l plan -t epic --status all` and
-  search with `bd search "<words>" --status all`. If one matches (or the
-  user names an id), open it with `bd show <id>` and elaborate it — work
-  from its current fields, children, and comments.
+- List the existing plans with
+  `bd --actor <actor> list -l plan -t epic --status all` and search with
+  `bd --actor <actor> search "<words>" --status all`. If one matches (or
+  the user names an id), open it with `bd --actor <actor> show <id>` and
+  elaborate it — work from its current fields, children, and comments.
 - Otherwise the plan is new: its title is a short, specific name for the
   feature. Disambiguate from a similar existing plan by name, never by a
   serial counter.
@@ -127,14 +135,14 @@ finalize it with the user before detailing the implementation plan.
   step children exist yet.
 - Record the gate state on the epic itself: the scaffold sets no metadata,
   and confirmation runs
-  `bd update <id> --set-metadata idea_gate_passed=<YYYY-MM-DD>` with today's
-  date from `date "+%Y-%m-%d"`.
+  `bd --actor <actor> update <id> --set-metadata idea_gate_passed=<YYYY-MM-DD>`
+  with today's date from `date "+%Y-%m-%d"`.
 - When resuming an existing plan, trust only that recorded metadata — a
   confirmation given in an earlier session's chat does not count. If the
   key is missing, run the gate again before detailing `design`.
 - Substantive edits to the description after confirmation reset the gate
-  with `bd update <id> --unset-metadata idea_gate_passed`; confirm with the
-  user again before planning on.
+  with `bd --actor <actor> update <id> --unset-metadata idea_gate_passed`;
+  confirm with the user again before planning on.
 
 ## Emit the rough scaffold
 
@@ -149,8 +157,8 @@ Create the epic now, as a rough first pass — do not wait for answers.
 - Fill what is known. Mark everything uncertain as a rough spot rather than
   guessing silently; an incomplete first pass is expected.
 - Tell the user the plan's id and call out the rough spots so they can read
-  them (`bd show <id>`, or the issues page of `crabswarm preview` where it
-  is running).
+  them (`bd --actor <actor> show <id>`, or the issues page of
+  `crabswarm preview` where it is running).
 
 ## Field templates
 
@@ -172,8 +180,9 @@ for each field's text; write them in markdown.
 - **acceptance_criteria** — the success criteria as a checklist, each item
   observable end to end.
 - **notes** — living progress narrative, appended with
-  `bd update <id> --append-notes`: what changed, what is blocked, the next
-  action. Progress itself is the children's status; notes explain it.
+  `bd --actor <actor> update <id> --append-notes`: what changed, what is
+  blocked, the next action. Progress itself is the children's status; notes
+  explain it.
 - **step children** — one `task` per implementation step, label `step`,
   independently verifiable, naming real files and symbols. The description
   holds what to change and a **verify** line naming the end-to-end
@@ -186,6 +195,31 @@ for each field's text; write them in markdown.
   options in view, and a tentative default.
 
 Reference actual file paths and symbols, never placeholders.
+
+### Keep the text structured
+
+Every field, comment, and note is read by a human in the issues viewer.
+Walls of prose are unreadable there; structure is not optional.
+
+- Split each field into headed sections (`##` to `####`) and write the
+  details as bullet lists; a section is a short lead sentence plus bullets,
+  never a single paragraph that runs on.
+- One idea per line; one line per list item; a nested bullet holds the
+  detail of its parent, one to three levels deep.
+- Compare in tables, show shape in mermaid — see **Use the right visual
+  artifact** below.
+- Code fences hold code, DDL, mermaid, commands, and recorded probe output
+  only. Never put prose in a fence: no explanation, no narrative, no
+  option list, no walkthrough. Text that would read as a wall in a fence
+  becomes headed sections and bullets outside it.
+- `Decision:` and `Discussion:` comments follow the same shape: the tag
+  and topic line, then one bullet each for the choice / decision needed,
+  the rationale, the options and rejected alternatives, and the step ids.
+- Every `notes` entry is one dated bullet with `changed:`, `blocked:`,
+  and `next:` sub-bullets — never a paragraph; leave a sub-bullet out
+  when it is empty.
+- Step child descriptions are bullets ending with the **verify** line;
+  the change list is a list, not a story.
 
 ### Use the right visual artifact
 
@@ -258,9 +292,9 @@ fixed, required follow-ups — is born as its own issue the moment it is
 discovered, never in a file and never from memory later.
 
 - Create it as a `task` with a `discovered-from` edge to the step or plan
-  that surfaced it, then `bd defer` it. Deferred status is the "awaiting the
-  user's triage" state: it stays out of `bd ready`, and
-  `bd list -s deferred` lists everything waiting.
+  that surfaced it, then `bd --actor <actor> defer` it. Deferred status is
+  the "awaiting the user's triage" state: it stays out of `bd ready`, and
+  `bd --actor <actor> list -s deferred` lists everything waiting.
 - Only two kinds are legitimate:
   - **Out-of-scope discovery** — a defect or improvement found while working
     that the agreed scope does not cover. Recording it is mandatory; fixing
