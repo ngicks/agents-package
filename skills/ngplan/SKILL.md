@@ -38,16 +38,22 @@ for the setup, the exact field mapping, and every command this skill uses.
   user's name. See [reference/beads.md](reference/beads.md) for details.
 - On every invocation run `scripts/bd-init.sh`, bundled in this skill's
   `scripts/` directory, as `BEADS_ACTOR=<actor> scripts/bd-init.sh`. It is
-  idempotent, picks the prefix itself, and mirrors the git origin as the
-  Dolt remote; never run raw `bd init`, never pass a prefix, never run
-  `bd hooks install`.
+  idempotent, picks the prefix itself, mirrors the git origin as the Dolt
+  remote, and finishes by running `scripts/hk-init.sh`, which wires the
+  skill's `hk` hooks (`hk.pkl`, `.hk/beads.pkl`, `hk install`); never run
+  raw `bd init`, never pass a prefix, never run `bd hooks install`, never
+  install git hooks any other way.
+- When the script reports that it wrote `hk.pkl` or `.hk/beads.pkl`,
+  include them in the next commit; a worktree without them runs no hooks.
+  If it exits 1 with wiring instructions, apply them to `hk.pkl` and rerun.
 - `bd` missing is blocking: the plan has nowhere to live. Tell the user and
-  stop instead of writing files.
+  stop instead of writing files. `hk` missing is not: the script says so
+  and goes on, commits just carry no trailer — tell the user.
 - Never run `bd dolt push`; syncing off the machine is the user's job.
 - Agent commits get an `Executed-By: <agent>` trailer automatically, from
-  the `prepare-commit-msg` hook in `reference/beads.hk.pkl` that the user
-  wires into `hk`. Commit normally; do not set variables, add, strip, or
-  edit the trailer.
+  the `prepare-commit-msg` hook in `reference/beads.hk.pkl` that the init
+  script wires into `hk`. Commit normally; do not set variables, add,
+  strip, or edit the trailer.
 
 How the plan maps onto one issue:
 

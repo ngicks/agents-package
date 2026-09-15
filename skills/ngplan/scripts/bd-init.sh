@@ -8,18 +8,31 @@
 # - Derives the issue prefix from that same root directory, so every
 #   worktree agrees on the prefix. Override with BEADS_PREFIX=<prefix>.
 # - Turns off bd's anonymous usage metrics (`bd metrics off`).
-# - Writes nothing into the worktree: no AGENTS.md, no git hooks, no push.
+# - The beads part writes nothing into the worktree: no AGENTS.md, no bd git
+#   hooks, no push.
 # - On first init, if the git `origin` already holds Dolt data
 #   (refs/dolt/data), clones that history instead of minting an empty
 #   database, so a fresh clone on another machine continues the same plan.
 # - Mirrors the git `origin` remote as the Dolt remote `origin` (git+https://
 #   or git+ssh://), so `bd dolt push` works once the user runs it. Apart from
 #   the first-init clone above, nothing is fetched and nothing is ever pushed.
+# - Finishes by running hk-init.sh (next to this script) on every path, so
+#   the hk hooks that stamp agent commits and sync the Dolt history are
+#   wired whenever beads is. That step is the one thing that writes into the
+#   worktree (`hk.pkl`, `.hk/beads.pkl`); see hk-init.sh.
 set -eu
+
+here=$(cd "$(dirname "$0")" && pwd -P)
+
+# Every exit goes through here so hk is wired even when beads already is.
+finish() {
+  "$here/hk-init.sh"
+  exit "$1"
+}
 
 if ! command -v bd >/dev/null 2>&1; then
   echo "bd-init: bd is not installed; skipping beads initialization" >&2
-  exit 0
+  finish 0
 fi
 
 # Opt out of anonymous usage metrics. The setting is machine-global and the
@@ -49,7 +62,7 @@ sync_remote() {
 
 if bd info -q >/dev/null 2>&1; then
   sync_remote
-  exit 0
+  finish 0
 fi
 
 # The git common dir is `<root>/.git` for a normal checkout and
@@ -84,6 +97,9 @@ else
   set --
 fi
 
+start=$(pwd)
 cd "$root"
 bd init -p "$prefix" "$@" --init-if-missing --skip-agents --skip-hooks --non-interactive -q
 sync_remote
+cd "$start" # hk-init.sh needs a worktree, and the root may be bare
+finish 0
