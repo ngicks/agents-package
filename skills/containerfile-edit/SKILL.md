@@ -18,7 +18,8 @@ name Containerfile unless the project already uses Dockerfile.
 - 4. Build and validate: build twice to confirm warm-cache reuse;
      then change an ordinary source file without changing dependency manifests
      and confirm dependency acquisition remains cached;
-     run as non-root with a read-only root filesystem.
+     run with an explicit arbitrary `--user <uid>:<gid>` and a read-only root filesystem;
+     under a rootless runtime also run with `--user` omitted (in-container root mapped to the caller).
 
 ## Language specifics
 
@@ -71,8 +72,9 @@ COPY --from=build /out/ /app/
 
 # Decision: exec form always; fixed executable in ENTRYPOINT,
 # replaceable default arguments in CMD.
-# Contract: never bake USER — the image must support an arbitrary UID, and
-# every consumer explicitly supplies --user under a rootless runtime; no VOLUME.
+# Contract: never bake USER — the image must work under any UID/GID, including
+# in-container root as mapped by a rootless runtime; consumers pick --user (or
+# omit it under rootless) at deployment time, never in the image; no VOLUME.
 ENTRYPOINT ["/app/<entrypoint>"]
 CMD ["<default-args>"]
 ```
@@ -255,8 +257,14 @@ RUN --mount=type=secret,id=corporate-ca,target=/run/secrets/corporate-ca.pem \
 - `EXPOSE`: declare the conventional listening port as documentation.
 - `LABEL`: add OCI labels (source, revision, licenses) when the project publishes images.
 - `USER`: never bake one — this is a deployment contract, not an omission to fix.
-  - The image must support an arbitrary UID, and every consumer must explicitly
-    supply `--user` under a rootless runtime for host UID/GID mapping.
+  - The image must work under an arbitrary UID/GID, including uid 0 as mapped by a rootless runtime.
+  - Consumers choose at deployment time, not in the image:
+    - pass `--user <uid>:<gid>` when an explicit host UID/GID mapping is wanted;
+    - or omit `--user` under a rootless runtime (rootless Podman/Docker), where in-container root
+      is a fake root: the user namespace maps it to the host uid/gid of whoever runs the runtime.
+  - An omitted `--user` is a valid choice, not a defect; never invent placeholder
+    users or groups (`nobody:nogroup` and the like) just to have something to pass.
+  - Under a rootful runtime, an omitted `--user` is real root; there, consumers must pass `--user`.
   - Docker's page recommends baking a non-root `USER`; this repository supersedes that.
     Do not "harden" an image by adding `USER`, and remove a baked `USER` when reviewing.
   - Either way: no path may require root at run time, and never use `sudo` in containers.
@@ -305,8 +313,10 @@ instead of presenting the build as portable.
 - Cache mounts on package-manager and compiler caches, with correct `sharing` mode.
 - Multiline `RUN` uses heredocs, never `&&`/`\` chains; every heredoc starts with `set -e`; pipes use `pipefail`.
 - No credential can reach layers, history, logs, or cache exports.
-- `ENTRYPOINT`/`CMD` in exec form; image works as non-root with read-only root filesystem.
-- No baked `USER` (deployment contract: arbitrary UID plus explicit runtime `--user`); no `VOLUME`.
+- `ENTRYPOINT`/`CMD` in exec form; image works under an arbitrary `--user` and,
+  under a rootless runtime, with `--user` omitted; read-only root filesystem in both cases.
+- No baked `USER` (deployment contract: any UID/GID works; `--user` is the consumer's
+  choice and may be omitted under a rootless runtime); no `VOLUME`.
 - Language-specific notes applied for every language in the build.
 - Builder portability verified, not assumed: every BuildKit feature used
   (secret `env=` mounts, ssh mounts, syntax-directive-gated features, short names)
