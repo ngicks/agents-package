@@ -51,13 +51,15 @@ dolt_remote_url() {
 }
 
 # Keep the Dolt remote in step with the git origin. `bd dolt remote add` is an
-# upsert, so this is idempotent and safe to run on every invocation.
+# upsert, so this is idempotent and safe to run on every invocation. bd 1.3+
+# aborts when the Dolt remote URL matches the git origin; that is the intended
+# layout here, so --allow-git-origin turns the abort into a warning.
 sync_remote() {
   origin=$(git remote get-url origin 2>/dev/null || true)
   [ -n "$origin" ] || return 0
   url=$(dolt_remote_url "$origin")
   [ -n "$url" ] || return 0
-  bd dolt remote add origin "$url" -q >/dev/null
+  bd dolt remote add origin "$url" --allow-git-origin -q >/dev/null
 }
 
 if bd info -q >/dev/null 2>&1; then
