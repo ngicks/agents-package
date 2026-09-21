@@ -171,8 +171,8 @@ Create the epic now, as a rough first pass — do not wait for answers.
   them (`bd --actor <actor> show <id>`, or the issues page of
   `crabswarm preview` where it is running).
 - Do not assume they read it. The user has not opened beads when the first
-  question arrives; everything a question relies on is repeated in chat
-  (see **Brief before asking** below).
+  question arrives; each question carries what it relies on
+  (see **Ask self-contained questions** below).
 
 ## Field templates
 
@@ -355,28 +355,31 @@ Walk the open questions and resolve every one with the user.
 - At most ~4 questions per round; go in rounds until nothing material is open.
 - Do not stop early on the grounds of having "enough to start".
 
-### Brief before asking
+### Ask self-contained questions
 
-The user reads the question, not the scaffold. Each round carries its own
-context so the user can answer without opening beads.
+The user reads the question, not the scaffold. Each question carries its own
+context so the user can answer from it and its options alone.
 
-- Before the `AskUserQuestion` call, write the brief in the reply: the plan
-  id, the idea in a few lines, then one short block per question with the
-  topic tag, why the question came up in this codebase, what it affects,
-  and the options with their trade-offs. The plain-chat fallback is this
-  brief with the questions appended.
-- Then make each question self-contained as well: the question text
-  restates the `Discussion:` comment — the decision needed, the reason it
-  arose, and what it affects — instead of naming the comment; each option's
-  description states that option's consequence and trade-off.
-- Test each question before asking it: if it makes sense only after reading
-  the scaffold, rewrite it.
+- The question text restates the `Discussion:` comment — the current
+  behavior, the decision needed, and what it affects — instead of naming
+  the comment; each option's description states that option's consequence
+  and trade-off.
+- Test each question before asking it: can the user understand the
+  situation and choose from this question and its options alone, without
+  the scaffold and without the surrounding chat? If not, rewrite it.
+  - Weak: "Which persistence approach should we use?"
+  - Better: "Saved plans currently disappear when the app restarts. Should
+    plans survive restarts only on this device, or also be available on
+    your other devices?"
+- Shared context goes in the reply once, before the tool call, when the
+  plan is new to the user: the plan id and the idea in a few lines. Do not
+  repeat the questions or their options there; the tool call already
+  presents them.
 - Set the question's `header` to the `Discussion:` topic tag so the answer
   maps back to the comment.
 - Use the option `preview` field when an option has shape a label cannot
   carry — a schema, a CLI invocation, a directory layout, a code snippet.
-- Keep one round to one concern (idea, one contract area, one step) so the
-  brief stays short enough to read.
+- Keep one round to one concern (idea, one contract area, one step).
 
 ## Finalize
 
