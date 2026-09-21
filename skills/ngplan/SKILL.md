@@ -124,6 +124,11 @@ finalize it with the user before detailing the implementation plan.
 - Then ask the user to confirm the description captures how it should be;
   only after that confirmation, detail the `design` contracts and the step
   children.
+- The user judges the description, so show it before asking: paste it in
+  the reply immediately before the confirmation question, in full, or
+  condensed to the use-case list and the usability requirements with
+  nothing dropped. A question that only says "the description" points at
+  text the user has not read.
 - Ask that confirmation with `AskUserQuestion`, using this fixed wording and
   option order every time — never reorder or reword it, so the user's answer
   by muscle memory always lands on the same choice:
@@ -165,6 +170,9 @@ Create the epic now, as a rough first pass — do not wait for answers.
 - Tell the user the plan's id and call out the rough spots so they can read
   them (`bd --actor <actor> show <id>`, or the issues page of
   `crabswarm preview` where it is running).
+- Do not assume they read it. The user has not opened beads when the first
+  question arrives; everything a question relies on is repeated in chat
+  (see **Brief before asking** below).
 
 ## Field templates
 
@@ -346,6 +354,29 @@ Walk the open questions and resolve every one with the user.
   reply, listing the questions by topic with their options and your default.
 - At most ~4 questions per round; go in rounds until nothing material is open.
 - Do not stop early on the grounds of having "enough to start".
+
+### Brief before asking
+
+The user reads the question, not the scaffold. Each round carries its own
+context so the user can answer without opening beads.
+
+- Before the `AskUserQuestion` call, write the brief in the reply: the plan
+  id, the idea in a few lines, then one short block per question with the
+  topic tag, why the question came up in this codebase, what it affects,
+  and the options with their trade-offs. The plain-chat fallback is this
+  brief with the questions appended.
+- Then make each question self-contained as well: the question text
+  restates the `Discussion:` comment — the decision needed, the reason it
+  arose, and what it affects — instead of naming the comment; each option's
+  description states that option's consequence and trade-off.
+- Test each question before asking it: if it makes sense only after reading
+  the scaffold, rewrite it.
+- Set the question's `header` to the `Discussion:` topic tag so the answer
+  maps back to the comment.
+- Use the option `preview` field when an option has shape a label cannot
+  carry — a schema, a CLI invocation, a directory layout, a code snippet.
+- Keep one round to one concern (idea, one contract area, one step) so the
+  brief stays short enough to read.
 
 ## Finalize
 
