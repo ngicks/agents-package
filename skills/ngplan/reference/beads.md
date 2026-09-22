@@ -248,20 +248,31 @@ It has its own gate, fields, steps, and comments; see
 
 ### Decisions and open questions
 
-Comments are append-only and carry the decision log.
+Comments are append-only and carry the decision log. Every comment is
+multi-line — the tag line, then one bullet per part — so it always goes
+through `--stdin`; there is no one-line form.
 
-    bd --actor <actor> comment <id> "Decision: <topic> — <choice>. Because <rationale>. Rejected: <alternatives>. Delivered by <step ids, or: non-goal>."
-    bd --actor <actor> comment <id> "Discussion: <topic> — <decision needed>. Options: <...>. Default: <...>."
+    printf '%s\n' "Decision: <topic>
+    - choice: <what was chosen>
+    - rationale: <why>
+    - rejected: <alternatives and why not>
+    - steps: <step ids, or: non-goal>" | bd --actor <actor> comment <id> --stdin
+
+    printf '%s\n' "Discussion: <topic>
+    - decision needed: <what must be settled>
+    - options: <options in view>
+    - default: <tentative default>" | bd --actor <actor> comment <id> --stdin
 
 - A `Discussion:` is open until a later `Decision:` names its topic.
 - An amendment is a new `Decision:` naming the one it replaces. Never edit
   or delete a comment.
-- Decisions made without the user are tagged: `Decision: <topic>
-  [automatic] — …`.
-- Long comments:
-  `printf '%s\n' "<text>" | bd --actor <actor> comment <id> --stdin`.
+- Decisions made without the user are tagged on the tag line:
+  `Decision: <topic> [automatic]`, bullets below as usual.
 - The viewer badges `Decision:` and `Discussion:` comments; keep the prefix
-  exact, at the start of the comment.
+  exact, at the start of the comment — the tag opens the quoted text, no
+  blank first line.
+- Existing comments in another shape are history, not a template; new
+  comments follow the shape above even when the thread does not.
 
 ### Handoff items
 
