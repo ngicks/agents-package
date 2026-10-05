@@ -1,0 +1,4 @@
+{
+  "description": "Draws the status line: model @ effort | context used | cwd | worktree.",
+  "modules": ["./register.ts"]
+}
