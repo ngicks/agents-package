@@ -1,0 +1,11 @@
+{
+  "name": "statusline",
+  "version": "0.1.0",
+  "description": "Status line as a mod: model @ effort | context used | cwd | worktree, cwd left-truncated to fit the row.",
+  "author": {
+    "name": "ngicks"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/ngicks/agents-package",
+  "skills": ["./"]
+}
