@@ -5,7 +5,7 @@ description: >-
   subtask, matching the repository's existing conventions. Returns a
   summary of edits with file:line references and notes any follow-ups.
 model: opus
-effort: xhigh
+effort: medium
 color: cyan
 skills:
 - ng-implementer

@@ -24,7 +24,7 @@ so it can be invoked directly (e.g. from `/goal` / `nggoal`).
 | Agent | Skill | Model | Tools |
 |---|---|---|---|
 | `ng-explorer` | `ng-explorer` | sonnet | inherits all |
-| `ng-implementer` | `ng-implementer` | opus (effort xhigh) | inherits all |
+| `ng-implementer` | `ng-implementer` | opus (effort medium) | inherits all |
 | `ng-reviewer` | `ng-reviewer` | opus (effort high) | Agent, Read, Grep, Glob, Bash |
 | `ng-reviewer-conventions` | `ng-focused-reviewer` | sonnet | Read, Grep, Glob |
 | `ng-reviewer-bugs` | `ng-focused-reviewer` | sonnet | Read, Grep, Glob |
