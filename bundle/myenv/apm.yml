@@ -17,12 +17,8 @@ dependencies:
         - claude
     - git: github.com/ngicks/agents-package
       path: vpkg/instructions/ngicks.base.env.instructions.md
-      targets:
-        - codex
     - git: github.com/ngicks/agents-package
       path: vpkg/instructions/ngicks.base.preference.instructions.md
-      targets:
-        - codex
     - git: github.com/ngicks/crabswarm
       path: apm-package/crabswarm-mcp
       targets:
