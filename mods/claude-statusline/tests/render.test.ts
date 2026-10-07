@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 import { cellWidth } from '../hooks/format'
 
 const HINT = { isDraft: false, isWorking: false, hint: '⏵⏵ auto mode on (shift+tab to cycle)' }
-const STATUS = '🤖 Opus 5.5 (1M context) @ high 🔋   7% used 📂 /src/repo ⛕ main'
+const STATUS = '🤖 Opus 5.5 (1M context) @ high | 🔋 7% used | 📂 /src/repo | ⛕ main'
 
 function engine(on: On, tails: (string | undefined)[], drawn: object = { type: 'engine', ref: 1 }) {
   mock.clock(on)
@@ -48,7 +48,7 @@ describe('PromptHint', () => {
       viewport: { columns: cellWidth(STATUS) + 2, rows: 40 },
     })
     expect((await ui.find({ type: 'Text', text: /7% used/ }))?.text).toBe(
-      '🤖 Opus 5.5 (1M context) @ high 🔋   7% used 📂 …c/repo ⛕ main',
+      '🤖 Opus 5.5 (1M context) @ high | 🔋 7% used | 📂 …c/repo | ⛕ main',
     )
   })
 

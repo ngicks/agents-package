@@ -4,7 +4,7 @@ A Claude Code mod that draws a status on a line of its own below the hint line u
 
 ```
   ⏵⏵ auto mode on (shift+tab to cycle)
-  🤖 Opus 5.5 (1M context) @ medium 🔋   7% used 📂 /home/u/src/agents-package/main ⛕ main
+  🤖 Opus 5.5 (1M context) @ medium | 🔋 7% used | 📂 /home/u/src/agents-package/main | ⛕ main
 ```
 
 The cwd is cut from the left so the whole line fits the terminal width.

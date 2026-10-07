@@ -68,28 +68,30 @@ describe('contextLabel', () => {
 
 describe('formatStatusLine', () => {
   test('labels every component', () => {
-    expect(formatStatusLine(parts)).toBe('🤖 Opus 5.5 (1M context) @ medium 🔋   7% used 📂 /home/u/src/agents-package/main ⛕ main')
+    expect(formatStatusLine(parts)).toBe(
+      '🤖 Opus 5.5 (1M context) @ medium | 🔋 7% used | 📂 /home/u/src/agents-package/main | ⛕ main',
+    )
   })
 
   test('labels a context used from 60% with a low battery', () => {
     expect(formatStatusLine({ ...parts, percent: 60 })).toBe(
-      '🤖 Opus 5.5 (1M context) @ medium 🪫  60% used 📂 /home/u/src/agents-package/main ⛕ main',
+      '🤖 Opus 5.5 (1M context) @ medium | 🪫 60% used | 📂 /home/u/src/agents-package/main | ⛕ main',
     )
   })
 
   test('leaves out effort and worktree when absent', () => {
-    expect(formatStatusLine({ model: 'Haiku 4.5', cwd: '/x' })).toBe('🤖 Haiku 4.5 🔋   0% used 📂 /x')
+    expect(formatStatusLine({ model: 'Haiku 4.5', cwd: '/x' })).toBe('🤖 Haiku 4.5 | 🔋 0% used | 📂 /x')
   })
 
   test('cuts the start of cwd so the line fills the width exactly', () => {
     const full = cellWidth(formatStatusLine(parts))
     const line = formatStatusLine(parts, full - 10)
     expect(cellWidth(line)).toBe(full - 10)
-    expect(line).toBe('🤖 Opus 5.5 (1M context) @ medium 🔋   7% used 📂 …/agents-package/main ⛕ main')
+    expect(line).toBe('🤖 Opus 5.5 (1M context) @ medium | 🔋 7% used | 📂 …/agents-package/main | ⛕ main')
   })
 
   test('drops cwd when nothing of it fits', () => {
-    expect(formatStatusLine(parts, 10)).toBe('🤖 Opus 5.5 (1M context) @ medium 🔋   7% used ⛕ main')
+    expect(formatStatusLine(parts, 10)).toBe('🤖 Opus 5.5 (1M context) @ medium | 🔋 7% used | ⛕ main')
   })
 })
 

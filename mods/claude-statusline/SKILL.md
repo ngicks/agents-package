@@ -1,6 +1,6 @@
 ---
 name: claude-statusline
-description: Explains the `statusline` mod that draws "🤖 model @ effort 🔋 n% used 📂 cwd ⛕ worktree" on a line below the hint line under the prompt. Use when the user asks why the status line shows something, or wants to change or debug it.
+description: Explains the `statusline` mod that draws "🤖 model @ effort | 🔋 n% used | 📂 cwd | ⛕ worktree" on a line below the hint line under the prompt. Use when the user asks why the status line shows something, or wants to change or debug it.
 disable-model-invocation: true
 ---
 
@@ -16,7 +16,7 @@ The mod draws its status through a `ui.render` hook on `PromptHint`, the hint li
 
 ```
   ⏵⏵ auto mode on (shift+tab to cycle)
-  🤖 Opus 5.5 (1M context) @ medium 🔋   7% used 📂 /home/u/src/agents-package/main ⛕ main
+  🤖 Opus 5.5 (1M context) @ medium | 🔋 7% used | 📂 /home/u/src/agents-package/main | ⛕ main
 ```
 
 - The status always takes a new line below the hint line, in a column `Box`.
@@ -24,7 +24,7 @@ The mod draws its status through a `ui.render` hook on `PromptHint`, the hint li
 
 ## What the status shows
 
-Each component starts with an emoji label, and a space separates the components.
+Each component starts with an emoji label, and ` | ` separates the components.
 
 - Model (🤖): the session's model id turned into its display name.
   - An id the mod does not recognize is shown as is.

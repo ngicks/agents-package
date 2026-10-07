@@ -1,6 +1,6 @@
 import type { StatusParts } from '../types'
 
-const SEPARATOR = ' '
+const SEPARATOR = ' | '
 const ELLIPSIS = '…'
 const MODEL_LABEL = '🤖'
 const CONTEXT_LABEL = '🔋'
@@ -51,7 +51,7 @@ export function contextLabel(percent: number): string {
 export function formatStatusLine(parts: StatusParts, width?: number): string {
   const percent = parts.percent ?? 0
   const head = `${MODEL_LABEL} ${parts.effort === undefined ? parts.model : `${parts.model} @ ${parts.effort}`}`
-  const used = `${contextLabel(percent)} ${String(percent).padStart(3)}% used`
+  const used = `${contextLabel(percent)} ${percent}% used`
   const tail = parts.worktree === undefined ? [] : [`${WORKTREE_LABEL} ${parts.worktree}`]
   const cwdPrefix = `${CWD_LABEL} `
   if (width === undefined) return [head, used, cwdPrefix + parts.cwd, ...tail].join(SEPARATOR)
