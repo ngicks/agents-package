@@ -3,28 +3,9 @@ import type { StatusParts } from '../types'
 const SEPARATOR = ' | '
 const ELLIPSIS = '…'
 
-// The engine indents the hint line by two cells. The two cells kept free at
-// the right end err toward a new line, since a tail wider than the row is cut
-// at its end.
+// The engine indents the hint line by two cells. Two more cells stay free at
+// the right end so the terminal never wraps the row.
 export const HINT_CHROME_WIDTH = 4
-
-export type StatusPlacement = { tail: string } | { line: string }
-
-// The status rides at the end of the hint line only while it shows whole
-// there; otherwise it takes a row of its own, where cwd is cut to fit.
-export function placeStatus(
-  hint: { hint: string; tail?: string },
-  parts: StatusParts,
-  columns: number | undefined,
-): StatusPlacement {
-  const before = hint.hint + (hint.tail ?? '')
-  const tail = (hint.tail ?? '') + (before === '' ? '' : SEPARATOR) + formatStatusLine(parts)
-  const width = HINT_CHROME_WIDTH + Array.from(hint.hint).length + Array.from(tail).length
-  if (columns !== undefined && !before.includes('\n') && width <= columns) {
-    return { tail }
-  }
-  return { line: formatStatusRow(parts, columns) }
-}
 
 export function formatStatusRow(parts: StatusParts, columns: number | undefined): string {
   return formatStatusLine(parts, columns === undefined ? undefined : columns - HINT_CHROME_WIDTH)

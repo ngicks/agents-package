@@ -1,6 +1,6 @@
 ---
 name: claude-statusline
-description: Explains the `statusline` mod that appends "model @ effort | n% used | cwd | worktree" to the hint line under the prompt. Use when the user asks why the status line shows something, or wants to change or debug it.
+description: Explains the `statusline` mod that draws "model @ effort | n% used | cwd | worktree" on a line below the hint line under the prompt. Use when the user asks why the status line shows something, or wants to change or debug it.
 disable-model-invocation: true
 ---
 
@@ -15,15 +15,12 @@ and loads its hooks module (`hooks/register.tsx`) as a mod.
 The mod draws its status through a `ui.render` hook on `PromptHint`, the hint line under the prompt:
 
 ```
-  ⏵⏵ auto mode on (shift+tab to cycle) | Opus 5.5 (1M context) @ medium |   7% used | /home/u/src/agents-package/main | main
+  ⏵⏵ auto mode on (shift+tab to cycle)
+  Opus 5.5 (1M context) @ medium |   7% used | /home/u/src/agents-package/main | main
 ```
 
-- The status is appended to the hint line as its `tail` when the whole of it fits the row.
-- The status takes a new line below the hint line, in a column `Box`, when
-  - the hint line has no room for it whole,
-  - the hint already spans 2 or more lines,
-  - a plugin beneath drew its own tree without the engine's line in it,
-  - or the surface is not the terminal, which alone draws `tail`.
+- The status always takes a new line below the hint line, in a column `Box`.
+- The mod leaves the hint line itself, and its `tail`, untouched.
 
 ## What the status shows
 
@@ -35,7 +32,7 @@ The mod draws its status through a `ui.render` hook on `PromptHint`, the hint li
   - Omitted while neither is known.
 - Context used: `$.session.usage().context.percent`; `0` until the first response.
 - cwd: the session's directory.
-  - On a line of its own, cut from the left with `…` so the whole line fits the terminal width.
+  - Cut from the left with `…` so the whole line fits the terminal width.
   - Dropped when nothing of it fits.
 - Worktree: the git worktree id (basename of `git rev-parse --absolute-git-dir` under `worktrees/`).
   - Omitted outside a linked worktree.
@@ -44,12 +41,12 @@ The mod draws its status through a `ui.render` hook on `PromptHint`, the hint li
 
 - The values are read at session start, after each turn, and every 2 seconds.
   - They are kept in `$.state` (`statusline.parts`), and a change redraws the hint line.
-- A terminal resize redraws the hint line, which places the status again.
+- A terminal resize redraws the hint line, which cuts cwd to the new width.
 
 ## Files
 
 - `hooks/register.tsx`: the hooks; reads session state and draws `PromptHint`.
-- `hooks/format.ts`: pure formatting, width budgeting and placement.
+- `hooks/format.ts`: pure formatting and width budgeting.
 - `types/index.d.ts`: the `$.state` contract.
 - `tests/`: run with `claude plugin test <this folder>`.
 

@@ -1,6 +1,6 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderNode } from 'claude-code'
-import { formatStatusRow, modelDisplayName, placeStatus, worktreeNameOf } from './format'
+import type { EngineInterface, Register } from 'claude-code'
+import { formatStatusRow, modelDisplayName, worktreeNameOf } from './format'
 
 // /model and /effort change the line without starting a turn, so poll for them.
 const REFRESH_MS = 2000
@@ -80,34 +80,13 @@ export const register: Register = (on) => {
     const parts = await read($, status)
     if (parts === null) return next(e)
 
-    const columns = e.viewport?.columns
-    // Only the terminal draws `tail`; elsewhere the status needs a line of its own.
-    const placed = e.surface === 'terminal' ? placeStatus(e.props, parts, columns) : { line: formatStatusRow(parts, columns) }
-    let drawn
-    let line
-    if ('tail' in placed) {
-      drawn = await next({ ...e, props: { ...e.props, tail: placed.tail } })
-      // `next` runs once, so the tail cannot be taken back. While the engine's
-      // line survives in a tree a plugin beneath drew, it already shows the
-      // status, and a new line would show it twice.
-      if (holdsEngine(drawn)) return drawn
-      line = formatStatusRow(parts, columns)
-    } else {
-      drawn = await next(e)
-      line = placed.line
-    }
+    const drawn = await next(e)
     const { Box, Text } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
         {drawn}
-        <Text dimColor>{line}</Text>
+        <Text dimColor>{formatStatusRow(parts, e.viewport?.columns)}</Text>
       </Box>
     )
   })
-}
-
-function holdsEngine(node: RenderNode): boolean {
-  if (typeof node === 'string') return false
-  if (node.type === 'engine') return true
-  return 'children' in node && Array.isArray(node.children) && node.children.some(holdsEngine)
 }
