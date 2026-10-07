@@ -13,7 +13,7 @@ and the metadata lives in its `apm.yml`.
 
 - A package never depends on other units in this repository.
   - Copy a primitive into `.apm/` when the package needs it, even if `vpkg/` holds the same one.
-- Keep the directory name unique across `pkg/`, `vpkg/*/`, and `bundle/`.
+- Keep the directory name unique across `pkg/`, `vpkg/*/`, `mods/`, and `bundle/`.
   - apm resolves a semver ref such as `#^1.0.0` against tags named `<leaf>-v<version>` or `<leaf>--v<version>`,
     where `<leaf>` is the last path segment only.
 

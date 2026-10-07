@@ -15,7 +15,7 @@ On that line the cwd is cut from the left so the whole line fits the terminal wi
 Install it globally with apm:
 
 ```bash
-apm install -g ngicks/agents-package/vpkg/mods/claude-statusline
+apm install -g ngicks/agents-package/mods/claude-statusline
 ```
 
 apm copies this folder to `~/.claude/skills/claude-statusline/`.
@@ -25,18 +25,18 @@ Run `/reload-plugins` to load it into a running session.
 For a one-off session from a checkout:
 
 ```bash
-claude --plugin-dir ./vpkg/mods/claude-statusline
+claude --plugin-dir ./mods/claude-statusline
 ```
 
 ## Develop
 
 ```bash
-claude plugin validate vpkg/mods/claude-statusline
-claude plugin test vpkg/mods/claude-statusline
+claude plugin validate mods/claude-statusline
+claude plugin test mods/claude-statusline
 ```
 
 Claude Code writes the API types to `.claude-plugin/types/` whenever it loads the mod from this folder.
-After that, `tsc -p vpkg/mods/claude-statusline` type-checks it.
+After that, `tsc -p mods/claude-statusline` type-checks it.
 
 ## Layout notes
 

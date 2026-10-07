@@ -13,7 +13,7 @@ Install contents via [apm](https://github.com/microsoft/apm)
 | `vpkg/skills/<name>/` | Single skill | `ngicks/agents-package/vpkg/skills/<name>` |
 | `vpkg/instructions/<name>.instructions.md` | Single instruction file | `ngicks/agents-package/vpkg/instructions/<name>.instructions.md` |
 | `vpkg/hooks/<name>/` | Single hook set | `ngicks/agents-package/vpkg/hooks/<name>` |
-| `vpkg/mods/<name>/` | Claude Code mod (skill plugin) | `apm install -g ngicks/agents-package/vpkg/mods/<name>` |
+| `mods/<name>/` | Claude Code mod (skill plugin) | `apm install -g ngicks/agents-package/mods/<name>` |
 
 ## Quick start
 

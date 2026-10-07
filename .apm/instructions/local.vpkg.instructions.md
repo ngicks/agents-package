@@ -16,9 +16,8 @@ Units are grouped by kind, and each kind has one shape.
   - Consumers depend on the file path itself.
 - `vpkg/hooks/<name>/`: a hook, wrapped in an apm package.
   - `apm.yml` plus `.apm/hooks/<name>.json`.
-- `vpkg/mods/<name>/`: a Claude Code mod shipped as a skill plugin.
 
-Keep the directory or file stem unique across `pkg/`, `vpkg/*/`, and `bundle/`.
+Keep the directory or file stem unique across `pkg/`, `vpkg/*/`, `mods/`, and `bundle/`.
 apm resolves a semver ref such as `#^1.0.0` against tags named `<leaf>-v<version>` or `<leaf>--v<version>`,
 where `<leaf>` is the last path segment only.
 

@@ -5,7 +5,7 @@ applyTo: "bundle/**"
 
 ### bundle layout
 
-Each directory under `bundle/` holds one hand-curated `apm.yml` that lists units from `pkg/` and `vpkg/`.
+Each directory under `bundle/` holds one hand-curated `apm.yml` that lists units from `pkg/`, `vpkg/`, and `mods/`.
 A bundle serves two uses with the same file.
 
 - Consumers copy it in as their own `apm.yml`, then edit `name`, `targets`, and the dependency list.
@@ -13,7 +13,8 @@ A bundle serves two uses with the same file.
 
 ### Rules
 
-- Write every dependency as a full repository path (`ngicks/agents-package/vpkg/skills/<name>`).
+- Write every dependency as a full repository path (`ngicks/agents-package/vpkg/skills/<name>`),
+  in either the shorthand string form or the `git:` + `path:` object form.
   - Relative or local paths break once the file is copied elsewhere.
 - Do not add `.apm/` or any primitive to a bundle.
   - A copied-in bundle would lose it.
@@ -21,8 +22,9 @@ A bundle serves two uses with the same file.
   - Copying one in would pull the other in without the reader seeing its list.
 - Do not list a `vpkg/` unit that a listed `pkg/` package already ships.
   - apm would install the same primitive twice.
-- Leave out `vpkg/mods/`.
-  - Mods are user-scope installs (`apm install -g`), and a bundle is a project dependency.
+- List `mods/` only in a user-scope bundle, one meant for `apm install -g` (e.g. `myenv`).
+  - Mods are user-scope installs; a project bundle leaves them out.
+  - Say which scope a bundle targets in its `description`.
 
 ### Verify before shipping
 

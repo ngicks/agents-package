@@ -1,12 +1,12 @@
 ---
-description: "Layout rules for the Claude Code mods under vpkg/mods/"
-applyTo: "vpkg/mods/**"
+description: "Layout rules for the Claude Code mods under mods/"
+applyTo: "mods/**"
 ---
 
 ### mods layout
 
-Each directory under `vpkg/mods/` is one Claude Code mod shipped as a skill plugin.
-Consumers install it with `apm install -g ngicks/agents-package/vpkg/mods/<name>`,
+Each directory under `mods/` is one Claude Code mod shipped as a skill plugin.
+Consumers install it with `apm install -g ngicks/agents-package/mods/<name>`,
 and apm copies the directory whole into `~/.claude/skills/<name>/`.
 Claude Code adopts every folder there that holds `.claude-plugin/plugin.json` as `<plugin>@skills-dir`.
 
@@ -15,11 +15,11 @@ Claude Code adopts every folder there that holds `.claude-plugin/plugin.json` as
   - `.claude-plugin/plugin.json`: `name`, `version`, `description`, `author`, `"skills": ["./"]`.
   - `hooks/hooks.json`: `{ "description": "...", "modules": ["./register.ts"] }`.
   - `hooks/register.ts` (or `.tsx` when it uses JSX): the hooks module.
-  - `tests/*.test.ts`: run with `claude plugin test vpkg/mods/<name>`.
+  - `tests/*.test.ts`: run with `claude plugin test mods/<name>`.
 
 ### The plugin manifest is required here
 
-- `vpkg/mods/**` is the opposite of `pkg/**`: keep `.claude-plugin/`.
+- `mods/**` is the opposite of `pkg/**`: keep `.claude-plugin/`.
   - The manifest makes apm detect `package_type: marketplace_plugin` and deploy the folder whole.
   - Claude Code needs the manifest to adopt the skills folder as a plugin.
 - Do not put `$schema` in `plugin.json`.
@@ -37,15 +37,15 @@ Claude Code adopts every folder there that holds `.claude-plugin/plugin.json` as
 ### Verify before shipping
 
 ```bash
-claude plugin validate vpkg/mods/<name>
-claude plugin test vpkg/mods/<name>
+claude plugin validate mods/<name>
+claude plugin test mods/<name>
 ```
 
 Then install it globally into a throwaway home and check that Claude Code loads it:
 
 ```bash
 H=$(mktemp -d) && mkdir -p "$H/.claude"
-HOME=$H CLAUDE_CONFIG_DIR=$H/.claude apm install -g -t claude "$PWD/vpkg/mods/<name>"
+HOME=$H CLAUDE_CONFIG_DIR=$H/.claude apm install -g -t claude "$PWD/mods/<name>"
 CLAUDE_CONFIG_DIR=$H/.claude claude plugin list
 ```
 
