@@ -1,7 +1,0 @@
-import {
-  "moonbit-community/yaml",
-}
-
-import {
-  "moonbit-community/yaml",
-} for "test"
