@@ -1,0 +1,12 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "crabswarm statusline render '{{ $m := .Model.DisplayName }}{{ with .Effort }}{{ $m = print $m \" @ \" .Level }}{{ end }}{{ padRuneRight 18 $m }} | {{ padRuneLeft 9 (print .ContextWindow.UsedPercentage \"% used\") }} | {{ $r := .Workspace.CurrentDir }}{{ with .Worktree }}{{ $r = print $r \" | \" .Name }}{{ end }}{{ if gt columns 38 }}{{ $t := truncRuneLeft (len (slice (padRuneLeft columns \"\") 38)) $r }}{{ if ne $t $r }}…{{ end }}{{ $t }}{{ else }}{{ $r }}{{ end }}'",
+    "padding": 1
+  }
+}

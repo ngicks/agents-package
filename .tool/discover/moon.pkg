@@ -1,7 +1,0 @@
-import {
-  "moonbitlang/async/fs",
-}
-
-import {
-  "moonbitlang/async",
-} for "test"

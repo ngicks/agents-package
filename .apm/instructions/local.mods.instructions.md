@@ -1,6 +1,6 @@
 ---
 description: "Layout rules for the Claude Code mods under mods/"
-applyTo: "mods/**"
+applyTo: ""
 ---
 
 ### mods layout
@@ -19,7 +19,7 @@ Claude Code adopts every folder there that holds `.claude-plugin/plugin.json` as
 
 ### The plugin manifest is required here
 
-- `mods/**` is the opposite of `apm-package/**`: keep `.claude-plugin/`.
+- `mods/**` is the opposite of `pkg/**`: keep `.claude-plugin/`.
   - The manifest makes apm detect `package_type: marketplace_plugin` and deploy the folder whole.
   - Claude Code needs the manifest to adopt the skills folder as a plugin.
 - Do not put `$schema` in `plugin.json`.
