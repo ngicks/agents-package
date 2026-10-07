@@ -12,7 +12,7 @@ targets:
 dependencies:
   apm:
     - git: github.com/ngicks/agents-package
-      path: mods/claude-statusline
+      path: mods/statusline
       targets:
         - claude
     - git: github.com/ngicks/agents-package

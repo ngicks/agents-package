@@ -1,10 +1,10 @@
 ---
-name: claude-statusline
+name: statusline
 description: Explains the `statusline` mod that draws "🤖 model @ effort | 🔋 n% used | 📂 cwd | ⛕ worktree" on a line below the hint line under the prompt. Use when the user asks why the status line shows something, or wants to change or debug it.
 disable-model-invocation: true
 ---
 
-# claude-statusline
+# statusline
 
 This skill folder is also a Claude Code plugin named `statusline`.
 Claude Code adopts every folder under `~/.claude/skills/` that holds `.claude-plugin/plugin.json`,

@@ -1,7 +1,7 @@
 {
   "name": "statusline",
   "version": "0.1.0",
-  "description": "Status at the end of the prompt hint line: model @ effort | context used | cwd | worktree, moved to a line of its own when it does not fit.",
+  "description": "Status on a line of its own below the prompt hint line: model @ effort | context used | cwd | worktree.",
   "author": {
     "name": "ngicks"
   },
