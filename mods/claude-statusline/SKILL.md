@@ -1,6 +1,6 @@
 ---
 name: claude-statusline
-description: Explains the `statusline` mod that draws "model @ effort | n% used | cwd | worktree" on a line below the hint line under the prompt. Use when the user asks why the status line shows something, or wants to change or debug it.
+description: Explains the `statusline` mod that draws "🤖 model @ effort 🔋 n% used 📂 cwd ⛕ worktree" on a line below the hint line under the prompt. Use when the user asks why the status line shows something, or wants to change or debug it.
 disable-model-invocation: true
 ---
 
@@ -16,7 +16,7 @@ The mod draws its status through a `ui.render` hook on `PromptHint`, the hint li
 
 ```
   ⏵⏵ auto mode on (shift+tab to cycle)
-  Opus 5.5 (1M context) @ medium |   7% used | /home/u/src/agents-package/main | main
+  🤖 Opus 5.5 (1M context) @ medium 🔋   7% used 📂 /home/u/src/agents-package/main ⛕ main
 ```
 
 - The status always takes a new line below the hint line, in a column `Box`.
@@ -24,17 +24,20 @@ The mod draws its status through a `ui.render` hook on `PromptHint`, the hint li
 
 ## What the status shows
 
-- Model: the session's model id turned into its display name.
+Each component starts with an emoji label, and a space separates the components.
+
+- Model (🤖): the session's model id turned into its display name.
   - An id the mod does not recognize is shown as is.
 - Effort: whichever changed last of
   - `effortLevel` in settings (what `/effort` saves),
   - the effort sent with the latest main-loop model request.
   - Omitted while neither is known.
-- Context used: `$.session.usage().context.percent`; `0` until the first response.
-- cwd: the session's directory.
+- Context used (🔋 below 60%, 🪫 from 60%): `$.session.usage().context.percent`; `0` until the first response.
+- cwd (📂): the session's directory.
   - Cut from the left with `…` so the whole line fits the terminal width.
-  - Dropped when nothing of it fits.
-- Worktree: the git worktree id (basename of `git rev-parse --absolute-git-dir` under `worktrees/`).
+  - Dropped with its label when nothing of it fits.
+  - The width budget counts 🤖, 🔋, 🪫 and 📂 as two cells and ⛕ as one.
+- Worktree (⛕): the git worktree id (basename of `git rev-parse --absolute-git-dir` under `worktrees/`).
   - Omitted outside a linked worktree.
 
 ## Refresh

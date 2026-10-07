@@ -1,7 +1,13 @@
 import type { StatusParts } from '../types'
 
-const SEPARATOR = ' | '
+const SEPARATOR = ' '
 const ELLIPSIS = '…'
+const MODEL_LABEL = '🤖'
+const CONTEXT_LABEL = '🔋'
+const CONTEXT_LOW_LABEL = '🪫'
+const CONTEXT_LOW_AT = 60
+const CWD_LABEL = '📂'
+const WORKTREE_LABEL = '⛕'
 
 // The engine indents the hint line by two cells. Two more cells stay free at
 // the right end so the terminal never wraps the row.
@@ -33,14 +39,25 @@ export function truncateStart(text: string, width: number): string {
   return ELLIPSIS + chars.slice(chars.length - (width - 1)).join('')
 }
 
+// Only the emoji labels are expected to be wide; ⛕ has no emoji presentation and takes one cell.
+export function cellWidth(text: string): number {
+  return Array.from(text).reduce((sum, c) => sum + ((c.codePointAt(0) ?? 0) >= 0x1f000 ? 2 : 1), 0)
+}
+
+export function contextLabel(percent: number): string {
+  return percent < CONTEXT_LOW_AT ? CONTEXT_LABEL : CONTEXT_LOW_LABEL
+}
+
 export function formatStatusLine(parts: StatusParts, width?: number): string {
-  const head = parts.effort === undefined ? parts.model : `${parts.model} @ ${parts.effort}`
-  const used = `${String(parts.percent ?? 0).padStart(3)}% used`
-  const tail = parts.worktree === undefined ? [] : [parts.worktree]
-  if (width === undefined) return [head, used, parts.cwd, ...tail].join(SEPARATOR)
+  const percent = parts.percent ?? 0
+  const head = `${MODEL_LABEL} ${parts.effort === undefined ? parts.model : `${parts.model} @ ${parts.effort}`}`
+  const used = `${contextLabel(percent)} ${String(percent).padStart(3)}% used`
+  const tail = parts.worktree === undefined ? [] : [`${WORKTREE_LABEL} ${parts.worktree}`]
+  const cwdPrefix = `${CWD_LABEL} `
+  if (width === undefined) return [head, used, cwdPrefix + parts.cwd, ...tail].join(SEPARATOR)
 
   const fixed = [head, used, ...tail]
-  const fixedWidth = fixed.reduce((sum, s) => sum + Array.from(s).length, 0) + SEPARATOR.length * fixed.length
-  const cwd = truncateStart(parts.cwd, width - fixedWidth)
-  return (cwd === '' ? fixed : [head, used, cwd, ...tail]).join(SEPARATOR)
+  const fixedWidth = fixed.reduce((sum, s) => sum + cellWidth(s), 0) + SEPARATOR.length * fixed.length
+  const cwd = truncateStart(parts.cwd, width - fixedWidth - cellWidth(cwdPrefix))
+  return (cwd === '' ? fixed : [head, used, cwdPrefix + cwd, ...tail]).join(SEPARATOR)
 }
