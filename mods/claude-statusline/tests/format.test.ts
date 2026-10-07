@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing'
-import { formatStatusLine, modelDisplayName, statusChromeWidth, truncateStart, worktreeNameOf } from '../hooks/format'
+import { HINT_CHROME_WIDTH, formatStatusLine, modelDisplayName, placeStatus, truncateStart, worktreeNameOf } from '../hooks/format'
 
 const parts = {
   model: 'Opus 5.5 (1M context)',
@@ -61,7 +61,30 @@ describe('formatStatusLine', () => {
     expect(formatStatusLine(parts, 10)).toBe('Opus 5.5 (1M context) @ medium |   7% used | main')
   })
 
-  test('budgets for the prefix and the right margin the engine draws', () => {
-    expect(statusChromeWidth('statusline')).toBe('  ⚠ statusline: '.length + 2)
+})
+
+describe('placeStatus', () => {
+  const hint = '⏵⏵ auto mode on (shift+tab to cycle)'
+  const status = formatStatusLine(parts)
+  const fits = HINT_CHROME_WIDTH + hint.length + ' | '.length + status.length
+
+  test('appends the whole status to the hint line when it fits', () => {
+    expect(placeStatus({ hint }, parts, fits)).toEqual({ tail: ` | ${status}` })
+  })
+
+  test('keeps a tail another plugin set', () => {
+    expect(placeStatus({ hint, tail: ' x' }, parts, fits + 2)).toEqual({ tail: ` x | ${status}` })
+  })
+
+  test('moves to a line of its own, cwd cut to the row, when the tail would be cut', () => {
+    expect(placeStatus({ hint }, parts, fits - 1)).toEqual({ line: formatStatusLine(parts, fits - 1 - HINT_CHROME_WIDTH) })
+  })
+
+  test('moves to a line of its own when the hint already spans lines', () => {
+    expect(placeStatus({ hint: `${hint}\nmore` }, parts, 1000)).toEqual({ line: status })
+  })
+
+  test('moves to a line of its own while the width is unknown', () => {
+    expect(placeStatus({ hint }, parts, undefined)).toEqual({ line: status })
   })
 })

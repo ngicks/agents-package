@@ -1,12 +1,13 @@
 # claude-statusline
 
-A Claude Code mod that pins a status line under the prompt:
+A Claude Code mod that appends a status to the hint line under the prompt:
 
 ```
-⚠ statusline: Opus 5.5 (1M context) @ medium |   7% used | …/agents-package/main | main
+  ⏵⏵ auto mode on (shift+tab to cycle) | Opus 5.5 (1M context) @ medium |   7% used | /home/u/src/agents-package/main | main
 ```
 
-The cwd is cut from the left so the whole line fits the terminal width.
+The status moves to a line of its own when the hint line cannot show it whole.
+On that line the cwd is cut from the left so the whole line fits the terminal width.
 `SKILL.md` describes each component.
 
 ## Install

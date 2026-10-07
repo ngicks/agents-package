@@ -1,11 +1,12 @@
 {
   "name": "statusline",
   "version": "0.1.0",
-  "description": "Status line as a mod: model @ effort | context used | cwd | worktree, cwd left-truncated to fit the row.",
+  "description": "Status at the end of the prompt hint line: model @ effort | context used | cwd | worktree, moved to a line of its own when it does not fit.",
   "author": {
     "name": "ngicks"
   },
   "license": "MIT",
   "repository": "https://github.com/ngicks/agents-package",
-  "skills": ["./"]
+  "skills": ["./"],
+  "types": "./types/index.d.ts"
 }

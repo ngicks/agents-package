@@ -1,4 +1,4 @@
 {
-  "description": "Draws the status line: model @ effort | context used | cwd | worktree.",
-  "modules": ["./register.ts"]
+  "description": "Appends model @ effort | context used | cwd | worktree to the prompt hint line.",
+  "modules": ["./register.tsx"]
 }
