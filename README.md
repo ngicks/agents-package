@@ -14,6 +14,7 @@ Install contents via [apm](https://github.com/microsoft/apm)
 | `vpkg/instructions/<name>.instructions.md` | Single instruction file | `ngicks/agents-package/vpkg/instructions/<name>.instructions.md` |
 | `vpkg/hooks/<name>/` | Single hook set | `ngicks/agents-package/vpkg/hooks/<name>` |
 | `mods/<name>/` | Claude Code mod (skill plugin) | `apm install -g ngicks/agents-package/mods/<name>` |
+| `settings/claude/` | Base for Claude Code's `settings.json` | Run `settings/claude/apply.sh` to merge it into the live settings |
 
 ## Quick start
 
