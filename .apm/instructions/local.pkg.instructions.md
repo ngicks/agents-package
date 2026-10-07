@@ -1,6 +1,6 @@
 ---
 description: "Layout rules for the apm packages under pkg/"
-applyTo: "pkg/**"
+applyTo: ""
 ---
 
 ### pkg layout
@@ -11,6 +11,8 @@ Everything a package ships lives under its `.apm/` directory
 (`agents/`, `skills/`, `instructions/`, `hooks/`, `prompts/`),
 and the metadata lives in its `apm.yml`.
 
+- Keep every instruction conditionless: `applyTo: ""`.
+  - Instructions reach agents only through the compiled `AGENTS.md`, which has no path scoping.
 - A package never depends on other units in this repository.
   - Copy a primitive into `.apm/` when the package needs it, even if `vpkg/` holds the same one.
 - Keep the directory name unique across `pkg/`, `vpkg/*/`, `mods/`, and `bundle/`.

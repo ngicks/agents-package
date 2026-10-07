@@ -1,6 +1,6 @@
 ---
 description: "Go basic preference"
-applyTo: "**/*.go"
+applyTo: ""
 ---
 
 ### Go basic DOs and DON'Ts

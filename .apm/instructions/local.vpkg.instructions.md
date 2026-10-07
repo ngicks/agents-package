@@ -1,6 +1,6 @@
 ---
 description: "Layout rules for the single-primitive packages under vpkg/"
-applyTo: "vpkg/**"
+applyTo: ""
 ---
 
 ### vpkg layout
@@ -13,7 +13,10 @@ Units are grouped by kind, and each kind has one shape.
   - Consumers depend on `ngicks/agents-package/vpkg/skills/<name>`.
   - Do not add `apm.yml`; a root `SKILL.md` already makes the directory installable.
 - `vpkg/instructions/<name>.instructions.md`: a single instruction file.
-  - Consumers depend on the file path itself.
+  - Consumers depend on the file path itself, with `targets: [codex]`.
+  - `apm compile` merges it into `AGENTS.md`, which Claude Code also reads, so no `.claude/rules/` copy is needed.
+  - Keep it conditionless: `applyTo: ""`.
+    `AGENTS.md` has no path scoping, so an `applyTo` glob only becomes a "Files matching" heading that no tool enforces.
 - `vpkg/hooks/<name>/`: a hook, wrapped in an apm package.
   - `apm.yml` plus `.apm/hooks/<name>.json`.
 
@@ -45,6 +48,7 @@ apm install --update -t claude
 
 - A hook must show `hook(s) integrated`.
 - A skill must show `Skill integrated`.
-- An instruction must show `rule(s) integrated`.
+- An instruction must appear in `AGENTS.md` after `apm compile`, and `.claude/rules/` must stay empty.
   - apm cannot install a single file from a local path ("Local package path does not exist").
-    Verify an instruction after pushing, with `ngicks/agents-package/vpkg/instructions/<name>.instructions.md#<branch>`.
+    Verify an instruction after pushing, with `ngicks/agents-package/vpkg/instructions/<name>.instructions.md#<branch>`
+    and `targets: [codex]`.

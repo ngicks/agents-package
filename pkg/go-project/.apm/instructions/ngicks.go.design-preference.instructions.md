@@ -1,6 +1,6 @@
 ---
 description: "General Go Design Preference"
-applyTo: "**/*.go"
+applyTo: ""
 ---
 
 ### Go Personal Design Preference

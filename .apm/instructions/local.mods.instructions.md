@@ -1,6 +1,6 @@
 ---
 description: "Layout rules for the Claude Code mods under mods/"
-applyTo: "mods/**"
+applyTo: ""
 ---
 
 ### mods layout

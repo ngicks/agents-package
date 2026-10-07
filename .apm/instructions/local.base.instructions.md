@@ -1,6 +1,6 @@
 ---
 description: "Basic instructions for the project"
-applyTo: "*"
+applyTo: ""
 ---
 
 ### The Project

@@ -1,6 +1,6 @@
 ---
 description: "Layout rules for the bundles under bundle/"
-applyTo: "bundle/**"
+applyTo: ""
 ---
 
 ### bundle layout
@@ -16,6 +16,9 @@ A bundle serves two uses with the same file.
 - Write every dependency as a full repository path (`ngicks/agents-package/vpkg/skills/<name>`),
   in either the shorthand string form or the `git:` + `path:` object form.
   - Relative or local paths break once the file is copied elsewhere.
+- Set `targets: [codex]` on every instruction dependency.
+  - `apm compile` merges instructions into `AGENTS.md`, and Claude Code reads that file.
+  - A `claude` target would also deploy them as `.claude/rules/`, so Claude would load each rule twice.
 - Do not add `.apm/` or any primitive to a bundle.
   - A copied-in bundle would lose it.
 - Do not depend on another bundle.
