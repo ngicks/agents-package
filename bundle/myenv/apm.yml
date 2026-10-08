@@ -20,21 +20,10 @@ dependencies:
     - git: github.com/ngicks/agents-package
       path: vpkg/instructions/ngicks.base.preference.instructions.md
     - git: github.com/ngicks/crabswarm
-      path: apm-package/crabswarm-mcp
-      targets:
-        - claude
-    - git: github.com/ngicks/crabswarm
       path: mods/handle-events
       targets:
         - claude
     - git: github.com/ngicks/crabswarm
-      path: mods/report-agent-state
-      targets:
-        - claude
-    - git: github.com/ngicks/crabswarm
       path: apm-package/crabswarm-mcp-shared
-      targets:
-        - codex
-        - opencode
   mcp: []
 scripts: {}
