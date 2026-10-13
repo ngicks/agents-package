@@ -1,0 +1,13 @@
+// Pre-commit steps formatting and linting Python code with ruff.
+//
+// Installed by `scripts/hk-init.sh`, which copies this file to
+// `.hk/python-ruff.pkl` at the worktree root and rewrites the hk version
+// below to the project's pin, so do not edit the copy by hand: rerun the
+// script. `hk.pkl` spreads `steps` into its pre-commit hook.
+import "package://github.com/jdx/hk/releases/download/v2.2.0/hk@2.2.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.2.0/hk@2.2.0#/Config.pkl"
+
+steps: Mapping<String, Config.Step> = new {
+  ["ruff-format"] = Builtins.ruff_format
+  ["ruff"] = Builtins.ruff
+}
