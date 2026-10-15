@@ -31,6 +31,10 @@ dependencies:
       targets:
         - claude
     - git: github.com/ngicks/crabswarm
+      path: mods/report-agent-state
+      targets:
+        - claude
+    - git: github.com/ngicks/crabswarm
       path: apm-package/crabswarm-mcp-shared
   mcp: []
 scripts: {}
