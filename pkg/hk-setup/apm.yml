@@ -1,0 +1,11 @@
+name: hk-setup
+version: 0.0.1
+description: Skills scaffolding hk pre-commit hooks for Go (golangci-lint, go vet with ngcheckers), Python (ruff), and mermaid diagrams (mermaid-lint).
+author: ngicks
+license: MIT
+repository: https://github.com/ngicks/agents-package
+includes: auto
+dependencies:
+  apm: []
+  mcp: []
+scripts: {}

@@ -147,9 +147,7 @@ when the `codex` target is inactive). If you previously installed with
 the `codex` target, switching to `agent-skills` makes apm clean up its
 stale compiled `.codex/agents/*.toml` automatically -- copy the native
 ones in after that. Which targets are active is gated by the
-consumer's `apm.yml` `targets:` (or `--target` / directory detection),
-intersected with this package's `targets:` -- which is why this
-package lists `agent-skills` alongside `claude` and `codex`.
+consumer's `apm.yml` `targets:` (or `--target` / directory detection).
 
 ## Authoring
 

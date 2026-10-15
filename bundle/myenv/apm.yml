@@ -2,9 +2,6 @@ name: myenv
 version: 1.0.0
 description: ngicks's user-scope environment, installed with apm install -g.
 author: ngicks
-# Which agent platforms to deploy to.
-# Resolution order: --target flag > this field > auto-detect from filesystem.
-# Accepted values: agent-skills, antigravity, claude, codex, copilot, cursor, gemini, grok-build, kiro, opencode, windsurf
 targets:
   - claude
   - codex
@@ -16,9 +13,15 @@ dependencies:
       targets:
         - claude
     - git: github.com/ngicks/agents-package
-      path: vpkg/instructions/ngicks.base.env.instructions.md
+      path: pkg/hk-setup
     - git: github.com/ngicks/agents-package
-      path: vpkg/instructions/ngicks.base.preference.instructions.md
+      path: vpkg/instructions/ngicks.base.doc.instructions.md
+    - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.base.commit.instructions.md
+    - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.base.change.instructions.md
+    - git: github.com/ngicks/agents-package
+      path: vpkg/hooks/agents-simple-automation
     - git: github.com/ngicks/crabswarm
       path: mods/handle-events
       targets:

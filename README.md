@@ -27,3 +27,9 @@ dependencies:
 ```
 
 Or copy `bundle/<name>/apm.yml` into your project, then drop or swap individual units.
+
+Install the user-scope bundle `myenv` into a devenv container:
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/ngicks/agents-package/main/bundle/myenv/install.sh | bash
+```

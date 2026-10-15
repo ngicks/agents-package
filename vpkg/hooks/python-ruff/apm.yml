@@ -4,9 +4,6 @@ description: Hooks that format and lint edited Python files with ruff.
 author: ngicks
 license: MIT
 repository: https://github.com/ngicks/agents-package
-targets:
-- claude
-- codex
 includes: auto
 dependencies:
   apm: []
