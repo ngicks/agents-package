@@ -27,6 +27,8 @@ dependencies:
     - git: github.com/ngicks/agents-package
       path: vpkg/skills/ngplan
     - git: github.com/ngicks/crabswarm
+      path: apm-package/crabswarm-mcp-shared
+    - git: github.com/ngicks/crabswarm
       path: mods/handle-events
       targets:
         - claude
@@ -34,7 +36,5 @@ dependencies:
       path: mods/report-agent-state
       targets:
         - claude
-    - git: github.com/ngicks/crabswarm
-      path: apm-package/crabswarm-mcp-shared
   mcp: []
 scripts: {}
