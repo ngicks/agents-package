@@ -15,6 +15,13 @@ fi
 # shells unless told to trust them.
 apm install -g -t "$targets" --trust-bin --trust-transitive-mcp "${sources[@]}"
 
+# apm writes the crabswarm-mcp-shared MCP server into ~/.claude.json too.
+# Claude Code does not need it. The claude CLI offers no disable, only
+# remove, and remove exits 1 when the entry is already gone.
+if command -v claude >/dev/null 2>&1; then
+  claude mcp remove crabswarm-mcp-shared --scope user || true
+fi
+
 if [ "${MYENV_UPDATE:-0}" = "1" ]; then
   apm update -g --yes
 fi
