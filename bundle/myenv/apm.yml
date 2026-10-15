@@ -22,6 +22,10 @@ dependencies:
       path: vpkg/instructions/ngicks.base.change.instructions.md
     - git: github.com/ngicks/agents-package
       path: vpkg/hooks/agents-simple-automation
+    - git: github.com/ngicks/agents-package
+      path: vpkg/skills/ngcommit
+    - git: github.com/ngicks/agents-package
+      path: vpkg/skills/ngplan
     - git: github.com/ngicks/crabswarm
       path: mods/handle-events
       targets:
