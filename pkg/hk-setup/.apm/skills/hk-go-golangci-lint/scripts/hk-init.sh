@@ -13,10 +13,13 @@
 # - Creates `hk.pkl` when there is none. An existing `hk.pkl` is never
 #   rewritten: Pkl is too free-form to edit safely with sed, so the script
 #   prints the two lines to add and exits 1.
+# - Copies `reference/golangci.yaml` to `.golangci.yaml` when the worktree
+#   has no golangci-lint config. An existing one is the project's own choice
+#   and is left alone.
 # - Validates the config and runs `hk install`.
 #
-# `hk.pkl` and `.hk/<name>.pkl` are meant to be committed: a worktree that
-# does not have them runs no hooks.
+# `hk.pkl`, `.hk/<name>.pkl` and `.golangci.yaml` are meant to be committed:
+# a worktree that does not have them runs no hooks.
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd -P)
@@ -95,7 +98,14 @@ fi
 
 hk validate >/dev/null
 
-# 3. Git hooks. hk skips this on its own when hooks are installed globally.
+# 3. golangci-lint config, unless the project already has one in any of the
+#    formats golangci-lint looks for.
+if [ ! -f .golangci.yaml ] && [ ! -f .golangci.yml ] && [ ! -f .golangci.toml ] && [ ! -f .golangci.json ]; then
+  cp "$here/../reference/golangci.yaml" .golangci.yaml
+  changed="$changed .golangci.yaml"
+fi
+
+# 4. Git hooks. hk skips this on its own when hooks are installed globally.
 hk install -q
 
 if [ -n "$changed" ]; then

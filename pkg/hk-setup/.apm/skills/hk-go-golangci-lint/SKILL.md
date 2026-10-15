@@ -25,17 +25,20 @@ The hook runs two steps on staged `*.go` files:
    - It copies `reference/go-golangci-lint.hk.pkl` to `.hk/go-golangci-lint.pkl`,
      pinned to the hk version the project already uses.
    - It creates `hk.pkl` when the repository has none.
+   - It copies `reference/golangci.yaml` to `.golangci.yaml` when the repository has no golangci-lint config.
    - It validates the config and runs `hk install`.
 2. If the script exits 1 with wiring instructions, `hk.pkl` already exists.
    - Add the printed `import` line after its `amends` line.
    - Add the printed `...go_golangci_lint.steps` line into the `steps` of `hooks["pre-commit"]`;
      create that hook when it is missing.
    - Rerun the script; it exits 0 once wired.
-3. Commit `hk.pkl` and `.hk/go-golangci-lint.pkl`.
+3. Commit `hk.pkl`, `.hk/go-golangci-lint.pkl` and `.golangci.yaml`.
    - A worktree without them runs no hooks.
 
 ## Notes
 
 - Do not edit `.hk/go-golangci-lint.pkl`; rerun the script to update it.
+- `.golangci.yaml` belongs to the project once copied; edit it freely.
+  The script never overwrites an existing golangci-lint config.
 - Put project-specific steps in `hk.pkl`.
 - `hk run pre-commit` runs the hook against the staged files without committing.
