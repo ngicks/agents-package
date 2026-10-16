@@ -22,6 +22,6 @@ if command -v claude >/dev/null 2>&1; then
   claude mcp remove crabswarm-mcp-shared --scope user || true
 fi
 
-if [ "${MYENV_UPDATE:-0}" = "1" ]; then
+if [ "${MYENV_UPDATE:-1}" = "1" ]; then
   apm update -g --yes
 fi
