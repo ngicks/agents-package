@@ -9,10 +9,6 @@ targets:
 dependencies:
   apm:
     - git: github.com/ngicks/agents-package
-      path: vpkg/hooks/go-golangci-lint
-    - git: github.com/ngicks/agents-package
-      path: vpkg/hooks/go-vet-ngcheckers
-    - git: github.com/ngicks/agents-package
       path: vpkg/instructions/ngicks.go.basics.instructions.md
       targets:
         - codex
