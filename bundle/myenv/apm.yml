@@ -27,6 +27,8 @@ dependencies:
     - git: github.com/ngicks/agents-package
       path: vpkg/skills/ngplan
     - git: github.com/ngicks/crabswarm
+      path: apm-package/crabswarm-issues-lint
+    - git: github.com/ngicks/crabswarm
       path: apm-package/crabswarm-mcp-shared
     - git: github.com/ngicks/crabswarm
       path: mods/handle-events
