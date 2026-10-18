@@ -28,6 +28,11 @@ Rules:
 
 - Do not wire `sync.WaitGroup` and `chan struct{}` by yourself as long as errgroup, semaphore and/or singleflight cover(s) the usecase.
 
+## Types
+
+- Do not use an anonymous struct type as a field type in a struct definition. Declare a named type instead.
+  - Anonymous field types cannot be referenced by callers, have no methods, and force the full literal into every composite literal and test.
+
 ## Preference
 
 - Opposing to `Go Review Comments`, do not use ALL-UPPERCASE for abbreviations. e.g. Id instead of ID.
