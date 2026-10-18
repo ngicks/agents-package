@@ -10,18 +10,19 @@ if ! command -v apm >/dev/null 2>&1; then
   exit 1
 fi
 
-# The bundle lists mods that ship bin/ executables and transitive packages
-# that define their own MCP servers. apm skips both in non-interactive
-# shells unless told to trust them.
-apm install -g -t "$targets" --trust-bin --trust-transitive-mcp "${sources[@]}"
-
-# apm writes the crabswarm-mcp-shared MCP server into ~/.claude.json too.
-# Claude Code does not need it. The claude CLI offers no disable, only
-# remove, and remove exits 1 when the entry is already gone.
-if command -v claude >/dev/null 2>&1; then
-  claude mcp remove crabswarm-mcp-shared --scope user || true
+if [ -f "$HOME/.apm/apm.yml" ]; then
+  apm update -g --yes -t "$targets"
 fi
 
-if [ "${MYENV_UPDATE:-1}" = "1" ]; then
-  apm update -g --yes
+apm install -g -t "$targets" --trust-bin --trust-transitive-mcp "${sources[@]}"
+
+# mcp entries in apm.yml go into ${CLAUDE_CONFIG_DIR}/.claude.json
+#
+# So after installation, there would be a dup betewen
+# `.claude.json` and `skills/crabswarm-mcp-shared`
+#
+# There's no stable cli command which turns off mcp rather than 
+# removing it.
+if command -v claude >/dev/null 2>&1; then
+  claude mcp remove crabswarm-mcp-shared --scope user || true
 fi
