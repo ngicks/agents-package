@@ -1,0 +1,17 @@
+name: moonbit
+version: 1.0.0
+description: ngicks's MoonBit project bundle, installed per project with apm install.
+author: ngicks
+targets:
+  - claude
+  - codex
+  - opencode
+dependencies:
+  apm:
+    - git: github.com/moonbitlang/skills
+    - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.moonbit.basics.instructions.md
+      targets:
+        - codex
+  mcp: []
+scripts: {}

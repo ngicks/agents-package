@@ -1,0 +1,30 @@
+name: go
+version: 1.0.0
+description: ngicks's Go project bundle, installed per project with apm install.
+author: ngicks
+targets:
+  - claude
+  - codex
+  - opencode
+dependencies:
+  apm:
+    - git: github.com/ngicks/agents-package
+      path: vpkg/hooks/go-golangci-lint
+    - git: github.com/ngicks/agents-package
+      path: vpkg/hooks/go-vet-ngcheckers
+    - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.go.basics.instructions.md
+      targets:
+        - codex
+    - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.go.design-preference.instructions.md
+      targets:
+        - codex
+    - git: github.com/ngicks/agents-package
+      path: vpkg/skills/go-check-outdated-patterns
+    - git: github.com/ngicks/agents-package
+      path: vpkg/skills/go-edit-cobra
+    - git: github.com/ngicks/agents-package
+      path: vpkg/skills/go-review-checklist
+  mcp: []
+scripts: {}

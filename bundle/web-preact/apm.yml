@@ -1,0 +1,20 @@
+name: web-preact
+version: 1.0.0
+description: ngicks's Preact SPA project bundle, installed per project with apm install.
+author: ngicks
+targets:
+  - claude
+  - codex
+  - opencode
+dependencies:
+  apm:
+    - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.web.base-preference.instructions.md
+      targets:
+        - codex
+    - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.web.preact-preference.instructions.md
+      targets:
+        - codex
+  mcp: []
+scripts: {}
