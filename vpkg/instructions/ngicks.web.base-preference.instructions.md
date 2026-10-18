@@ -20,6 +20,13 @@ applyTo: ""
 
 ### Playwright
 
-- Browsers and their deps are provided through nix, NOT downloaded by Playwright itself.
-- The environment sets `PLAYWRIGHT_BROWSERS_PATH` to a nix store path; the Playwright library version (npm `@playwright/test` / `playwright`, or `playwright-go`) MUST match the version those nix-provided browsers were built for — browser revision directories (e.g. `chromium-1228`) are version-specific and a mismatched library will not find them.
-- NEVER run `playwright install` / `playwright install-deps`, and NEVER bump the Playwright dependency independently. When a newer Playwright is needed, update the nix side first (or ask the user), then align the dependency to it.
+- The environment sets `PLAYWRIGHT_BROWSERS_PATH` to a persistent browser cache shared by every project.
+  - Do not override it, unset it, or set it per project.
+  - Check with `echo "$PLAYWRIGHT_BROWSERS_PATH"`; if it is empty, ask the user before downloading anything.
+- Playwright downloads browsers into that cache by itself. Install them through the project's own dependency:
+  - Pin `@playwright/test` (or `playwright`) in `package.json`, then run `pnpm exec playwright install chromium`.
+  - Each Playwright version needs its own browser revision directory (e.g. `chromium-1234`). After bumping the dependency, run the install command again; the cache keeps old revisions, so other projects keep working.
+  - Install only `chromium` unless the user asks for `firefox` or `webkit`.
+- NEVER run `playwright install-deps`.
+  - System libraries come from the environment, not from apt. `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true` is set for that reason.
+  - If a browser fails to launch over a missing shared library, report it to the user instead of installing packages.
