@@ -22,3 +22,7 @@ Rules:
 
 - Do not use an anonymous struct type as a field type in a struct definition. Declare a named type instead.
   - Anonymous field types cannot be referenced by callers, have no methods, and force the full literal into every composite literal and test.
+
+### Naming
+
+- Opposing to `Go Review Comments`, do not use ALL-UPPERCASE for abbreviations in identifiers. Write `Id`, `Json`, `Http`, not `ID`, `JSON`, `HTTP`.

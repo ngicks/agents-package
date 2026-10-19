@@ -35,4 +35,4 @@ Rules:
 
 ## Preference
 
-- Opposing to `Go Review Comments`, do not use ALL-UPPERCASE for abbreviations. e.g. Id instead of ID.
+- Opposing to `Go Review Comments`, do not use ALL-UPPERCASE for abbreviations in identifiers. Write `Id`, `Json`, `Http`, not `ID`, `JSON`, `HTTP`.
