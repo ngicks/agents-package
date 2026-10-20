@@ -17,6 +17,8 @@ dependencies:
     - git: github.com/ngicks/agents-package
       path: vpkg/instructions/ngicks.base.doc.instructions.md
     - git: github.com/ngicks/agents-package
+      path: vpkg/instructions/ngicks.base.file-order.instructions.md
+    - git: github.com/ngicks/agents-package
       path: vpkg/instructions/ngicks.base.commit.instructions.md
     - git: github.com/ngicks/agents-package
       path: vpkg/instructions/ngicks.base.change.instructions.md
