@@ -33,6 +33,13 @@ Rules:
 - Do not use an anonymous struct type as a field type in a struct definition. Declare a named type instead.
   - Anonymous field types cannot be referenced by callers, have no methods, and force the full literal into every composite literal and test.
 
+## JSON
+
+- Does the code reject unknown fields with v1 `DisallowUnknownFields` or v2 `RejectUnknownMembers`? Remove it unless the project explicitly requires it.
+  - Capture unknown fields with a v2 embedded fallback field instead: `` Unknown map[string]any `json:",embed"` ``.
+  - Add a `Validate` method that rejects or warns on a non-empty `Unknown`.
+  - Warn by default. Reject only when the project requires strictness.
+
 ## Preference
 
 - Opposing to `Go Review Comments`, do not use ALL-UPPERCASE for abbreviations in identifiers. Write `Id`, `Json`, `Http`, not `ID`, `JSON`, `HTTP`.
