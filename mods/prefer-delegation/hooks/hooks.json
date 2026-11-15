@@ -1,0 +1,4 @@
+{
+  "description": "Adds a system prompt section that prefers subagent delegation on Fable and Mythos models.",
+  "modules": ["./register.ts"]
+}

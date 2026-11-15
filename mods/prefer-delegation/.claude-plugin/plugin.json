@@ -1,0 +1,11 @@
+{
+  "name": "prefer-delegation",
+  "version": "0.1.0",
+  "description": "Adds a system prompt section that prefers subagent delegation for sizable tasks on Fable and Mythos models.",
+  "author": {
+    "name": "ngicks"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/ngicks/agents-package",
+  "skills": ["./"]
+}
