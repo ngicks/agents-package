@@ -9,6 +9,16 @@ const CORE = [
 
 function engine(on: On) {
   on('prompt.compose', () => ({ sections: CORE }))
+  on('session.id', () => ({ value: 'conversation-1' }))
+}
+
+function logs(on: On): string[] {
+  const lines: string[] = []
+  on('ui.log', (_$, e) => {
+    lines.push(e.text)
+    return { value: undefined }
+  })
+  return lines
 }
 
 // The engine skips a hook whose input lacks any of these facts.
@@ -57,5 +67,28 @@ describe('prompt.compose', () => {
     engine(on)
     const { sections } = await $.prompt.compose(facts('claude-fable-5-2', ['Bash', 'Read']))
     expect(sections).toEqual([...CORE])
+  })
+
+  test('logs the added section once per conversation', async ($, on) => {
+    engine(on)
+    const lines = logs(on)
+    await $.prompt.compose(facts('claude-fable-5-2', ['Bash', 'Agent']))
+    await $.prompt.compose(facts('claude-fable-5-2', ['Bash', 'Agent']))
+    expect(lines).toEqual(['prefer-delegation: delegation section added to the system prompt (claude-fable-5-2)'])
+  })
+
+  test('does not log a section that a running conversation will not receive', async ($, on) => {
+    engine(on)
+    const lines = logs(on)
+    await $.prompt.compose(facts('claude-opus-5-5', ['Bash', 'Agent']))
+    await $.prompt.compose(facts('claude-fable-5-2', ['Bash', 'Agent']))
+    expect(lines).toEqual([])
+  })
+
+  test('does not log when the Agent tool is not offered', async ($, on) => {
+    engine(on)
+    const lines = logs(on)
+    await $.prompt.compose(facts('claude-fable-5-2', ['Bash']))
+    expect(lines).toEqual([])
   })
 })

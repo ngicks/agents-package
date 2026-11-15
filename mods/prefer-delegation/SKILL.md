@@ -49,6 +49,16 @@ The hook answers every render of the system prompt with the model of that render
   - `/new`, `/clear` and a compaction start the prompt over, and the section then follows the current model.
   - A session that loads the mod midway gets the section at its next render.
 
+## Transcript line
+
+The mod writes one dim line to the transcript when a conversation receives the section.
+
+- The line reads `prefer-delegation: delegation section added to the system prompt (<model id>)`.
+- The model does not see the line.
+- A conversation gets the line once, at its first render that offers the `Agent` tool.
+  - A `/model` switch in a running conversation writes no line, because that conversation keeps its prompt.
+  - `/new`, `/clear` and a compaction decide again.
+
 ## Files
 
 - `hooks/register.ts`: the `prompt.compose` hook.
