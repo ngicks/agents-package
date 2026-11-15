@@ -14,7 +14,7 @@ if [ -f "$HOME/.apm/apm.yml" ]; then
   apm update -g --yes -t "$targets"
 fi
 
-apm install -g -t "$targets" --trust-bin --trust-transitive-mcp "${sources[@]}"
+apm install --update -g -t "$targets" --trust-bin --trust-transitive-mcp "${sources[@]}"
 
 # mcp entries in apm.yml go into ${CLAUDE_CONFIG_DIR}/.claude.json
 #
