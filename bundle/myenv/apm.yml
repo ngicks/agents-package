@@ -9,6 +9,10 @@ targets:
 dependencies:
   apm:
     - git: github.com/ngicks/agents-package
+      path: mods/prefer-delegation
+      targets:
+        - claude
+    - git: github.com/ngicks/agents-package
       path: mods/statusline
       targets:
         - claude
