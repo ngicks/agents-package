@@ -16,6 +16,7 @@ linters:
     - copyloopvar
     - gocritic
     - lll
+    - wsl_v5
   exclusions:
     paths:
       # Analyzer fixtures under testdata/ intentionally contain "wrong" code
