@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
-import { SECTION_ID, SECTION_TEXT, isDelegatingModel } from '../hooks/section'
+import { SECTION_ID, isDelegatingModel, sectionText, subagentModel } from '../hooks/section'
 
 const CORE = [
   { id: 'intro', text: 'intro', scope: 'shared' },
@@ -46,12 +46,34 @@ describe('isDelegatingModel', () => {
   })
 })
 
+describe('subagentModel', () => {
+  test('names the first model of the next lower tier', () => {
+    expect(subagentModel('claude-fable-5-2[1m]')).toBe('opus')
+    expect(subagentModel('us.anthropic.claude-mythos-5-2-v1:0')).toBe('opus')
+    expect(subagentModel('claude-opus-5-5')).toBe('sonnet')
+    expect(subagentModel('claude-sonnet-5-5')).toBe('haiku')
+  })
+
+  test('names nothing below the lowest tier or for an unknown family', () => {
+    expect(subagentModel('claude-haiku-5-5')).toBe(undefined)
+    expect(subagentModel('gpt-9')).toBe(undefined)
+  })
+})
+
+describe('sectionText', () => {
+  test('tells Fable and Mythos to spawn subagents on opus', () => {
+    for (const model of ['claude-fable-5-2', 'claude-mythos-5-2']) {
+      expect(sectionText(model)).toContain('Pass `model: "opus"` on every Agent call.')
+    }
+  })
+})
+
 describe('prompt.compose', () => {
   test('appends the section last, as session, for Fable and Mythos', async ($, on) => {
     engine(on)
     for (const model of ['claude-fable-5-2', 'claude-mythos-5-2[1m]']) {
       const { sections } = await $.prompt.compose(facts(model, ['Bash', 'Agent']))
-      expect(sections).toEqual([...CORE, { id: SECTION_ID, text: SECTION_TEXT, scope: 'session' }])
+      expect(sections).toEqual([...CORE, { id: SECTION_ID, text: sectionText(model), scope: 'session' }])
     }
   })
 

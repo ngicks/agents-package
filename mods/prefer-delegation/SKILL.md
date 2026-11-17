@@ -17,13 +17,29 @@ The section tells the model to delegate sizable tasks to subagents by default.
 
 - The section id is `prefer-delegation:delegation`.
 - The section sits last, on the `session` side of the prompt cache boundary.
-- The section text is a constant in `hooks/section.ts`.
+- `sectionText` in `hooks/section.ts` builds the section text for the model of the request.
+
+## Model tiers
+
+`MODEL_TIERS` in `hooks/section.ts` orders the model families from most to least capable.
+
+- Tier 0: `mythos`, `fable`
+- Tier 1: `opus`
+- Tier 2: `sonnet`
+- Tier 3: `haiku`
+
+The mod reads two answers from the list.
+
+- Only tier 0 receives the section.
+- The section names the first family of the next lower tier as the model for subagents.
+  - Fable and Mythos tell their subagents to run on `opus`.
+  - A subagent without a `model` runs on the model of its parent, so the section names one.
 
 ## When the section is added
 
 The mod adds the section when both conditions hold.
 
-- The model id of the request contains `fable` or `mythos`, in any letter case.
+- The model id of the request contains a tier 0 family name, in any letter case.
   - Ids with a provider prefix or a suffix such as `[1m]` match too.
 - The request offers the `Agent` tool.
   - A thread without the tool cannot delegate, so the section would only mislead it.
@@ -32,9 +48,11 @@ Every other request keeps its system prompt unchanged.
 
 ## What the section says
 
-- Delegate sizable work: many tool calls, reading across several files, multi-step implementation, broad searches, long verification runs.
-- Run independent pieces in parallel subagents.
-- Brief each subagent completely, and verify its result.
+- The model has limited usage and consumes it fast, so heavy work should run on a cheaper model.
+- Delegate sizable work as a baseline: many tool calls, reading across several files, multi-step implementation, broad searches, long verification runs.
+- One subagent per task is enough. The section does not ask for parallel subagents.
+- Pass `model: "opus"` on every `Agent` call.
+- Stay the coordinator, and verify a subagent's result.
 - Do small work inline.
 - A subagent does its delegated work directly and does not delegate again.
 - Instructions from the user, the project's instruction files, or a loaded skill override the default.
@@ -62,7 +80,7 @@ The mod writes one dim line to the transcript when a conversation receives the s
 ## Files
 
 - `hooks/register.ts`: the `prompt.compose` hook.
-- `hooks/section.ts`: the section text and the model check.
+- `hooks/section.ts`: the model tiers, the model check and the section text.
 - `tests/`: run with `claude plugin test <this folder>`.
 
 ## Debugging

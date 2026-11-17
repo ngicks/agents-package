@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { AGENT_TOOL, SECTION_ID, SECTION_TEXT, isDelegatingModel } from './section'
+import { AGENT_TOOL, SECTION_ID, isDelegatingModel, sectionText } from './section'
 
 export const register: Register = (on) => {
   // The engine sends a thread the prompt of its first render and ignores later
@@ -25,7 +25,7 @@ export const register: Register = (on) => {
     return {
       sections: [
         ...result.sections.filter(s => s.id !== SECTION_ID),
-        { id: SECTION_ID, text: SECTION_TEXT, scope: 'session' },
+        { id: SECTION_ID, text: sectionText(e.model), scope: 'session' },
       ],
     }
   })
