@@ -12,6 +12,7 @@ The hook runs two steps on staged `*.go` files:
 - `golangci-lint-fmt`: `golangci-lint fmt` on the staged files; hk stages the fixes.
 - `golangci-lint`: `golangci-lint run` in each Go module that holds a staged file.
   - `--fix` runs too, because the hook sets `fix = true`.
+  - Each run passes `--allow-parallel-runners`, because hk runs the modules in parallel.
 
 ## Requirements
 

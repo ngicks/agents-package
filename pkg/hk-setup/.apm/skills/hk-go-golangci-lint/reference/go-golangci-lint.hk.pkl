@@ -9,5 +9,14 @@ import "package://github.com/jdx/hk/releases/download/v2.2.0/hk@2.2.0#/Config.pk
 
 steps: Mapping<String, Config.Step> = new {
   ["golangci-lint-fmt"] = Builtins.golangci_lint_fmt
-  ["golangci-lint"] = Builtins.golangci_lint
+  // hk runs this step once per go.mod, in parallel. golangci-lint refuses a
+  // concurrent run unless every run passes --allow-parallel-runners.
+  ["golangci-lint"] = (Builtins.golangci_lint) {
+    check {
+      command = "golangci-lint run --fix=false --allow-parallel-runners ./..."
+    }
+    fix {
+      command = "golangci-lint run --fix --allow-parallel-runners ./..."
+    }
+  }
 }
