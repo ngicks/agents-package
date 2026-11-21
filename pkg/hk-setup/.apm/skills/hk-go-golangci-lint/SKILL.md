@@ -36,10 +36,30 @@ The hook runs two steps on staged `*.go` files:
 3. Commit `hk.pkl`, `.hk/go-golangci-lint.pkl` and `.golangci.yaml`.
    - A worktree without them runs no hooks.
 
+## Changing a scaffolded step
+
+`hk.pkl` changes a step of the fragment by amending the fragment's `steps` in a `local`.
+
+```pkl
+local go_golangci_lint_steps = (go_golangci_lint.steps) {
+  ["golangci-lint"] {
+    env { ["GOLANGCI_LINT_CACHE"] = "/var/cache/golangci-lint" }
+  }
+}
+```
+
+- Replace `...go_golangci_lint.steps` with `...go_golangci_lint_steps` in the `steps` of `hooks["pre-commit"]`.
+- The block sets only the fields it names; the step keeps every other field.
+- Do not redefine `["golangci-lint"]` after `...go_golangci_lint.steps` inside `steps`.
+  - Pkl rejects it with "Duplicate definition of member".
+  - Every `git commit` then fails before any step runs.
+- Run `hk validate` after the change.
+
 ## Notes
 
 - Do not edit `.hk/go-golangci-lint.pkl`; rerun the script to update it.
 - `.golangci.yaml` belongs to the project once copied; edit it freely.
   The script never overwrites an existing golangci-lint config.
 - Put project-specific steps in `hk.pkl`.
+  - Change a scaffolded step there too; see "Changing a scaffolded step".
 - `hk run pre-commit` runs the hook against the staged files without committing.

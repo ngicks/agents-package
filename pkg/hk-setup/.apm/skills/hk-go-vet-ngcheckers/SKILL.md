@@ -34,8 +34,28 @@ The hook runs one step when `*.go` files are staged:
 3. Commit `hk.pkl` and `.hk/go-vet-ngcheckers.pkl`.
    - A worktree without them runs no hooks.
 
+## Changing a scaffolded step
+
+`hk.pkl` changes a step of the fragment by amending the fragment's `steps` in a `local`.
+
+```pkl
+local go_vet_ngcheckers_steps = (go_vet_ngcheckers.steps) {
+  ["go-vet-ngcheckers"] {
+    env { ["GOFLAGS"] = "-tags=integration" }
+  }
+}
+```
+
+- Replace `...go_vet_ngcheckers.steps` with `...go_vet_ngcheckers_steps` in the `steps` of `hooks["pre-commit"]`.
+- The block sets only the fields it names; the step keeps every other field.
+- Do not redefine `["go-vet-ngcheckers"]` after `...go_vet_ngcheckers.steps` inside `steps`.
+  - Pkl rejects it with "Duplicate definition of member".
+  - Every `git commit` then fails before any step runs.
+- Run `hk validate` after the change.
+
 ## Notes
 
 - Do not edit `.hk/go-vet-ngcheckers.pkl`; rerun the script to update it.
 - Put project-specific steps in `hk.pkl`.
+  - Change a scaffolded step there too; see "Changing a scaffolded step".
 - `hk run pre-commit` runs the hook against the staged files without committing.

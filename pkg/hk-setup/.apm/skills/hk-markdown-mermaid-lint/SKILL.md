@@ -35,9 +35,29 @@ The hook runs one step on staged `*.md`, `*.mdx`, `*.markdown`, and `*.mmd` file
 3. Commit `hk.pkl` and `.hk/markdown-mermaid-lint.pkl`.
    - A worktree without them runs no hooks.
 
+## Changing a scaffolded step
+
+`hk.pkl` changes a step of the fragment by amending the fragment's `steps` in a `local`.
+
+```pkl
+local markdown_mermaid_lint_steps = (markdown_mermaid_lint.steps) {
+  ["mermaid-lint"] {
+    exclude = List("vendor/**")
+  }
+}
+```
+
+- Replace `...markdown_mermaid_lint.steps` with `...markdown_mermaid_lint_steps` in the `steps` of `hooks["pre-commit"]`.
+- The block sets only the fields it names; the step keeps every other field.
+- Do not redefine `["mermaid-lint"]` after `...markdown_mermaid_lint.steps` inside `steps`.
+  - Pkl rejects it with "Duplicate definition of member".
+  - Every `git commit` then fails before any step runs.
+- Run `hk validate` after the change.
+
 ## Notes
 
 - Do not edit `.hk/markdown-mermaid-lint.pkl`; rerun the script to update it.
 - Put project-specific steps in `hk.pkl`.
+  - Change a scaffolded step there too; see "Changing a scaffolded step".
 - Configure mermaid-lint itself in `.mermaidlintrc` or `mermaid-lint.config.js`.
 - `hk run pre-commit` runs the hook against the staged files without committing.
