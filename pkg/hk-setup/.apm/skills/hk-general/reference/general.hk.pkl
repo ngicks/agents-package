@@ -1,0 +1,34 @@
+// Pre-commit steps that apply to every repository, whatever its language.
+//
+// Installed by `scripts/hk-init.sh`, which copies this file to
+// `.hk/general.pkl` at the worktree root and rewrites the hk version
+// below to the project's pin, so do not edit the copy by hand: rerun the
+// script. `hk.pkl` spreads `steps` into its pre-commit hook.
+import "package://github.com/jdx/hk/releases/download/v2.2.0/hk@2.2.0#/Config.pkl"
+
+steps: Mapping<String, Config.Step> = new {
+  // hk's check_added_large_files measures the worktree file, so it also
+  // rejects files tracked by git LFS. This step measures the staged blob.
+  // The staged blob of an LFS file is a small pointer.
+  //
+  // The default limit is 100 MiB. GitHub blocks files above it and GitLab.com
+  // rejects files of that size or larger, so the comparison is `>=`.
+  ["no-large-files"] {
+    // hk drops binary files from a step's file list by default, which would
+    // let every large binary through.
+    allow_binary = true
+    check =
+      #"""
+      sizes=$(git --literal-pathspecs ls-files --format='%(objectsize) %(path)' -- {{files}}) || exit 1
+      printf '%s\n' "$sizes" | awk -v max="${HK_LARGE_FILE_MAX_BYTES:-104857600}" '
+        $1 + 0 >= max + 0 {
+          size = $1
+          sub(/^[0-9]+ /, "")
+          printf "%s: %d bytes, limit is %d bytes; track it with git lfs or keep it out of git\n", $0, size, max
+          bad = 1
+        }
+        END { exit bad }
+      '
+      """#
+  }
+}
