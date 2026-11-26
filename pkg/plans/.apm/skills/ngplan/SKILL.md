@@ -28,7 +28,7 @@ specific to this codebase, not generic.
 
 The plan lives in the repository's beads (`bd`) database, one database
 shared by every git worktree. Read [reference/beads.md](reference/beads.md)
-for the setup, the exact field mapping, and every command this skill uses.
+for the exact field mapping and every command this skill uses.
 
 - Pass `--actor <actor>` on every `bd` invocation, reads included, so the
   audit trail names the agent instead of the git user. The actor is
@@ -36,24 +36,18 @@ for the setup, the exact field mapping, and every command this skill uses.
   the model id it is running, e.g. `claude/claude-fable-5-1`; drop the
   `/<model>` part only when the model is genuinely unknown. Never use the
   user's name. See [reference/beads.md](reference/beads.md) for details.
-- On every invocation run `scripts/bd-init.sh`, bundled in this skill's
-  `scripts/` directory, as `BEADS_ACTOR=<actor> scripts/bd-init.sh`. It is
-  idempotent, picks the prefix itself, mirrors the git origin as the Dolt
-  remote, and finishes by running `scripts/hk-init.sh`, which wires the
-  skill's `hk` hooks (`hk.pkl`, `.hk/beads.pkl`, `hk install`); never run
-  raw `bd init`, never pass a prefix, never run `bd hooks install`, never
-  install git hooks any other way.
-- When the script reports that it wrote `hk.pkl` or `.hk/beads.pkl`,
-  include them in the next commit; a worktree without them runs no hooks.
-  If it exits 1 with wiring instructions, apply them to `hk.pkl` and rerun.
+- On every invocation check that the database exists with
+  `bd --actor <actor> info -q`. Exit status 0 means beads is initialized.
+- This skill does not initialize beads. The `beads-init` skill does.
+  When the check fails, load the `beads-init` skill, follow it, then
+  continue. Never run raw
+  `bd init`, never run `bd hooks install`, never install git hooks by hand.
 - `bd` missing is blocking: the plan has nowhere to live. Tell the user and
-  stop instead of writing files. `hk` missing is not: the script says so
-  and goes on, commits just carry no trailer — tell the user.
+  stop instead of writing files.
 - Never run `bd dolt push`; syncing off the machine is the user's job.
 - Agent commits get an `Executed-By: <agent>` trailer automatically, from
-  the `prepare-commit-msg` hook in `reference/beads.hk.pkl` that the init
-  script wires into `hk`. Commit normally; do not set variables, add,
-  strip, or edit the trailer.
+  the `hk` hooks that `beads-init` wires. Commit normally; do not set
+  variables, add, strip, or edit the trailer.
 
 How the plan maps onto one issue:
 

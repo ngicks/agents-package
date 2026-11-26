@@ -22,6 +22,8 @@
 #   which hk skips by itself when hooks are installed globally.
 # - Exits 0 without doing anything when hk is not installed; commits then
 #   simply carry no `Executed-By` trailer.
+# - Exits 0 without doing anything outside a worktree (e.g. a bare root),
+#   asking the caller to rerun from a worktree.
 #
 # `hk.pkl` and `.hk/beads.pkl` are meant to be committed: a worktree that
 # does not have them runs no hooks.
@@ -32,6 +34,11 @@ src="$here/../reference/beads.hk.pkl"
 
 if ! command -v hk >/dev/null 2>&1; then
   echo "hk-init: hk is not installed; skipping hook setup (agent commits get no Executed-By trailer)" >&2
+  exit 0
+fi
+
+if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
+  echo "hk-init: not inside a git worktree (bare root?); skipping hook setup. Rerun bd-init.sh from a worktree to wire hk." >&2
   exit 0
 fi
 

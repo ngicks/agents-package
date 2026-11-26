@@ -2,14 +2,15 @@
 # Idempotent beads (bd) initialization for a repository that may be
 # checked out as several git worktrees.
 #
-# - No-op (exit 0) when bd is already initialized.
+# - When bd is already initialized, only re-syncs the Dolt remote (exit 0).
 # - Creates the database at the repository root (the parent of the git
 #   common dir), never in the current worktree, so every worktree shares it.
 # - Derives the issue prefix from that same root directory, so every
 #   worktree agrees on the prefix. Override with BEADS_PREFIX=<prefix>.
 # - Turns off bd's anonymous usage metrics (`bd metrics off`).
-# - The beads part writes nothing into the worktree: no AGENTS.md, no bd git
-#   hooks, no push.
+# - The beads part writes no AGENTS.md, no bd git hooks, and pushes nothing.
+#   `bd init` itself still writes `.gitignore` and `.beads/` next to the
+#   database and, when the root is a worktree (plain clone), commits them.
 # - On first init, if the git `origin` already holds Dolt data
 #   (refs/dolt/data), clones that history instead of minting an empty
 #   database, so a fresh clone on another machine continues the same plan.
@@ -50,23 +51,6 @@ dolt_remote_url() {
   esac
 }
 
-# Keep the Dolt remote in step with the git origin. `bd dolt remote add` is an
-# upsert, so this is idempotent and safe to run on every invocation. bd 1.3+
-# aborts when the Dolt remote URL matches the git origin; that is the intended
-# layout here, so --allow-git-origin turns the abort into a warning.
-sync_remote() {
-  origin=$(git remote get-url origin 2>/dev/null || true)
-  [ -n "$origin" ] || return 0
-  url=$(dolt_remote_url "$origin")
-  [ -n "$url" ] || return 0
-  bd dolt remote add origin "$url" --allow-git-origin -q >/dev/null
-}
-
-if bd info -q >/dev/null 2>&1; then
-  sync_remote
-  finish 0
-fi
-
 # The git common dir is `<root>/.git` for a normal checkout and
 # `<root>/.bare` (or similar) for a bare-repo + sibling-worktrees layout.
 # Its parent is the repository root in both cases. The database is created
@@ -74,6 +58,33 @@ fi
 common=$(git rev-parse --git-common-dir)
 common=$(cd "$common" && pwd -P)
 root=$(dirname "$common")
+
+# Keep the Dolt remote in step with the git origin. bd refuses a Dolt remote
+# URL equal to the git origin; --allow-git-origin keeps a future bd that also
+# matches the git+ form from aborting.
+# `bd dolt remote add` git-commits `.beads/config.yaml` with
+# GIT_DIR=<root>/.git and GIT_WORK_TREE=<root>. From a worktree of a bare-root
+# layout that commits an otherwise empty tree onto the checked-out branch
+# (bd 1.3.4), so skip the call when nothing changes and run it from the root,
+# where bd does not commit in that layout.
+sync_remote() {
+  origin=$(git remote get-url origin 2>/dev/null || true)
+  [ -n "$origin" ] || return 0
+  url=$(dolt_remote_url "$origin")
+  [ -n "$url" ] || return 0
+  # `bd init` stores the raw git URL in sync.remote, so compare it too.
+  if [ "$(cd "$root" && bd config get sync.remote 2>/dev/null)" = "$url" ] &&
+    (cd "$root" && bd dolt remote list 2>/dev/null) |
+    awk -v u="$url" '$1 == "origin" && $2 == u { f = 1 } END { exit !f }'; then
+    return 0
+  fi
+  (cd "$root" && bd dolt remote add origin "$url" --allow-git-origin -q >/dev/null)
+}
+
+if bd info -q >/dev/null 2>&1; then
+  sync_remote
+  finish 0
+fi
 
 if [ -n "${BEADS_PREFIX:-}" ]; then
   prefix=$BEADS_PREFIX
@@ -99,9 +110,6 @@ else
   set --
 fi
 
-start=$(pwd)
-cd "$root"
-bd init -p "$prefix" "$@" --init-if-missing --skip-agents --skip-hooks --non-interactive -q
+(cd "$root" && bd init -p "$prefix" "$@" --init-if-missing --skip-agents --skip-hooks --non-interactive -q)
 sync_remote
-cd "$start" # hk-init.sh needs a worktree, and the root may be bare
 finish 0
